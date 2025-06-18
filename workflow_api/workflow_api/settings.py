@@ -53,11 +53,16 @@ INSTALLED_APPS = [
     # reference apps
     'task',
     'tickets',
+
+    # api apps
+    'amscheckout',
+    'bmscheckout',
     # dependencies
     'rest_framework',
     'rest_framework_simplejwt.token_blacklist',
     "corsheaders",
     'django_extensions',
+    'django_filters',
 
 ]
 

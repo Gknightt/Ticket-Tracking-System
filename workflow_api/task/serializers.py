@@ -1,13 +1,14 @@
 from rest_framework import serializers
 from .models import Task
 
+# task/serializers.py
+from rest_framework import serializers
+from task.models import Task
+from tickets.serializers import WorkflowTicketSerializer
+
 class TaskSerializer(serializers.ModelSerializer):
+    ticket = WorkflowTicketSerializer(source='ticket_id', read_only=True)  # ✅ display full ticket data
+
     class Meta:
         model = Task
-        fields = ['id', 'ticket_id', 'workflow_id', 'fetched_at']
-
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
-        data['ticket_id'] = instance.ticket_id.ticket_id if instance.ticket_id else None
-        data['workflow_id'] = instance.workflow_id.workflow_id if instance.workflow_id else None
-        return data
+        fields = ['task_id', 'workflow_id', 'ticket', 'fetched_at']  # customize as needed

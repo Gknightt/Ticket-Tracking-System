@@ -6,7 +6,7 @@ import uuid
 
 class Steps(models.Model):
     step_id = models.CharField(max_length=64, unique=True, null=True, blank=True)  # New UUID field
-    
+
     # foreign keys - now reference UUID fields
     workflow_id = models.ForeignKey('workflow.Workflows', on_delete=models.CASCADE, to_field='workflow_id')
     role_id = models.ForeignKey(Roles, on_delete=models.PROTECT, to_field='role_id')
@@ -14,6 +14,7 @@ class Steps(models.Model):
     # steps details
     name = models.CharField(max_length=64, unique=True)
     description = models.CharField(max_length=256, null=True)
+    instruction = models.TextField(null=True, blank=True)  # ✅ Added instruction field
     order = models.PositiveIntegerField(default=0)
 
     # flags
@@ -27,22 +28,22 @@ class Steps(models.Model):
         ordering = ['order']
 
     def __str__(self):
-        return f"{self.name} (Order: {self.order})"  # Fixed: was stepName, now name
+        return f"{self.name} (Order: {self.order})"
 
     def save(self, *args, **kwargs):
-        if not self.pk:  # Only enforce immutability on creation
+        if not self.pk:
             if not self.step_id:
-                self.step_id = str(uuid.uuid4())  # Assign a unique identifier if missing
+                self.step_id = str(uuid.uuid4())
         else:
             if 'step_id' in kwargs.get('update_fields', []):
-                raise ValidationError("step_id cannot be modified after creation.")  # Prevent updates
+                raise ValidationError("step_id cannot be modified after creation.")
 
-        super().save(*args, **kwargs)  # Save to database
+        super().save(*args, **kwargs)
 
     def get_workflow(self):
-        # Optional: only if you need to reference it somewhere dynamically
         from workflow.models import Workflows
         return Workflows.objects.first()
+
 
 
 class StepTransition(models.Model):

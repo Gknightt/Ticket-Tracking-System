@@ -3,10 +3,20 @@ from .models import StepInstance
 from step.models import StepTransition
 from action.models import Actions
 from action_log.models import ActionLog
+
+
+# step_instance/serializers.py
+from rest_framework import serializers
+from .models import StepInstance
+from task.serializers import TaskSerializer
+
 class StepInstanceSerializer(serializers.ModelSerializer):
+    task = TaskSerializer(source='task_id', read_only=True)  # ✅ include the task (with ticket)
+
     class Meta:
         model = StepInstance
-        fields = '__all__'
+        fields = ['step_instance_id', 'user_id', 'step_transition_id', 'task', 'has_acted']
+
 
 class NextStepInstanceSerializer(serializers.Serializer):
     action_id = serializers.CharField()

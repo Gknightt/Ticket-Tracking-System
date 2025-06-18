@@ -9,6 +9,13 @@ STATUS_CHOICES = [
     ("paused", "Paused"),
     ("initialized", "Initialized"),
 ]
+END_LOGIC_CHOICES = [
+    ('', 'None'),
+    ('asset', 'Asset Management'),
+    ('budget', 'Budget Management'),
+    ('notification', 'Send Notification'),
+]
+
 
 class Category(models.Model):
     category_id = models.CharField(max_length=64, unique=True, null=True, blank=True)
@@ -40,6 +47,14 @@ class Workflows(models.Model):
     name = models.CharField(max_length=64, unique=True)
     description = models.CharField(max_length=256, null=True)
     workflow_id = models.CharField(max_length=64, unique=True, null=True, blank=True)
+    
+    end_logic = models.CharField(
+        max_length=32,
+        choices=END_LOGIC_CHOICES,
+        blank=True,
+        default='asset',  # default to Asset Management
+        help_text="Optional end-condition to trigger when workflow completes."
+    )
 
     category = models.ForeignKey(
         Category,

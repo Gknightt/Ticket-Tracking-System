@@ -25,5 +25,9 @@ urlpatterns = [
     path('workflow/steps/', include('step.urls')),
     path('workflow/', include('tickets.urls')),
     path('workflow/tasks/', include('task.urls')),
-    path('workflow/instance/', include('step_instance.urls'))
+    path('workflow/instance/', include('step_instance.urls')),
+
+    path('workflow/action_log/', include('action_log.urls')),
+    path('', include('amscheckout.urls')),
+    path('', include('bmscheckout.urls')),
 ]
