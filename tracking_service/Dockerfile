@@ -7,7 +7,17 @@ FROM python:3.11-slim-bookworm
 # Set working directory
 WORKDIR /app
 
-# Copy and install dependencies
+ARG DJANGO_ALLOWED_HOSTS
+ENV DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS}
+
+# Install necessary dependencies
+RUN apk add --no-cache \
+    build-base \
+    libffi-dev \
+    postgresql-dev \
+    && pip install --no-cache-dir --upgrade pip
+
+# Copy application requirements and install
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
