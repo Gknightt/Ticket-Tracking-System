@@ -26,5 +26,8 @@ COPY . .
 # Expose port (optional, for local dev)
 EXPOSE 8000
 
-# Start Django using Gunicorn
-CMD ["gunicorn", "ticket_service.wsgi:application", "--bind", "0.0.0.0:8000"]
+# Command to run the Django server
+COPY start.sh .
+RUN chmod +x start.sh
+
+CMD ["sh", "start.sh"]
