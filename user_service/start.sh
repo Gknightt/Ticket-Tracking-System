@@ -1,4 +1,4 @@
+#!/bin/bash
 python manage.py migrate
-python manage.py runserver 0.0.0.0:3000 
-
+python manage.py collectstatic --noinput
 gunicorn user_service.wsgi:application --bind 0.0.0.0:8000
