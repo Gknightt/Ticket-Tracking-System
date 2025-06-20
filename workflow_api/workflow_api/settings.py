@@ -250,3 +250,10 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 
 USER_SERVICE_URL = "http://localhost:3000"
+
+# Base directory of the project
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Media files (uploaded by users or scripts)
+MEDIA_URL = '/media/'  # URL prefix to access media files
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')  # Actual filesystem path

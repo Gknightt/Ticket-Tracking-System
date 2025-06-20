@@ -9,6 +9,10 @@ from django.core.exceptions import ValidationError
 def receive_ticket(ticket_data):
     import traceback
     try:
+        # ✅ Map ticket_number to ticket_id
+        if 'ticket_number' in ticket_data:
+            ticket_data['ticket_id'] = ticket_data.pop('ticket_number')
+
         # ✅ Normalize sub_category -> subcategory
         if 'sub_category' in ticket_data:
             ticket_data['subcategory'] = ticket_data.pop('sub_category')

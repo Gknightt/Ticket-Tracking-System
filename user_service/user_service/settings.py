@@ -210,7 +210,7 @@ SIMPLE_JWT = {
     "SLIDING_TOKEN_REFRESH_SERIALIZER": "rest_framework_simplejwt.serializers.TokenRefreshSlidingSerializer",
 }
 
-CELERY_BROKER_URL = 'amqp://guest:guest@localhost:5672//'
+CELERY_BROKER_URL = 'amqp://GY6Jx5nsXW5edoIB:DGHuVF0tWCZgWnO~T51D._6viJWc7U_B@ballast.proxy.rlwy.net:48690//'
 CELERY_TASK_DEFAULT_QUEUE = 'role_send'
 CELERY_TASK_DEFAULT_DELIVERY_MODE = 'persistent'
 CELERY_TASK_ACKS_LATE = True
