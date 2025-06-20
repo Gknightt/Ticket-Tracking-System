@@ -9,6 +9,7 @@ class WorkflowTicket(models.Model):
     ]
 
     STATUS_CHOICES = [
+        ('New', 'New'),
         ('Open', 'Open'),
         ('In Progress', 'In Progress'),
         ('Resolved', 'Resolved'),
@@ -16,29 +17,43 @@ class WorkflowTicket(models.Model):
         ('On Hold', 'On Hold'),
     ]
 
-    # Original ticket fields
-    ticket_id = models.CharField(max_length=20)  # Not unique since it's a copy
+    # Ticket identity fields
+    ticket_id = models.CharField(max_length=20, blank=True, null=True)
+    original_ticket_id = models.CharField(max_length=20, db_index=True,  blank=True, null=True)  # ID from source service
+    source_service = models.CharField(max_length=50, default='ticket_service', db_index=True)
+
+    # Customer info
+    customer = models.JSONField(blank=True, null=True)  # Dict with id, name, company_id, etc.
+
+    # Ticket metadata
     subject = models.CharField(max_length=255)
-    customer = models.CharField(max_length=100)
-    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='Low')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Open')
-    opened_on = models.DateField()
-    sla = models.CharField(max_length=20)
-    description = models.TextField()
-    department = models.CharField(max_length=100)
-    position = models.CharField(max_length=100)
-    fetched_at = models.DateTimeField(null=True, blank=True)
     category = models.CharField(max_length=100, blank=True, null=True)
     subcategory = models.CharField(max_length=100, blank=True, null=True)
-    
-    # Workflow service specific fields
-    original_ticket_id = models.CharField(max_length=20)  # Reference to original ticket
-    source_service = models.CharField(max_length=50, default='ticket_service')
+    description = models.TextField(blank=True, null=True)
+    scheduled_date = models.DateField(blank=True, null=True)
+    submit_date = models.DateTimeField(blank=True, null=True)
+    update_date = models.DateTimeField(blank=True, null=True)
+    assigned_to = models.CharField(max_length=255, blank=True, null=True)
+
+    # Status tracking
+    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='Low', db_index=True,  blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='New', db_index=True,  blank=True, null=True)
+    department = models.CharField(max_length=100, db_index=True,  blank=True, null=True)
+
+    # Timing info
+    response_time = models.DurationField(blank=True, null=True)
+    resolution_time = models.DurationField(blank=True, null=True)
+    time_closed = models.DateTimeField(blank=True, null=True)
+    rejection_reason = models.TextField(blank=True, null=True)
+
+    # Attachments as JSON
+    attachments = models.JSONField(default=list, blank=True)
+
+    # Workflow-specific
+    is_task_allocated = models.BooleanField(default=False)
+    fetched_at = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
-    # flags
-    is_task_allocated = models.BooleanField(default=False)
 
     class Meta:
         indexes = [
@@ -51,13 +66,12 @@ class WorkflowTicket(models.Model):
         ]
 
     def save(self, *args, **kwargs):
-        first = self.pk is None
+        is_new = self.pk is None
         super().save(*args, **kwargs)
 
-        if not self.is_task_allocated:
+        if is_new and not self.is_task_allocated:
             from tickets.utils import allocate_task_for_ticket
             if allocate_task_for_ticket(self):
-                # flip flag without re-invoking save logic
                 WorkflowTicket.objects.filter(pk=self.pk).update(
                     is_task_allocated=True
                 )
