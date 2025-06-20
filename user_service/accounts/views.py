@@ -1,3 +1,4 @@
+import os    
 from rest_framework import generics
 from rest_framework.views import APIView
 from django.shortcuts import render
@@ -317,7 +318,11 @@ class InviteUserView(CreateAPIView):
 
         # FRONTEND URL (change this to your production domain when deployed)
         # frontend_base_url = "http://localhost:3000/api/authapi/register/${token}/"
-        frontend_base_url = "http://localhost:1000/register"
+        #import os
+
+        #frontend_base_url = os.environ.get("FRONTEND_BASE_URL")
+
+        frontend_base_url = "https://userservice-production-b465.up.railway.app/api/register"
         query_string = urlencode({'token': token})
         url = f"{frontend_base_url}?{query_string}"
 
