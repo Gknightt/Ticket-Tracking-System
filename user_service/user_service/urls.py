@@ -18,23 +18,24 @@ from django.contrib import admin
 from django.urls import path, include
 from rest_framework_simplejwt import views as jwt_views
 from accounts import views
-from django.conf import settings
-from django.conf.urls.static import static
+
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 
 urlpatterns = [
     # Django Admin default
     path('admin/', admin.site.urls),
 
     # this issues Access JWT token 
-    path('api/token',jwt_views.TokenObtainPairView.as_view(),name='token_obtain_pair'),
+    path('token',jwt_views.TokenObtainPairView.as_view(),name='token_obtain_pair'),
 
     # this issues refresh JWT token 
-    path('api/token/refresh/',jwt_views.TokenRefreshView.as_view(),name = 'token_refresh'),
+    path('token/refresh/',jwt_views.TokenRefreshView.as_view(),name = 'token_refresh'),
 
     # this route takes all from accounts/urls.py under the /api endpoint
-    path("api/", include("accounts.urls")),
-    path("api/auth", include("accounts.urls")),
-    path('api/role/', include("role.urls"))
+    path("", include("accounts.urls")),
+    path('role/', include("role.urls")),
+    
+    path('schema/', SpectacularAPIView.as_view(), name='schema'),  # raw schema (still useful)
+    path('docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),  # Swagger UI
+    path('redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),  # Redoc UI
 ]
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -15,24 +15,20 @@ from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
 
-# locate .env root
+# Base directory of the project
 BASE_DIR = Path(__file__).resolve().parent.parent
-# Ensure DJANGO_ALLOWED_HOSTS is read correctly
-allowed_hosts_env = os.getenv('DJANGO_ALLOWED_HOSTS')
-if allowed_hosts_env:
-    ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(',') if host.strip()]
-else:
-    ALLOWED_HOSTS = ['localhost']  # default fallback
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
+# Load environment variables
+LOCAL_ENV = BASE_DIR / '.env'
+load_dotenv(dotenv_path=LOCAL_ENV)
+
+# Security settings
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-$6412+n(t#!#4zo%akvxla5cub-u-i8!ulxck68_+97g_z066^')
+DEBUG = os.getenv('DJANGO_DEBUG', 'True') == 'True'
+ALLOWED_HOSTS = ['*'] if DEBUG else os.getenv('DJANGO_ALLOWED_HOSTS', '').split(',')
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-aqvze*zup3p1_dfz81d8nh-rq6-31)!1t2j9y7=d%!839=07l_'
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
 
 # Application definition
 
@@ -48,6 +44,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt.token_blacklist',
         "corsheaders",
+    'rest_framework_simplejwt',
+    'drf_spectacular',
 ]
 
 
@@ -74,7 +72,9 @@ REST_FRAMEWORK = {
  'DEFAULT_AUTHENTICATION_CLASSES': (
     'rest_framework_simplejwt.authentication.JWTAuthentication',
     'rest_framework.authentication.SessionAuthentication',
- )
+ ),
+ 'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+
 }
 
 MIDDLEWARE = [
@@ -213,3 +213,9 @@ CELERY_TASK_DEFAULT_DELIVERY_MODE = 'persistent'
 CELERY_TASK_ACKS_LATE = True
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'My API',
+    'DESCRIPTION': 'Awesome API docs',
+    'VERSION': '1.0.0',
+}
