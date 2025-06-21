@@ -17,8 +17,8 @@ class Command(BaseCommand):
             try:
                 role_map = {
                     'Requester': Roles.objects.get(name='Admin'),
-                    'Reviewer': Roles.objects.get(name='Manager'),
-                    'Approver': Roles.objects.get(name='Employee'),
+                    'Reviewer': Roles.objects.get(name='Asset Manager'),
+                    'Approver': Roles.objects.get(name='Budget Manager'),
                 }
             except Roles.DoesNotExist as e:
                 raise CommandError(f"Missing expected role: {e}")

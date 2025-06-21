@@ -4,7 +4,7 @@ from django.shortcuts import render
 from rest_framework.generics import GenericAPIView, RetrieveAPIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from .serializers import *
-from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
+from rest_framework_simplejwt.tokens import RefreshToken, AccessToken, TokenError
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from .serializers import VerifyLoginOTPSerializer
@@ -36,8 +36,6 @@ from django.core import signing
 
 
 User = get_user_model()
-
-
 
 class UserListView(generics.ListAPIView):
     queryset = CustomUser.objects.all()
@@ -187,21 +185,36 @@ class VerifyLoginOTPAPIView(GenericAPIView):
         return Response(data, status=200)
 
 
-class UserLogoutAPIView(GenericAPIView):
-    permission_classes = (IsAuthenticated,)
-    
-    def post(self, request, *args, **kwargs):
-        try:
-            refresh_token = request.data["refresh"]
-            token = RefreshToken(refresh_token)
-            token.blacklist()
-            return Response(status=status.HTTP_205_RESET_CONTENT)
-        except Exception as e:
-            return Response(status= status.HTTP_400_BAD_REQUEST)
+# class UserLogoutAPIView(GenericAPIView):    
+#     def post(self, request, *args, **kwargs):
+#         try:
+#             refresh_token = request.data["refresh"]
+#             token = RefreshToken(refresh_token)
+#             token.blacklist()
+#             return Response(status=status.HTTP_205_RESET_CONTENT)
+#         except Exception as e:
+#             return Response(status= status.HTTP_400_BAD_REQUEST)
 
     
-    def get_object(self):
-        return self.request.user
+#     def get_object(self):
+#         return self.request.user
+    
+
+class UserLogoutAPIView(APIView):
+    permission_classes = [AllowAny]  # No access token required
+
+    def post(self, request, *args, **kwargs):
+        refresh_token = request.data.get("refresh")
+
+        if not refresh_token:
+            return Response({"detail": "Refresh token required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            token = RefreshToken(refresh_token)
+            token.blacklist()  # Will raise TokenError if already blacklisted or invalid
+            return Response({"detail": "Successfully logged out."}, status=status.HTTP_205_RESET_CONTENT)
+        except TokenError as e:
+            return Response({"detail": "Invalid or already blacklisted refresh token."}, status=status.HTTP_400_BAD_REQUEST)
     
 class RequestPasswordResetAPIView(GenericAPIView):
     permission_classes = (AllowAny,)
@@ -421,3 +434,13 @@ class Me(APIView):
     def get(self, request):
         serializer = CustomUserSerializer(request.user)
         return Response(serializer.data)
+        
+
+class UserIDsByRoleView(APIView):
+    def get(self, request):
+        role_id = request.query_params.get('role_id')
+        if not role_id:
+            return Response({"error": "role_id parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        user_ids = CustomUser.objects.filter(role_id=role_id).values_list('id', flat=True)
+        return Response(list(user_ids), status=status.HTTP_200_OK)

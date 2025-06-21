@@ -11,6 +11,7 @@ auth_patterns = [
     path("logout/", UserLogoutAPIView.as_view(), name="logout-user"),
     path("me/", Me.as_view(), name="me"),
     path("change-password/", ChangePasswordAPIView.as_view(), name="change-password"),
+    path("verify/", Verify.as_view(), name="verify-user"),
 ]
 
 password_patterns = [
@@ -44,4 +45,5 @@ urlpatterns = [
     path("registration/", include(registration_patterns)),
     path("users/", include(user_patterns)),
     path("account/", include(bypass_patterns)),
+    path('round-robin', UserIDsByRoleView.as_view()),
 ]

@@ -12,7 +12,7 @@ const useUserTickets = () => {
   useEffect(() => {
     if (!authLoading && user?.id) {
       api
-        .get(`workflow/instance/list/?user_id=${user.id}`)
+        .get(`instance/list/?user_id=${user.id}`)
         .then((res) => {
           setTickets(res.data);
         })

@@ -22,11 +22,12 @@ def assign_user_to_step_instance(sender, instance, created, **kwargs):
         logger.info(f"Role ID: {role_id}")
 
         # 2. Fetch users assigned to this role from the user service
-        response = requests.get(f"{settings.USER_SERVICE_URL}/api/role/{role.id}")
+        response = requests.get(f"{settings.USER_SERVICE_URL}/round-robin?role_id={role.id}")
+        print(response)
         logger.info(f"User service responded with {response.status_code}")
 
         if response.status_code != 200:
-            logger.warning(f"Failed to fetch users for role {role_id}")
+            logger.warning(f"Failed to fetch users for role {role.name}")
             return
 
         users = response.json()
@@ -42,16 +43,16 @@ def assign_user_to_step_instance(sender, instance, created, **kwargs):
             defaults={"pointer": 0}
         )
         if created_pointer:
-            logger.info(f"Created new pointer for role {role_id}")
+            logger.info(f"Created new pointer for role {role.name}")
         else:
-            logger.info(f"Existing pointer found for role {role_id} at index {pointer.pointer}")
+            logger.info(f"Existing pointer found for role {role.name} at index {pointer.pointer}")
 
         index = pointer.pointer or 0
-        selected_user = users[index % len(users)]
-        logger.info(f"Selected user ID: {selected_user['id']} at index: {index}")
+        selected_user_id = users[index % len(users)]
+        logger.info(f"Selected user ID: {selected_user_id} at index: {index}")
 
         # 4. Assign user to the step instance and update pointer
-        instance.user_id = selected_user['id']
+        instance.user_id = selected_user_id
         instance.save(update_fields=["user_id"])
         logger.info(f"StepInstance {instance.step_instance_id} assigned to user {instance.user_id}")
 

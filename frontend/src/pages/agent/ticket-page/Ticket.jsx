@@ -15,11 +15,17 @@ import TicketTable from "../../../tables/agent/TicketTable";
 // axios
 import axios from "axios";
 import useUserTickets from "../../../api/useUserTickets";
+import { useAuth } from "../../../api/AuthContext";
 
 // api
 const ticketURL = import.meta.env.VITE_TICKET_API;
 
 export default function Ticket() {
+
+  const { user } = useAuth();
+  const { ticket } = useUserTickets
+
+
   // for tab
   const {tickets} = useUserTickets();
   console.log(tickets);

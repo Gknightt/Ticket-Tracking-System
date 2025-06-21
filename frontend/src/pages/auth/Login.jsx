@@ -1,8 +1,14 @@
 import { useLogin } from "../../api/useLogin";
+import React, { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
 import styles from "./login.module.css";
 
+const verifyURL = import.meta.env.VITE_VERIFY_API;
 
 function Login() {
+  const navigate = useNavigate();
+
   const {
     email,
     setEmail,
@@ -17,13 +23,44 @@ function Login() {
     handleBackToLogin,
   } = useLogin();
 
+  useEffect(() => {
+    const checkIfLoggedIn = async () => {
+      const accessToken = localStorage.getItem("accessToken");
+      if (!accessToken) return;
+
+      try {
+        const res = await axios.get(verifyURL, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+
+        if (res.data.is_staff) {
+          navigate("/admin");
+        } else {
+          navigate("/agent/dashboard");
+        }
+      } catch (err) {
+        console.error(
+          "JWT invalid or expired:",
+          err.response?.data || err.message
+        );
+        // Clear localStorage if token is invalid
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+      }
+    };
+
+    checkIfLoggedIn();
+  }, [navigate]);
+
   return (
     <main className={styles.loginPage}>
       <section className={styles.leftPanel}>
         <div className={styles.leftImage}>
           <img
             src="./tts_bg.jpeg"
-            alt="login-illustration"
+            alt="Login illustration"
             className={styles.assetImage}
           />
         </div>
@@ -32,7 +69,7 @@ function Login() {
       <section className={styles.rightPanel}>
         <header className={styles.formHeader}>
           <section className={styles.logo}>
-            <img src="./map-logo.png" alt="logo" />
+            <img src="./map-logo.png" alt="TicketFlow logo" />
             <h1 className={styles.logoText}>TicketFlow</h1>
           </section>
           <p>Welcome! Please provide your credentials to log in.</p>
@@ -41,28 +78,32 @@ function Login() {
         {!showOTP ? (
           <form className={styles.lpForm} onSubmit={handleLogin}>
             <fieldset>
-              <label>Email:</label>
+              <label htmlFor="email">Email:</label>
               <input
                 type="text"
+                id="email"
                 name="email"
                 placeholder="Enter your email"
                 className={styles.input}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                aria-label="Email"
               />
             </fieldset>
 
             <fieldset>
-              <label>Password:</label>
+              <label htmlFor="password">Password:</label>
               <input
                 type="password"
+                id="password"
                 name="password"
                 placeholder="Enter your password"
                 className={styles.input}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                aria-label="Password"
               />
             </fieldset>
 
@@ -75,9 +116,10 @@ function Login() {
         ) : (
           <form className={styles.lpForm} onSubmit={handleOTPSubmit}>
             <fieldset>
-              <label>Enter OTP:</label>
+              <label htmlFor="otp">Enter OTP:</label>
               <input
                 type="text"
+                id="otp"
                 name="otp"
                 placeholder="Enter the 6-digit OTP"
                 className={styles.input}
@@ -85,6 +127,7 @@ function Login() {
                 onChange={(e) => setOtp(e.target.value)}
                 maxLength={6}
                 required
+                aria-label="OTP"
               />
               <small style={{ color: "#666", fontSize: "12px" }}>
                 OTP sent to {email}

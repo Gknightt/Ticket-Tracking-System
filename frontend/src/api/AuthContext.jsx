@@ -16,7 +16,7 @@ export const AuthProvider = ({ children }) => {
       return;
     }
 
-    axios.get(`${Verify}api/me/`, {
+    axios.get(`${Verify}auth/me/`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },

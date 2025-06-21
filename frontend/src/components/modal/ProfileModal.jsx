@@ -1,12 +1,13 @@
 // style
+import { useLogout } from "../../api/Authentication/useLogout";
 import styles from "./profile-modal.module.css";
 
 // react
 import { useNavigate } from "react-router-dom";
-
 export default function ProfileModal({ closeProfileAction }) {
   // navigate
   const navigate = useNavigate();
+  const { logout } = useLogout();
   return (
     <div
       className={styles.pmOverlayWrapper}
@@ -35,7 +36,13 @@ export default function ProfileModal({ closeProfileAction }) {
             Account Settings
           </button>
           {/* <button onClick={() => navigate("/settings")}>Settings</button> */}
-          <button className={styles.pmButtonLogOut}>Log Out</button>
+          <button 
+            className={styles.pmButtonLogOut}
+            onClick={() => {
+              closeProfileAction(false); // close modal first
+              logout(); // perform logout
+            }}
+          >Log Out</button>
         </div>
       </div>
     </div>
