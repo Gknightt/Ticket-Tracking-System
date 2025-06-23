@@ -11,7 +11,7 @@ import useUpdateStepTransition from '../../../api/useUpdateStepTransition';
 import NewWorkflowVisualizer from "../../../components/workflow/NewWorkflowVisualizer";
 
 const WorkflowEditor = () => {
-    const { uuid } = useParams(); // Get workflow UUID from route
+  const { uuid } = useParams(); // Get workflow UUID from route
   const { role } = getRoles();
   const { createStep } = useCreateStep();
   const { createTransition } = useCreateTransition();
@@ -259,8 +259,39 @@ const handleUpdateTransition = () => {
           <h2 className={styles.sectionTitle}>Workflow Steps</h2>
           
           <div className={styles.stepsList}>
+
+            <div className={styles.addStepForm}>
+        <h3 className={styles.formTitle}>Add New Step</h3>
+        <div className={styles.formFields}>
+          <input
+            type="text"
+            placeholder="Step name"
+            value={StepformData.name}
+            onChange={(e) => setStepFormData({...StepformData, name: e.target.value})}
+            className={styles.input}
+          />
+          <select
+            value={StepformData.role_id}
+            onChange={(e) => setStepFormData({...StepformData, role_id: e.target.value})}
+            className={styles.select}
+          >
+            <option value="">Select Role</option>
+            {role.map(r => (
+              <option key={r.role_id} value={r.role_id}>{r.name}</option>
+            ))}
+          </select>
+          <button 
+            onClick={handleCreateStep}
+            className={styles.addButton}
+          >
+            Add Step
+          </button>
+        </div>
+            </div>
+
             {steps.map(step => (
               <div key={step.step_id} className={styles.stepCard}>
+                
                 <div className={styles.stepHeader}>
                   <div>
                     <h3 className={styles.stepTitle}>{step.order}. {step.name}</h3>
@@ -282,7 +313,7 @@ const handleUpdateTransition = () => {
                   </div>
                 </div>
                 
-                {/* Show transitions for this step */}
+
                 <div className={styles.transitionsList}>
                   {transitions.filter(t => t.from_step_id === step.step_id).map((transition) => (
                     <div key={transition.transition_id} className={styles.transitionItem}>
@@ -290,46 +321,19 @@ const handleUpdateTransition = () => {
                     </div>
                   ))}
                 </div>
+
+
               </div>
             ))}
-          </div>
-
-          {/* Add Step Form */}
-          <div className={styles.addStepForm}>
-            <h3 className={styles.formTitle}>Add New Step</h3>
-            <div className={styles.formFields}>
-              <input
-                type="text"
-                placeholder="Step name"
-                value={StepformData.name}
-                onChange={(e) => setStepFormData({...StepformData, name: e.target.value})}
-                className={styles.input}
-              />
-              <select
-                value={StepformData.role_id}
-                onChange={(e) => setStepFormData({...StepformData, role_id: e.target.value})}
-                className={styles.select}
-              >
-                <option value="">Select Role</option>
-                {role.map(r => (
-                  <option key={r.role_id} value={r.role_id}>{r.name}</option>
-                ))}
-              </select>
-              <button 
-                onClick={handleCreateStep}
-                className={styles.addButton}
-              >
-                Add Step
-              </button>
-            </div>
           </div>
         </div>
 
         {/* RIGHT PANEL - Workflow Flow */}
+
+        
         <div className={styles.section}>
           <h2 className={styles.sectionTitle}>Workflow Flow</h2>
           
-          {/* Existing transitions */}
           <div className={styles.transitionsSection}>
             {transitions.map((transition) => (
               <div key={transition.transition_id} className={styles.transitionCard}>
@@ -363,7 +367,6 @@ const handleUpdateTransition = () => {
             ))}
           </div>
 
-          {/* Add Transition Form */}
           <div className={styles.addTransitionForm}>
             <h3 className={styles.formTitle}>Add New Flow</h3>
             <div className={styles.formFields}>
@@ -374,10 +377,6 @@ const handleUpdateTransition = () => {
                 onChange={(e) => setNewTransition({ ...newTransition, from: e.target.value || null })}
                 className={styles.select}
               >
-                {/* Default "Start" option */}
-                <option value="">Start</option>
-
-                {/* Dynamic step options */}
                 {steps.map((step) => (
                   <option key={step.step_id} value={step.step_id}>
                     {step.description}
@@ -434,6 +433,9 @@ const handleUpdateTransition = () => {
         </div>
       </div>
 
+
+      {/* Modals */}
+      
       {/* Edit Step Modal */}
       {editStepModal.isOpen && (
         <div className={styles.modalOverlay}>

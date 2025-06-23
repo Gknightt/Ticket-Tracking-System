@@ -27,7 +27,7 @@ export function useLogin() {
         localStorage.setItem("accessToken", response.data.tokens.access);
         localStorage.setItem("refreshToken", response.data.tokens.refresh);
         if (response.data.is_staff) {
-          navigate("/admin");
+          navigate("/admin/dashboard");
         } else {
           navigate("/agent/dashboard");
         }

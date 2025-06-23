@@ -67,6 +67,7 @@ class WorkflowGraphView(APIView):
 
         edges = [
             {
+                "position": tr.transition_id,
                 "from": tr.from_step_id.step_id if tr.from_step_id else None,
                 "to": tr.to_step_id.step_id if tr.to_step_id else None,
                 "action": tr.action_id.name if tr.action_id else ""

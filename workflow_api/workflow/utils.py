@@ -100,6 +100,6 @@ def compute_workflow_status(workflow_id):
         workflow.status = new_status
         workflow.save(update_fields=["status"])
 
-        if new_status == "initialized":
-            send_to_consumer.delay(workflow.workflow_id)  # Trigger Celery task
-            # send_hello()
+        # if new_status == "initialized":
+        #     send_to_consumer.delay(workflow.workflow_id)  # Trigger Celery task
+        #     # send_hello()
