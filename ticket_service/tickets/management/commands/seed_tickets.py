@@ -11,8 +11,8 @@ from tickets.models import Ticket
 import mimetypes
 
 # Constants
-PRIORITIES = ['Low', 'Medium', 'High', 'Urgent']
-STATUSES = ['New', 'Open', 'In Progress', 'Resolved', 'Closed', 'On Hold']
+PRIORITIES = ['Low', 'Medium', 'High', 'Critical']
+STATUSES = ['Open']
 
 CATEGORIES = ['General Inquiry', 'Technical Issue', 'Billing']
 SUBCATEGORIES = ['Software', 'Hardware', 'Payment']

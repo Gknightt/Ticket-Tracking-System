@@ -1,20 +1,22 @@
 from django.db import models
 
 class WorkflowTicket(models.Model):
-    PRIORITY_CHOICES = [
-        ('Low', 'Low'),
-        ('Medium', 'Medium'),
+    PRIORITY_LEVELS = [
+        ('Critical', 'Critical'),
         ('High', 'High'),
-        ('Urgent', 'Urgent'),
+        ('Medium', 'Medium'),
+        ('Low', 'Low'),
     ]
 
     STATUS_CHOICES = [
         ('New', 'New'),
         ('Open', 'Open'),
-        ('In Progress', 'In Progress'),
-        ('Resolved', 'Resolved'),
-        ('Closed', 'Closed'),
+        ('On Process', 'On Process'),
         ('On Hold', 'On Hold'),
+        ('Pending', 'Pending'),
+        ('Resolved', 'Resolved'),
+        ('Rejected', 'Rejected'),
+        ('Closed', 'Closed'),
     ]
 
     # Ticket identity fields
@@ -36,7 +38,7 @@ class WorkflowTicket(models.Model):
     assigned_to = models.CharField(max_length=255, blank=True, null=True)
 
     # Status tracking
-    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='Low', db_index=True,  blank=True, null=True)
+    priority = models.CharField(max_length=10, choices=PRIORITY_LEVELS, default='Low', db_index=True,  blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='New', db_index=True,  blank=True, null=True)
     department = models.CharField(max_length=100, db_index=True,  blank=True, null=True)
 

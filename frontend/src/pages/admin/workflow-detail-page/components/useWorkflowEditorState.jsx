@@ -8,12 +8,14 @@ import useUpdateStepTransition from '../../../../api/useUpdateStepTransition';
 import { useWorkflowRefresh } from '../../../../components/workflow/WorkflowRefreshContext';
 
 export default function useWorkflowEditorState(uuid) {
+  // Hooks and API
   const { role } = getRoles();
   const { createStep } = useCreateStep();
   const { createTransition } = useCreateTransition();
-  const { updateStep } = useStepUpdater();
-  const { updateTransition } = useUpdateStepTransition();
+  const { updateStep, deleteStep } = useStepUpdater();
+  const { updateTransition, deleteTransition } = useUpdateStepTransition();
   const { triggerRefresh } = useWorkflowRefresh();
+
 
   const {
     workflow,
@@ -25,9 +27,11 @@ export default function useWorkflowEditorState(uuid) {
     removeTransition,
     getRoleName,
     getActionName,
-    getStepName,
+    getStepNameTo,
+    getStepNameFrom,
   } = useWorkflow(uuid);
 
+  // State
   const [steps, setSteps] = useState([]);
   const [transitions, setTransitions] = useState([]);
   const [previousTransition, setPreviousTransition] = useState(null);
@@ -50,6 +54,7 @@ export default function useWorkflowEditorState(uuid) {
   const [editStepModal, setEditStepModal] = useState({ isOpen: false, step: null });
   const [editTransitionModal, setEditTransitionModal] = useState({ isOpen: false, transition: null });
 
+  // Effects
   useEffect(() => {
     setSteps(fetchedSteps);
   }, [fetchedSteps]);
@@ -58,6 +63,7 @@ export default function useWorkflowEditorState(uuid) {
     setTransitions(fetchedTransitions);
   }, [fetchedTransitions]);
 
+  // --- Step Logic ---
   const handleCreateStep = async () => {
     if (!StepformData.name || !StepformData.role_id || !workflow?.workflow_id) return;
     const payload = {
@@ -79,25 +85,6 @@ export default function useWorkflowEditorState(uuid) {
     });
   };
 
-  const handleCreateTransition = async () => {
-    if (!newTransition.from || !newTransition.actionName || !workflow?.workflow_id) return;
-    const payload = {
-      workflow_id: workflow.workflow_id,
-      from_step_id: newTransition.from,
-      to_step_id: newTransition.to || null,
-      action: {
-        name: newTransition.actionName,
-        description: newTransition.actionDescription || '',
-      },
-    };
-    const created = await createTransition(payload);
-    if (created?.transition_id) {
-      setTransitions((prev) => [...prev, created]);
-      triggerRefresh();
-    }
-    setNewTransition({ from: '', to: '', actionName: '', actionDescription: '' });
-  };
-
   const handleUpdateStep = async () => {
     const step = editStepModal.step;
     if (!step?.step_id || !step.name || !step.role_id) return;
@@ -117,19 +104,42 @@ export default function useWorkflowEditorState(uuid) {
     }
   };
 
+  const handleDeleteStep = async (stepId) => {
+    const confirmed = window.confirm("Are you sure you want to delete this step?");
+    if (!confirmed) return;
+
+    const success = await deleteStep(stepId);
+    if (success) {
+      setSteps((prev) => prev.filter((s) => s.step_id !== stepId));
+      triggerRefresh();
+    }
+  };
+
   const handleEditStep = (step) => {
     setEditStepModal({ isOpen: true, step: { ...step } });
   };
 
-  const handleEditTransition = (transition) => {
-    setPreviousTransition({ ...transition }); // ← Save original before editing
-    setEditTransitionModal({
-      isOpen: true,
-      transition: {
-        ...transition,
-        action_name: getActionName(transition.action_id) || '',
+  // --- Transition Logic ---
+  const handleCreateTransition = async () => {
+    if (!newTransition.from || !newTransition.actionName || !workflow?.workflow_id) return;
+
+    const payload = {
+      workflow_id: workflow.workflow_id,
+      from_step_id: newTransition.from,
+      to_step_id: newTransition.to || null,
+      action: {
+        name: newTransition.actionName,
+        description: newTransition.actionDescription || '',
       },
-    });
+    };
+
+    const created = await createTransition(payload);
+    if (created?.transition_id) {
+      setTransitions((prev) => [...prev, created]);
+      triggerRefresh();
+    }
+
+    setNewTransition({ from: '', to: '', actionName: '', actionDescription: '' });
   };
 
   const handleUpdateTransition = async () => {
@@ -152,6 +162,29 @@ export default function useWorkflowEditorState(uuid) {
     setEditTransitionModal({ isOpen: false, transition: null });
   };
 
+  const handleDeleteTransition = async (transitionId) => {
+    const confirmed = window.confirm("Are you sure you want to delete this transition?");
+    if (!confirmed) return;
+  
+    const success = await deleteTransition(transitionId);
+    if (success) {
+      setTransitions((prev) => prev.filter((t) => t.transition_id !== transitionId));
+      triggerRefresh();
+    }
+  };
+
+
+  const handleEditTransition = (transition) => {
+    setPreviousTransition({ ...transition });
+    setEditTransitionModal({
+      isOpen: true,
+      transition: {
+        ...transition,
+        action_name: getActionName(transition.action_id) || '',
+      },
+    });
+  };
+
   const handleUndoTransition = async () => {
     if (!previousTransition) return;
 
@@ -169,11 +202,12 @@ export default function useWorkflowEditorState(uuid) {
         prev.map((tr) => (tr.transition_id === reverted.transition_id ? reverted : tr))
       );
       triggerRefresh();
-      setPreviousTransition(null); // clear undo
+      setPreviousTransition(null);
       setEditTransitionModal({ isOpen: false, transition: null });
     }
   };
 
+  // --- Return ---
   return {
     uuid,
     workflow,
@@ -187,21 +221,25 @@ export default function useWorkflowEditorState(uuid) {
     newTransition,
     setNewTransition,
     handleCreateStep,
+    handleUpdateStep,
+    handleDeleteStep,
+    handleEditStep,
     handleCreateTransition,
     handleUpdateTransition,
-    getRoleName,
-    getActionName,
-    getStepName,
-    removeStep,
-    removeTransition,
+    handleEditTransition,
+    handleUndoTransition,
     editStepModal,
     setEditStepModal,
     editTransitionModal,
     setEditTransitionModal,
-    handleUpdateStep,
-    handleEditStep,
-    handleEditTransition,
-    handleUndoTransition,
-    previousTransition, // expose if you want to enable/disable Undo button
+    getRoleName,
+    getActionName,
+    getStepNameTo,
+    getStepNameFrom,
+    removeStep,
+    removeTransition,
+    previousTransition,
+
+    handleDeleteTransition,
   };
 }

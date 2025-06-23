@@ -4,32 +4,37 @@ import general from '../../../style/general.module.css';
 
 // component
 import AgentNav from "../../../components/navigation/AgentNav";
-import ProgressTracker from "../../../components/component/ProgressTracker";
+import WorkflowTracker2 from "../../../components/ticket/WorkflowVisualizer2";
+import WorkflowVisualizer from "../../../components/ticket/WorkflowVisualizer";
+import DocumentViewer from "../../../components/ticket/DocumentViewer";
+// react
 
 // react
 import { useNavigate } from "react-router-dom";
 import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
-import axios from "axios";
+
+
+// hooks
+import useFetchActionLogs from "../../../api/workflow-graph/useActionLogs";
+import ActionLogList from "../../../components/ticket/ActionLogList";
+import { useWorkflowProgress } from "../../../api/workflow-graph/useWorkflowProgress";
 
 // modal
 import TicketAction from "./modals/TicketAction";
 import useUserTickets from "../../../api/useUserTickets";
-
-
-// Your API URL
-const ticketURL = import.meta.env.VITE_TICKET_API;
 
 export default function AdminTicketDetail() {
 
   const navigate = useNavigate();
   const { id } = useParams(); // ticket_id from URL
   const { userTickets } = useUserTickets();
-
   // States
   const [ticket, setTicket] = useState(null);
   const [action, setAction] = useState([]);
   const [instance, setInstance] = useState([]);
+  const [taskid, setTaskid] = useState();
+  const [instruction, setInstruction] = useState();
   const [stepInstance, setStepInstance] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -45,7 +50,7 @@ export default function AdminTicketDetail() {
 
     // 1️⃣ Filter step instance by ticket_id
     const matchedInstance = userTickets.find(
-      (instance) => instance.task?.ticket?.ticket_id === id
+      (instance) => instance.step_instance_id === id
     );
 
     if (!matchedInstance) {
@@ -57,17 +62,29 @@ export default function AdminTicketDetail() {
       setTicket(matchedInstance.task.ticket);
       setInstance(matchedInstance.step_instance_id)
       setAction(matchedInstance.available_actions || []);
-      setStepInstance(matchedInstance);
+      setTaskid(matchedInstance.task.task_id); // ✅ FIXED: set actual task_id
+      setInstruction(matchedInstance.step.instruction); // ✅ FIXED: set actual task_id
       setError("");
     }
-
     setLoading(false);
   }, [userTickets, id]);
+  const { fetchActionLogs, logs } = useFetchActionLogs();
+  useEffect(() => {
+    if (taskid) {
+      fetchActionLogs(taskid);
+    }
+  }, [taskid]);
+
+  const { tracker } = useWorkflowProgress(taskid);
+  console.log('tracker',tracker)
+
+  console.log('loglog', logs)
+
 
   if (error) {
     return (
       <>
-        <AgentNav />
+        <AdminNav />
         <main className={styles.ticketDetailPage}>
           <section className={styles.tdpHeader}>
             <div className={styles.tdBack} onClick={() => navigate(-1)}>
@@ -84,7 +101,7 @@ export default function AdminTicketDetail() {
       </>
     );
   }
-  
+  console.log('aaticket',ticket?.attachments)
 
   return (
     <>
@@ -94,8 +111,14 @@ export default function AdminTicketDetail() {
           <div className={styles.tdBack} onClick={() => navigate(-1)}>
             <i className="fa fa-chevron-left"></i>
           </div>
+          <div>
+            <h2>Workflow Visualization</h2>
+          </div>
           <h1>Ticket Detail</h1>
         </section>
+        <div className="max-w-4xl mx-auto mt-10">
+          <h1 className="text-xl font-semibold mb-4">Document Preview</h1>
+        </div>
         <section className={styles.tdpBody}>
           <div className={styles.tdpWrapper}>
             <div className={styles.tdpLeftCont}>
@@ -115,10 +138,10 @@ export default function AdminTicketDetail() {
                 </p>
                 <div className={styles.tdMetaData}>
                   <p className={styles.tdDateOpened}>
-                    Opened On: {ticket?.opened_on}
+                    Opened On: {new Date(ticket?.created_at).toLocaleString()}
                   </p>
                   <p className={styles.tdDateResolution}>
-                    Expected Resolution:
+                    Expected Resolution: {new Date(ticket?.created_at).toLocaleString()}
                   </p>
                 </div>
               </div>
@@ -132,10 +155,7 @@ export default function AdminTicketDetail() {
                   <h3>Instructions</h3>
                 </div>
                 <p>
-                  Lorem ipsum, dolor sit amet consectetur adipisicing elit. Quae
-                  modi ex voluptates ratione obcaecati reiciendis magnam,
-                  consectetur sint nesciunt. Id ab unde cumque suscipit enim
-                  fugiat! Mollitia id corporis tempora?
+                  {instruction}
                 </p>
               </div>
               <div className={styles.tdAttachment}>
@@ -143,6 +163,7 @@ export default function AdminTicketDetail() {
                 <div className={styles.tdAttached}>
                   <i className="fa fa-upload"></i>
                   <span className={styles.placeholderText}>
+                  <DocumentViewer attachments={ticket?.attachments} />;
                     No file attached
                   </span>
                   <input
@@ -168,7 +189,7 @@ export default function AdminTicketDetail() {
                 <div className={styles.tdStatusLabel}>Status</div>
                 <div>{ticket?.status}</div>
               </div>
-              <ProgressTracker currentStatus={ticket?.status} />
+              <WorkflowTracker2 workflowData={tracker} />
               <div className={styles.tdInfoWrapper}>
                 <div className={styles.tdInfoHeader}>
                   <h3>Details</h3>
@@ -187,23 +208,38 @@ export default function AdminTicketDetail() {
                   <div className={styles.tdInfoItem}>
                     <div className={styles.tdInfoLabelValue}>
                       <div className={styles.tdInfoLabel}>Ticket Owner</div>
+                      {`${ticket?.employee.first_name} ${ticket?.employee.last_name}`}
                       <div className={styles.tdInfoValue}></div>
                     </div>
                     <div className={styles.tdInfoLabelValue}>
                       <div className={styles.tdInfoLabel}>Department</div>
+                      {`${ticket?.employee.department}`}
                       <div className={styles.tdInfoValue}></div>
                     </div>
-                    <div className={styles.tdInfoLabelValue}>
+
+
+
+                    {/* <div className={styles.tdInfoLabelValue}>
                       <div className={styles.tdInfoLabel}>Position</div>
                       <div className={styles.tdInfoValue}></div>
                     </div>
                     <div className={styles.tdInfoLabelValue}>
                       <div className={styles.tdInfoLabel}>SLA</div>
                       <div className={styles.tdInfoValue}></div>
-                    </div>
+                    </div> */}
                   </div>
                 )}
               </div>
+              <div className="action-logs">
+
+
+
+              <h3>Action Logs</h3>
+              <ActionLogList logs={logs} loading={loading} error={error} />
+
+
+
+            </div>
             </div>
           </div>
         </section>

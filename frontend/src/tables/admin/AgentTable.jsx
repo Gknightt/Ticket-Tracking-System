@@ -6,19 +6,11 @@ import { SearchBar } from "../../components/component/General";
 import Pagination from "../../components/component/Pagination";
 
 // react
-import { useNavigate } from "react-router-dom";
 import { useState } from "react";
+import ActivateAgent from "../../pages/admin/agent-page/modals/ActivateAgent";
 
 // headers for the agent
-const agentHeaders = [
-  "",
-  "NAME",
-  "EMAIL",
-  "ROLE",
-  "STATUS",
-  "LAST LOGIN",
-  "ACTION",
-];
+const agentHeaders = ["", "NAME", "EMAIL", "ROLE", "STATUS", "ACTION"];
 
 function AgentHeader() {
   return (
@@ -30,25 +22,26 @@ function AgentHeader() {
   );
 }
 
-function AgentItem({ item }) {
-  const navigate = useNavigate();
+function AgentItem({ item, onActivateClick }) {
   return (
     <tr className={general.item}>
       <td>
         <div className={general.img}>
-          <img src={item.ImageURL} alt="" />
+          <img
+            src={
+              item.profile_picture ||
+              "https://img.freepik.com/premium-vector/stylish-default-user-profile-photo-avatar-vector-illustration_664995-353.jpg"
+            }
+            alt="Agent"
+          />
         </div>
       </td>
-      <td>{item.Name}</td>
-      <td>{item.Email}</td>
-      <td>{item.Role}</td>
-      <td>{item.Status}</td>
-      <td>{item.LastLogin}</td>
+      <td>{`${item.first_name} ${item.middle_name} ${item.last_name}`}</td>
+      <td>{item.email}</td>
+      <td>{item.role}</td>
+      <td>{item.is_active ? "🟢 Active" : "🔴 Inactive"}</td>
       <td>
-        <button
-          className={general.btn}
-          onClick={() => navigate(`/agent/ticket/${item.id}`)}
-        >
+        <button className={general.btn} onClick={() => onActivateClick(item)}>
           👁
         </button>
       </td>
@@ -62,32 +55,57 @@ export default function AgentTable({
   onSearchChange,
   activeTab,
   onInviteAgent,
+  fetchUsers, // passed from parent
 }) {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
 
+  // Modal state
+  const [openActivateAgent, setOpenActivateAgent] = useState(false);
+  const [selectedAgent, setSelectedAgent] = useState(null);
+
   const startIndex = (currentPage - 1) * pageSize;
   const endIndex = startIndex + pageSize;
-  const paginatedTickets = agents.slice(startIndex, endIndex);
+  const paginatedAgents = agents.slice(startIndex, endIndex);
+
+  const handleActivateClick = (agent) => {
+    setSelectedAgent(agent);
+    setOpenActivateAgent(true);
+  };
+
+  const handleCloseModal = () => {
+    setOpenActivateAgent(false);
+    setSelectedAgent(null);
+    fetchUsers(); // refresh agents list after modal closes
+  };
 
   return (
     <div className={general.ticketTableSection}>
       <div className={general.tableHeader}>
-        <h2>{activeTab} ({agents.length})</h2>
+        <h2>
+          {activeTab} ({agents.length})
+        </h2>
         <div className={general.tableActions}>
           <SearchBar value={searchValue} onChange={onSearchChange} />
-          <button className={general.addButton} onClick={onInviteAgent}>Invite Agent</button>
+          <button className={general.addButton} onClick={onInviteAgent}>
+            Invite Agent
+          </button>
         </div>
       </div>
+
       <table className={general.ticketTable}>
         <thead>
           <AgentHeader />
         </thead>
         <tbody>
           {agents.length > 0 ? (
-            paginatedTickets.map((agent) => (
-              <AgentItem key={agent.ID} item={agent} />
+            paginatedAgents.map((agent) => (
+              <AgentItem
+                key={agent.id}
+                item={agent}
+                onActivateClick={handleActivateClick}
+              />
             ))
           ) : (
             <tr>
@@ -98,6 +116,7 @@ export default function AgentTable({
           )}
         </tbody>
       </table>
+
       <div className={general.ttPagination}>
         <Pagination
           currentPage={currentPage}
@@ -107,6 +126,13 @@ export default function AgentTable({
           onPageSizeChange={setPageSize}
         />
       </div>
+
+      {openActivateAgent && selectedAgent && (
+        <ActivateAgent
+          agent={selectedAgent}
+          closeActivateAgent={handleCloseModal}
+        />
+      )}
     </div>
   );
 }

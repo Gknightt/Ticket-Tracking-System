@@ -79,10 +79,16 @@ export default function useWorkflow(workflowId) {
   const removeTransition = (id) => {
     setTransitions((prev) => prev.filter(t => t.transition_id !== id));
   };
-
+  
   const getRoleName = (id) => roles.find(r => r.role_id === id)?.name || id;
   const getActionName = (id) => actions.find(a => a.action_id === id)?.name || id;
-  const getStepName = (id) => {
+  const getStepNameTo = (id) => {
+    console.log('id', id)
+    if (!id) return 'Start';
+    return steps.find(s => s.step_id === id)?.description || 'Unknown';
+  };
+  const getStepNameFrom = (id) => {
+    console.log('id', id)
     if (!id) return 'End';
     return steps.find(s => s.step_id === id)?.description || 'Unknown';
   };
@@ -101,7 +107,8 @@ export default function useWorkflow(workflowId) {
     removeTransition,
     getRoleName,
     getActionName,
-    getStepName,
+    getStepNameTo,
+    getStepNameFrom,
     refetch: fetchWorkflowData, // ✅ expose refetch
   };
 }

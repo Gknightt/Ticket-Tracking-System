@@ -1,28 +1,29 @@
 .container {
-  max-width: 700px;
-  margin: 1rem auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
   padding: 1rem;
 }
 
 .card {
-  display: flex;
-  align-items: center;
-  background: #f8f8f8;
+  background: #f9f9f9;
+  border-radius: 8px;
   padding: 1rem;
-  margin-bottom: 0.5rem;
-  border-radius: 10px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
   cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  width: 200px;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
   transition: transform 0.2s ease;
 }
 
 .card:hover {
-  transform: scale(1.01);
+  transform: scale(1.03);
 }
 
 .icon {
   font-size: 2rem;
-  margin-right: 1rem;
 }
 
 .info {
@@ -32,31 +33,58 @@
 
 .filename {
   font-weight: bold;
-  color: #333;
 }
 
 .meta {
+  color: #555;
   font-size: 0.875rem;
-  color: #777;
 }
 
-.viewer {
-  margin-top: 2rem;
-  border: 1px solid #ccc;
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modalContent {
+  background: #fff;
+  padding: 1rem;
+  width: 90%;
+  max-width: 900px;
+  max-height: 90vh;
+  overflow-y: auto;
   border-radius: 8px;
-  overflow: hidden;
+  position: relative;
 }
 
 .viewerHeader {
-  background: #eee;
-  padding: 0.5rem 1rem;
-  font-weight: bold;
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  margin-bottom: 1rem;
 }
 
-.viewerFilename {
-  font-size: 0.875rem;
-  color: #444;
+.backBtn,
+.downloadBtn {
+  padding: 0.5rem 1rem;
+  background: #007bff;
+  border: none;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.pdfViewer {
+  height: 80vh;
+}
+
+.docxContent {
+  padding: 1rem;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #333;
 }

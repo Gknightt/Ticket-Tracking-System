@@ -23,6 +23,7 @@ password_patterns = [
 registration_patterns = [
     path("invite/", InviteUserView.as_view(), name="invite-user"),
     path("pending-invites/", PendingRegistrationListView.as_view(), name="pending-invites"),
+    path('pending-invites/<int:id>/', PendingRegistrationDeleteView.as_view()),
     path("register/<uuid:token>/", RegisterUserView.as_view(), name="register-user"),
     path("validate-token/", validate_registration_token),
 ]

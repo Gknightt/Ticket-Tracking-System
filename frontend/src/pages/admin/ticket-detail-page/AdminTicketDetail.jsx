@@ -3,27 +3,25 @@ import styles from "./ticket-detail.module.css";
 import general from '../../../style/general.module.css';
 
 // component
-import AgentNav from "../../../components/navigation/AgentNav";
-import ProgressTracker from "../../../components/component/ProgressTracker";
+import AdminNav from "../../../components/navigation/AdminNav";
+import WorkflowTracker2 from "../../../components/ticket/WorkflowVisualizer2";
+import WorkflowVisualizer from "../../../components/ticket/WorkflowVisualizer";
+import DocumentViewer from "../../../components/ticket/DocumentViewer";
 
 // react
 import { useNavigate } from "react-router-dom";
 import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
-import axios from "axios";
+
+// hooks
+import useFetchActionLogs from "../../../api/workflow-graph/useActionLogs";
+import ActionLogList from "../../../components/ticket/ActionLogList";
+import { useWorkflowProgress } from "../../../api/workflow-graph/useWorkflowProgress";
 
 // modal
 import TicketAction from "./modals/TicketAction";
 import useUserTickets from "../../../api/useUserTickets";
-import AdminNav from "../../../components/navigation/AdminNav";
-import DocumentViewer from "../../../components/ticket/DocumentViewer";
-import useFetchActionLogs from "../../../api/workflow-graph/useActionLogs";
-import ActionLogList from "../../../components/ticket/ActionLogList";
-import { useWorkflowProgress } from "../../../api/workflow-graph/useWorkflowProgress";
-import WorkflowVisualizer from "../../../components/ticket/WorkflowVisualizer";
-import WorkflowTracker2 from "../../../components/ticket/WorkflowVisualizer2";
-// Your API URL
-const ticketURL = import.meta.env.VITE_TICKET_API;
+
 
 export default function AdminTicketDetail() {
 

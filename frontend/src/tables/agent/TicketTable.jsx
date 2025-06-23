@@ -8,9 +8,11 @@ import Pagination from "../../components/component/Pagination";
 // react
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { format } from 'date-fns';
 
 // headers for the table
 const ticketHeaders = [
+  "Acted",
   "TICKET NO.",
   "TITLE",
   "DESCRIPTION",
@@ -35,6 +37,8 @@ function TicketItem({ item }) {
   console.log("id",item);
   return (
     <tr className={general.item}>
+      
+      <td>{item.hasacted ? 'Has Acted' : 'Not Yet'}</td>
       <td>{item.ticket_id}</td>
       <td>{item.subject}</td>
       <td>{item.description}</td>
@@ -45,11 +49,11 @@ function TicketItem({ item }) {
         </div>
       </td>
       <td>{item.status}</td>
-      <td>{item.opened_on}</td>
+      <td>{format(new Date(item.created_at), 'yyyy-MM-dd hh:mm:ss a')}</td>
       <td>
         <button
           className={general.btn}
-          onClick={() => navigate(`/agent/ticket/${item.ticket_id}`)}
+          onClick={() => navigate(`/agent/ticket/${item.step_instance_id}`)}
         >
           👁
         </button>

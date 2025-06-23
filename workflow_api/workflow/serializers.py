@@ -71,13 +71,18 @@ class RoleSerializer(serializers.ModelSerializer):
 
 
 class StepSerializer(serializers.ModelSerializer):
+    role_name = serializers.SerializerMethodField()
     class Meta:
         model = Steps
         fields = [
             'step_id', 'name', 'description', 'order',
             'is_initialized', 'created_at', 'updated_at',
-            'role_id', 'workflow_id'
+            'role_name', 
+            'workflow_id'
         ]
+
+    def get_role_name(self, obj):
+        return obj.role_id.name if obj.role_id else None
 
 
 class StepTransitionSerializer(serializers.ModelSerializer):

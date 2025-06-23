@@ -8,6 +8,7 @@ import { useState, useEffect, useRef } from "react";
 // modal
 import Notification from "../modal/Notification";
 import ProfileModal from "../modal/ProfileModal";
+import AdminProfileModal from "../modal/AdminProfileModal";
 
 export default function AgentNav() {
   const location = useLocation();

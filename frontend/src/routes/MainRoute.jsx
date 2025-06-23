@@ -24,6 +24,7 @@ import PasswordReset from "../pages/auth/PasswordReset";
 import NotFound from "../pages/error/NotFound";
 import AdminTicketDetail from "../pages/admin/ticket-detail-page/AdminTicketDetail";
 import TEST from "../pages/test";
+import AdminProfile from "../pages/auth/AdminProfile";
 
 export default function MainRoute() {
   return (
@@ -53,6 +54,7 @@ export default function MainRoute() {
         <Route path="/admin/ticket/:id" element={<AdminTicketDetail />} />
         <Route path="/admin/assigned" element={<AdminTicket />} />
         <Route path="/admin/workflow/:uuid" element={<WorkflowDetail />} />
+        <Route path="admin/profile" element={<AdminProfile />} />
       </Route>
 
       {/* <Route path="/test" element={<TEST />} /> */}

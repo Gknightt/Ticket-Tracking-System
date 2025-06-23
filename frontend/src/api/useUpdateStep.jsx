@@ -21,7 +21,21 @@ const useStepUpdater = () => {
     }
   };
 
-  return { updateStep, data, loading, error };
+  const deleteStep = async (stepId) => {
+    setLoading(true);
+    try {
+      await api.delete(`steps/${stepId}/`);
+      setData(null);  // Step is deleted
+      return true;
+    } catch (err) {
+      setError("Failed to delete step.");
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { updateStep, deleteStep, data, loading, error };
 };
 
 export default useStepUpdater;

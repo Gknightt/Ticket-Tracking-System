@@ -4,94 +4,89 @@ import general from "../../../style/general.module.css";
 
 // components
 import AdminNav from "../../../components/navigation/AdminNav";
-
-// modals
 import AddAgent from "./modals/AddAgent";
-
-// api
-const agentURL = import.meta.env.VITE_AGENTS_API;
+import AgentTable from "../../../tables/admin/AgentTable";
+import InviteTable from "../../../tables/admin/InviteTable";
 
 // react
 import { useEffect, useState } from "react";
 
-// table
-import AgentTable from "../../../tables/admin/AgentTable";
-
-// axios
-import axios from "axios";
+// api
+import useUsersApi from "../../../api/useUsersApi";
+import { useInviteManager } from "../../../api/useInviteManager";
 
 export default function Agent() {
-  // open ticket action modal
+  // States
   const [openAddAgent, setOpenAddAgent] = useState(false);
-
-  // for tab
   const [activeTab, setActiveTab] = useState("All");
-
-  // for filter states
-  const [filters, setFilters] = useState({
-    search: "",
-  });
-
-  // fetching states
+  const [filters, setFilters] = useState({ search: "" });
   const [allAgents, setAllAgents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [statusOptions, setStatusOptions] = useState([]);
+  const [pendingInvite, setPendingInvite] = useState([]);
 
-  // Fetch tickets from backend
+  // API Calls
+  const { users, fetchUsers, activateUser } = useUsersApi();
+  const { pending, fetchPendingInvites, deleteInvite} = useInviteManager();
+  
+
   useEffect(() => {
-    const fetchAgents = async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const res = await axios.get(agentURL);
-        const fetchedAgents = res.data;
+    setAllAgents(users);
+    setPendingInvite(pending)
+  }, [users, pending]);
 
-        setAllAgents(fetchedAgents);
+  const handleToggleActive = async (agent) => {
+    await activateUser(agent.id, !agent.is_active);
+    fetchUsers();
+  };
 
-        // extract status options
-        const statusSet = new Set(
-          fetchedAgents.map((a) => a.Status).filter(Boolean)
-        );
+  const handleToggleDelete = async (agent) => {
+    const confirmed = window.confirm(`Delete invite for ${agent.email}?`);
+    if (!confirmed) return;
+  
+    await deleteInvite(agent.id);
+    fetchPendingInvites();
+  };
+  
 
-        setStatusOptions(["All", ...Array.from(statusSet)]);
-      } catch (err) {
-        console.error("Failed to fetch agents:", err);
-        setError("Failed to load agents. Please try again.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAgents();
-  }, []);
-
-  // Handle tab change (priority)
   const handleTabClick = (e, tab) => {
     e.preventDefault();
     setActiveTab(tab);
   };
 
-  // Filter tickets based on tab and filters
+
+
+  // Filter Agent Block
   const filteredAgents = allAgents.filter((agent) => {
-    // Filter by priority tab
-    if (activeTab !== "All" && agent.Status !== activeTab) return false;
+    if (activeTab === "Active" && !agent.is_active) return false;
+    if (activeTab === "Inactive" && agent.is_active) return false;
 
-    // Filter by search term
     const search = filters.search.toLowerCase();
-    if (
-      search &&
-      !(
-        agent.Name.toLowerCase().includes(search) ||
-        agent.Email.toLowerCase().includes(search) ||
-        agent.Role.toLowerCase().includes(search)
-      )
-    ) {
-      return false;
-    }
+    const fullName = `${agent.first_name} ${agent.middle_name || ""} ${agent.last_name}`.toLowerCase();
+    const email = agent.email.toLowerCase();
+    const role = agent.role.toLowerCase();
 
-    return true;
+    return (
+      !search ||
+      fullName.includes(search) ||
+      email.includes(search) ||
+      role.includes(search)
+    );
   });
+
+  const sharedProps = {
+    agents: filteredAgents,
+    pendingInvite,
+    searchValue: filters.search,
+    onSearchChange: (e) =>
+      setFilters((prev) => ({ ...prev, search: e.target.value })),
+    error,
+    activeTab,
+    onInviteAgent: () => setOpenAddAgent(true),
+    onActivateClick: handleToggleActive,
+    onDeleteClick: handleToggleDelete,
+    fetchUsers,
+  };
 
   return (
     <>
@@ -100,10 +95,10 @@ export default function Agent() {
         <section className={styles.apHeader}>
           <h1>Agent</h1>
         </section>
+
         <section className={styles.apBody}>
-          {/* Tabs */}
           <div className={styles.tpTabs}>
-            {["All", "Active", "Pending", "Suspended"].map((tab) => (
+            {["All", "Active", "Inactive", "Invite"].map((tab) => (
               <a
                 key={tab}
                 href=""
@@ -116,6 +111,7 @@ export default function Agent() {
               </a>
             ))}
           </div>
+
           <div className={styles.tpTableSection}>
             <div className={general.tpTable}>
               {loading && (
@@ -123,21 +119,17 @@ export default function Agent() {
                   <div className={styles.loader}></div>
                 </div>
               )}
-              <AgentTable
-                agents={filteredAgents}
-                searchValue={filters.search}
-                onSearchChange={(e) =>
-                  setFilters((prev) => ({ ...prev, search: e.target.value }))
-                }
-                error={error}
-                activeTab={activeTab}
-                onInviteAgent={() => setOpenAddAgent(true)}
-              />
+              {activeTab === "Invite" ? (
+                <InviteTable {...sharedProps} />
+              ) : (
+                <AgentTable {...sharedProps} />
+              )}
             </div>
           </div>
         </section>
       </main>
-      {openAddAgent && <AddAgent closeAddAgent={() => setOpenAddAgent(false)}/>}
+
+      {openAddAgent && <AddAgent closeAddAgent={() => setOpenAddAgent(false)} />}
     </>
   );
 }

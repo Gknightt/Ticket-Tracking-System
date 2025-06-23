@@ -52,6 +52,12 @@ class PendingRegistrationListView(generics.ListAPIView):
     def get_queryset(self):
         now = timezone.now()
         return PendingRegistration.objects.filter(is_used=False, expires_at__gt=now)
+    
+class PendingRegistrationDeleteView(generics.DestroyAPIView):
+    queryset = PendingRegistration.objects.all()
+    lookup_field = 'id'  # or 'pk'
+    
+
 class ToggleUserActivationAPIView(GenericAPIView):
     # permission_classes = [permissions.IsAdminUser]  # Add later when needed
     renderer_classes = [JSONRenderer, BrowsableAPIRenderer]

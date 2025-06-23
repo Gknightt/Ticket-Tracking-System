@@ -18,7 +18,7 @@ import useUserTickets from "../../../api/useUserTickets";
 import { useAuth } from "../../../api/AuthContext";
 
 
-export default function Ticket() {
+export default function AdminTicket() {
   const { userTickets, loading, error } = useUserTickets();
   console.log(userTickets);
 
@@ -37,11 +37,15 @@ export default function Ticket() {
   // Status options
   const [statusOptions, setStatusOptions] = useState([]);
 
-  // Extract all ticket data from step instances
+  // Extract all ticket data with step_instance_id
   const allTickets = (userTickets || [])
-    .map((entry) => entry.task.ticket)
-    .filter((t) => t); // safety: remove undefined/null
-
+    .filter((entry) => entry.task?.ticket)
+    .map((entry) => ({
+      ...entry.task.ticket,
+      step_instance_id: entry.step_instance_id, // ✅ attach here
+      hasacted: entry.has_acted, // ✅ attach here
+    }));
+  
   // Extract status options on ticket update
   useEffect(() => {
     const statusSet = new Set(
@@ -49,8 +53,6 @@ export default function Ticket() {
     );
     setStatusOptions(["All", ...Array.from(statusSet)]);
   }, [userTickets]);
-
-  console.log(allTickets);
 
   // Handle tab click
   const handleTabClick = (e, tab) => {
