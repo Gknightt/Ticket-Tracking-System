@@ -4,12 +4,11 @@ import styles from "./workflow-detail.module.css";
 // component
 import AdminNav from "../../../components/navigation/AdminNav";
 
-import WorkflowEditor from "./WorkflowEditor";
 import WorkflowVisualizer from "../../../components/ticket/WorkflowVisualizer";
 import { useParams } from "react-router-dom";
 import TestFlow from "../../../components/workflow/testflow";
 import NewWorkflowVisualizer from "../../../components/workflow/NewWorkflowVisualizer";
-import WorkflowEditor2 from "./components/WorkflowEditor";
+import WorkflowEditor from "./components/WorkflowEditor";
 
 export default function WorkflowDetail() {
   const {uuid} = useParams();
@@ -21,7 +20,7 @@ export default function WorkflowDetail() {
           <h1>Workflow Detail</h1>
         </section>
         <section className={styles.wpdBody}>
-          <WorkflowEditor2/>
+          <WorkflowEditor/>
         </section>
       </main>
     </>
