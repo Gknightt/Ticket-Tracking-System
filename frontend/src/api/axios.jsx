@@ -1,11 +1,11 @@
-// src/api/axios.jsx
-
-import axios from 'axios';
-
-const baseURL = import.meta.env.VITE_BACKEND_API;
+// src/api/axios.js
+import axios from "axios";
 
 const api = axios.create({
-  baseURL: baseURL,
+  baseURL: import.meta.env.VITE_BACKEND_API,
+  headers: {
+    "Content-Type": "application/json",
+  },
 });
 
 export default api;

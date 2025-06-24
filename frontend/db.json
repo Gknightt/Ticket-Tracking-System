@@ -19,6 +19,15 @@
       "parent_id": null
     },
     {
+      "id": "e7e1",
+      "task_id": "1",
+      "ticket_id": "1",
+      "user_id": "1",
+      "message": "kingina",
+      "created_at": "2025-06-09T02:24:48.956Z",
+      "parent_id": null
+    },
+    {
       "id": "59e5",
       "task_id": "1",
       "ticket_id": "1",
@@ -44,51 +53,6 @@
       "message": "hi",
       "created_at": "2025-06-09T02:52:55.031Z",
       "parent_id": null
-    },
-    {
-      "id": "ff7b",
-      "task_id": "6",
-      "ticket_id": "6",
-      "user_id": "6",
-      "message": "Hi hello how are you",
-      "created_at": "2025-06-13T15:46:14.713Z",
-      "parent_id": null
-    },
-    {
-      "id": "c0a4",
-      "task_id": "1",
-      "ticket_id": "1",
-      "user_id": "1",
-      "message": "hello worl",
-      "created_at": "2025-06-14T01:11:52.765Z",
-      "parent_id": null
-    },
-    {
-      "id": "02a0",
-      "task_id": "1",
-      "ticket_id": "1",
-      "user_id": "1",
-      "message": "test",
-      "created_at": "2025-06-14T01:17:31.816Z",
-      "parent_id": "155e"
-    },
-    {
-      "id": "fe08",
-      "task_id": "1",
-      "ticket_id": "1",
-      "user_id": "1",
-      "message": "testing",
-      "created_at": "2025-06-14T01:17:43.386Z",
-      "parent_id": "155e"
-    },
-    {
-      "id": "e825",
-      "task_id": "1",
-      "ticket_id": "1",
-      "user_id": "1",
-      "message": "test",
-      "created_at": "2025-06-14T01:17:54.029Z",
-      "parent_id": "59e5"
     }
   ],
   "activity_log": [
@@ -171,14 +135,6 @@
       "user_id": "1",
       "content": "Status changed to \"Approved\" on 2025-06-09T02:36:29.534Z",
       "created_at": "2025-06-09T02:36:29.534Z"
-    },
-    {
-      "id": "db40",
-      "task_id": "6",
-      "ticket_id": "6",
-      "user_id": "6",
-      "content": "Status changed to \"On Hold\" on 2025-06-13T15:46:37.000Z",
-      "created_at": "2025-06-13T15:46:37.000Z"
     }
   ],
   "tickets": [
@@ -259,7 +215,7 @@
       "subject": "Feature Request for Dashboard",
       "customer": "Michael Brown",
       "priority": "Medium",
-      "status": "In Progress",
+      "status": "Rejected",
       "opened_on": "2025-04-08",
       "sla": "48 hours",
       "description": "Customer suggested adding filters to dashboard reports.",

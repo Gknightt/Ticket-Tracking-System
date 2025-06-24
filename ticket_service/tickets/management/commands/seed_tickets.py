@@ -8,10 +8,11 @@ from django.core.management.base import BaseCommand
 from django.utils.timezone import make_aware
 from django.conf import settings
 from tickets.models import Ticket
+import mimetypes
 
 # Constants
-PRIORITIES = ['Low', 'Medium', 'High', 'Urgent']
-STATUSES = ['New', 'Open', 'In Progress', 'Resolved', 'Closed', 'On Hold']
+PRIORITIES = ['Low', 'Medium', 'High', 'Critical']
+STATUSES = ['Open']
 
 CATEGORIES = ['General Inquiry', 'Technical Issue', 'Billing']
 SUBCATEGORIES = ['Software', 'Hardware', 'Payment']
@@ -59,25 +60,49 @@ class Command(BaseCommand):
             # Copy random files and collect full URLs
             selected_files = random.sample(sample_files, k=random.randint(0, min(3, len(sample_files))))
             attached_paths = []
-
             for file_path in selected_files:
                 filename = f"{datetime.now().timestamp()}_{os.path.basename(file_path)}"
                 destination_path = os.path.join(dest_dir, filename)
 
                 shutil.copy(file_path, destination_path)
+
                 relative_path = os.path.join(ATTACHMENT_UPLOAD_DIR, filename).replace("\\", "/")
                 full_url = urljoin(settings.BASE_URL, f"/media/{relative_path}")
-                attached_paths.append({"file": full_url})  # Change here
+                file_stat = os.stat(destination_path)
+
+                attachment_data = {
+                    "id": random.randint(50, 9999),  # Or use a counter if needed
+                    "file": full_url,
+                    "file_name": os.path.basename(file_path),
+                    "file_type": mimetypes.guess_type(file_path)[0] or "application/octet-stream",
+                    "file_size": file_stat.st_size,
+                    "upload_date": datetime.now().isoformat(),
+                }
+                attached_paths.append(attachment_data)
+
+            # Random employee data
+            first_name = random.choice(NAMES)
+            last_name = random.choice(NAMES)
+            email = f"{first_name.lower()}.{last_name.lower()}@example.com"
+            company_id = f"MA{random.randint(1000, 9999)}"
+            department = random.choice(DEPARTMENTS)
+            image_url = urljoin(settings.BASE_URL, "/media/employee_images/resized-placeholder.jpeg")
+
+            employee = {
+                "first_name": first_name,
+                "last_name": last_name,
+                "email": email,
+                "company_id": company_id,
+                "department": department,
+                "image": image_url,
+            }
+
 
 
             ticket = Ticket.objects.create(
                 ticket_id=f"WF-{random.randint(1000, 9999)}",
                 original_ticket_id=f"TK-{random.randint(1000, 9999)}",
-                customer={
-                    "id": random.randint(1, 100),
-                    "name": random.choice(NAMES),
-                    "company": random.choice(COMPANIES),
-                },
+                employee=employee,
                 subject=f"Issue {i+1}: {random.choice(SUBCATEGORIES)}",
                 category=random.choice(CATEGORIES),
                 subcategory=random.choice(SUBCATEGORIES),

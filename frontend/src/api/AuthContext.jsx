@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import axios from 'axios';
 
 const AuthContext = createContext();
+const Verify = import.meta.env.VITE_USER_SERVER_API;
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -15,7 +16,7 @@ export const AuthProvider = ({ children }) => {
       return;
     }
 
-    axios.get('http://localhost:3000/api/me/', {
+    axios.get(`${Verify}auth/me/`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -25,7 +26,6 @@ export const AuthProvider = ({ children }) => {
     })
     .catch(err => {
       console.error("Auth error", err);
-      localStorage.removeItem('accessToken');
     })
     .finally(() => {
       setLoading(false);

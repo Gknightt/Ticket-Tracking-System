@@ -1,4 +1,3 @@
-// src/api/useUpdateStepTransition.js
 import { useState } from 'react';
 import api from './axios';
 
@@ -13,27 +12,45 @@ const useUpdateStepTransition = () => {
     setUpdated(null);
 
     try {
-      const res = await api.patch(`workflow/steps/step-transitions/${transitionId}`, {
+      const res = await api.patch(`steps/step-transitions/${transitionId}/`, {
         from_step_id: updateData.from_step_id,
         to_step_id: updateData.to_step_id,
         action: {
           name: updateData.action_name,
-        }
+        },
       });
       setUpdated(res.data);
     } catch (err) {
       console.error(err);
-      if (err.response?.data) {
-        setError(JSON.stringify(err.response.data, null, 2));
-      } else {
-        setError('Failed to update step transition.');
-      }
+      setError(err.response?.data ? JSON.stringify(err.response.data, null, 2) : 'Failed to update step transition.');
     } finally {
       setLoading(false);
     }
   };
 
-  return { updateTransition, loading, error, updated };
+  const deleteTransition = async (transitionId) => {
+    setLoading(true);
+    setError('');
+
+    try {
+      await api.delete(`steps/step-transitions/${transitionId}/`);
+      return true;
+    } catch (err) {
+      console.error(err);
+      setError('Failed to delete transition.');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return {
+    updateTransition,
+    deleteTransition,
+    loading,
+    error,
+    updated,
+  };
 };
 
 export default useUpdateStepTransition;

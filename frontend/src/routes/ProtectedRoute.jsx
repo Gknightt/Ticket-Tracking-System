@@ -1,33 +1,43 @@
-// components/ProtectedRoute.jsx
-import { useEffect, useState } from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
-import axios from 'axios';
-const ticketURL = import.meta.env.VITE_VERIFY_API;
+import React, { useEffect, useState } from "react";
+import { Navigate, Outlet } from "react-router-dom";
+import axios from "axios";
 
-const ProtectedRoute = ({ requiredRole }) => {
-  const [authorized, setAuthorized] = useState(null); // null: loading, false: deny, true: allow
+const verifyURL = import.meta.env.VITE_VERIFY_API;
+
+export default function ProtectedRoute({ requireAdmin = false }) {
+  const [isAuthorized, setIsAuthorized] = useState(null);
+  const accessToken = localStorage.getItem("accessToken");
 
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    console.log('verify token get', token)
-    if (!token) return setAuthorized(false);
+    const verifyToken = async () => {
+      if (!accessToken) return setIsAuthorized(false);
 
-    axios.get(`${ticketURL}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-    .then(res => {
-      console.log('verify response', res)
-      const isAdmin = res.data.is_staff;
-      const userRole = isAdmin ? 'admin' : 'agent';
-      setAuthorized(userRole === requiredRole);
-    })
-    .catch(() => setAuthorized(false));
-  }, [requiredRole]);
+      try {
+        const res = await axios.get(verifyURL, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
 
-  if (authorized === null) return <p>Checking authorization...</p>;
-  if (!authorized) return <Navigate to="/unauthorized" />;
+        const isStaff = res.data.is_staff;
 
-  return <Outlet />;
-};
+        if (requireAdmin && !isStaff) {
+          setIsAuthorized(false);
+        } else if (!requireAdmin && isStaff) {
+          setIsAuthorized(false);
+        } else {
+          setIsAuthorized(true);
+        }
+      } catch (err) {
+        console.error("Token verification failed", err);
+        setIsAuthorized(false);
+      }
+    };
 
-export default ProtectedRoute;
+    verifyToken();
+  }, [accessToken, requireAdmin]);
+
+  if (isAuthorized === null) return <div>Loading...</div>;
+
+  return isAuthorized ? <Outlet /> : <Navigate to="/" replace />;
+}

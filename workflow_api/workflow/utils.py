@@ -15,7 +15,7 @@ def is_transition_initialized(transition):
     """
     result = (
         transition.action_id is not None and
-        (transition.from_step_id is not None or transition.to_step_id is not None)
+        (transition.from_step_id_id is not None or transition.to_step_id_id is not None)
     )
     logger.debug(f"Transition {getattr(transition, 'transition_id', transition)} initialized: {result}")
     return result
@@ -100,6 +100,6 @@ def compute_workflow_status(workflow_id):
         workflow.status = new_status
         workflow.save(update_fields=["status"])
 
-        if new_status == "initialized":
-            send_to_consumer.delay(workflow.workflow_id)  # Trigger Celery task
-            # send_hello()
+        # if new_status == "initialized":
+        #     send_to_consumer.delay(workflow.workflow_id)  # Trigger Celery task
+        #     # send_hello()

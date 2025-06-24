@@ -1,38 +1,63 @@
-import { useNavigate } from "react-router-dom";
+// styles
+import styles from "./workflow.module.css";
+import general from "../../../style/general.module.css";
 
-import AdminNav from "../../../components/navigations/admin-nav/AdminNav";
-import TitleCard from "../../../components/TitleCard";
+// components
+import AdminNav from "../../../components/navigation/AdminNav";
+import FilterPanel from "../../../components/component/FilterPanel";
 
-import style from "./Workflow.module.css";
-import forms from "../../../forms.module.css";
-import WorkflowTable from "../../../tables/admin/workflow/Workflow";
+// modal
+import AddWorkflow from "./modals/AddWorkflow";
+
+// react
+import { useEffect, useState } from "react";
+
+// table
+import WorkflowTable from "../../../tables/admin/WorkflowTable";
+
+// axios
+import axios from "axios";
+import useFetchWorkflows from "../../../api/useFetchWorkflows";
+// api
+const workflowURL = import.meta.env.VITE_TICKET_API;
+
+
 
 export default function Workflow() {
-  const navigate = useNavigate();
+  // open ticket action modal
+  const [openAddWorkflow, setOpenAddWorkflow] = useState(false);
+  const {workflows, refetch} = useFetchWorkflows();
+  const [allworkflow, setAllWorkflow] = useState([]);
+
+  useEffect(() => {
+    if (workflows.length > 0) {
+      // setOpenAddWorkflow(workflows)
+      setAllWorkflow(workflows)
+    }
+  }, [workflows])
+
 
   return (
     <>
       <AdminNav />
-      <main className={style.main}>
-        <section>
-          <div className={style.title}>
-            <TitleCard 
-              title="Workflow"
-              name="jessa"
-            />
-            <button 
-              className={forms.button}
-              onClick={() => navigate("/admin/workflow/create")}
-            >
-              Create Workflow
-            </button>
-          </div>
-          <hr />
+      <main className={styles.workflowPage}>
+        <section className={styles.wpHeader}>
+          <h1>Workflow</h1>
         </section>
-        <section>
-          <WorkflowTable/>
+        <section className={styles.wpBody}>
+          <div className={styles.wpFilterSection}>
+            <FilterPanel />
+          </div>
+          <div className={styles.wpTableSection}>
+            <div className={general.tpTable}>
+              <WorkflowTable workflows={allworkflow}/>
+            </div>
+          </div>
         </section>
       </main>
+      {openAddWorkflow && (
+        <AddWorkflow closeAddWorkflow={() => setOpenAddWorkflow(false)} />
+      )}
     </>
   );
-} 
+}

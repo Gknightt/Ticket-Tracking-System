@@ -1,0 +1,387 @@
+/* Container and Layout */
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
+  min-height: 100vh;
+  border: 1px solid #ccc;
+}
+
+.header {
+  padding: 2rem;
+  margin-bottom: 2rem;
+  border: 1px solid #ccc;
+}
+
+.title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin: 0 0 0.5rem 0;
+}
+
+.description {
+  font-size: 1.1rem;
+  margin: 0 0 1rem 0;
+  line-height: 1.6;
+}
+
+.statusBadge {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  border: 1px solid #ccc;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+/* Section Styles */
+.section {
+  padding: 1.5rem;
+  border: 1px solid #ccc;
+}
+
+.sectionTitle {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0 0 1.5rem 0;
+  padding-bottom: 0.75rem;
+}
+
+/* Steps List */
+.stepsList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.stepCard {
+  padding: 1rem;
+  transition: all 0.2s ease;
+  border: 1px solid #ccc;
+}
+
+.stepHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+}
+
+.stepTitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0 0 0.25rem 0;
+}
+
+.stepRole {
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.buttonGroup {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.editButton, .removeButton {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid #ccc;
+}
+
+/* Transitions List */
+.transitionsList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.transitionItem {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  border: 1px solid #ccc;
+}
+
+.transitionsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.transitionCard {
+  padding: 1rem;
+  transition: all 0.2s ease;
+  border: 1px solid #ccc;
+}
+
+.transitionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.transitionFlow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.transitionStep {
+  padding: 0.375rem 0.75rem;
+  font-weight: 500;
+  border: 1px solid #ccc;
+}
+
+.transitionArrow {
+  font-weight: bold;
+  font-size: 1.25rem;
+}
+
+.transitionAction {
+  font-size: 0.875rem;
+  font-style: italic;
+}
+
+/* Form Styles */
+.addStepForm, .addTransitionForm {
+  padding: 1.5rem;
+  border: 1px solid #ccc;
+}
+
+.formTitle {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0 0 1rem 0;
+}
+
+.formFields {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.formField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.label {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.input, .select {
+  padding: 0.75rem;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+  border: 1px solid #ccc;
+}
+
+.addButton, .addTransitionButton {
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 0.5rem;
+  border: 1px solid #ccc;
+}
+
+/* Modal Styles */
+.modalOverlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.modal {
+  width: 100%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow: hidden;
+  border: 1px solid #ccc;
+}
+
+.modalOverlay {
+  position: fixed;                /* Fullscreen overlay */
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.4); /* Dark backdrop */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000; /* Above all other content */
+  padding: 1rem;
+}
+
+/* MODALS */
+
+.modal {
+  background: #fff;
+  width: 100%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow: hidden;
+  border-radius: 8px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #ccc;
+}
+
+.modalTitle {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.modalCloseButton {
+  font-size: 1.5rem;
+  cursor: pointer;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  background: transparent;
+  line-height: 1;
+}
+
+.modalContent {
+  padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border-top: 1px solid #ccc;
+  background-color: #f9f9f9;
+}
+
+/* END MODALS */
+
+
+.cancelButton, .saveButton {
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid #ccc;
+}
+
+/* Loading and Error States */
+.loadingContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+}
+
+.loadingText, .errorText {
+  font-size: 1.125rem;
+  text-align: center;
+  padding: 1rem;
+  border: 1px solid #ccc;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  
+  .container {
+    padding: 1rem;
+  }
+  
+  .title {
+    font-size: 2rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .stepHeader, .transitionHeader {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+  
+  .buttonGroup {
+    justify-content: flex-end;
+  }
+  
+  .transitionFlow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .transitionArrow {
+    transform: rotate(90deg);
+  }
+  
+  .modal {
+    margin: 0;
+    max-height: 95vh;
+  }
+}
+
+@media (max-width: 480px) {
+  .header {
+    padding: 1.5rem;
+  }
+  
+  .title {
+    font-size: 1.75rem;
+  }
+  
+  .section {
+    padding: 1rem;
+  }
+  
+  .modalOverlay {
+    padding: 0;
+  }
+  
+  .modal {
+    height: 100vh;
+  }
+}
+
+
+/* steptransition */
+
+.undoButton {
+  background-color: #f3f3f3;
+  color: #333;
+  margin-right: 8px;
+  padding: 6px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}

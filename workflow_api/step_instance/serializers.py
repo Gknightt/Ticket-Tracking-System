@@ -9,13 +9,37 @@ from action_log.models import ActionLog
 from rest_framework import serializers
 from .models import StepInstance
 from task.serializers import TaskSerializer
+from action.serializers import ActionSerializer
+from step.serializers import StepSerializer
 
 class StepInstanceSerializer(serializers.ModelSerializer):
-    task = TaskSerializer(source='task_id', read_only=True)  # ✅ include the task (with ticket)
-
+    task = TaskSerializer(source='task_id', read_only=True)
+    available_actions = serializers.SerializerMethodField()
+    step = StepSerializer(source='step_transition_id.to_step_id', read_only=True)
+    # edit_helper_/instance/list/
     class Meta:
         model = StepInstance
-        fields = ['step_instance_id', 'user_id', 'step_transition_id', 'task', 'has_acted']
+        fields = [
+            'step_instance_id',
+            'user_id',
+            'step_transition_id',
+            'has_acted',
+            'step',
+            'task',
+            'available_actions',  # 👈 include custom field
+        ]
+
+    def get_available_actions(self, instance):
+        try:
+            current_step = instance.step_transition_id.to_step_id
+        except AttributeError:
+            return []
+
+        transitions = StepTransition.objects.filter(from_step_id=current_step)
+        actions = [t.action_id for t in transitions if t.action_id]
+
+        serializer = ActionSerializer(actions, many=True)
+        return serializer.data
 
 
 class NextStepInstanceSerializer(serializers.Serializer):
@@ -51,6 +75,8 @@ class TriggerNextStepSerializer(serializers.Serializer):
     action_id = serializers.CharField()
     available_actions = serializers.SerializerMethodField()
     has_acted = serializers.BooleanField(read_only=True)
+    user = serializers.CharField(required=True)  # ✅ Add user input
+    comment = serializers.CharField(required=True) 
 
     def validate_action_id(self, value):
         try:
@@ -76,6 +102,8 @@ class TriggerNextStepSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         action = validated_data['action_id']
+        user = validated_data['user']
+        comment = validated_data['comment']
         original_instance = self.context['step_instance']
 
         # Prevent re-acting
@@ -95,7 +123,9 @@ class TriggerNextStepSerializer(serializers.Serializer):
         ActionLog.objects.create(
             step_instance_id=original_instance,
             action_id=action,
-            task_id=original_instance.task_id
+            task_id=original_instance.task_id,
+            user=user,
+            comment=comment
         )
 
         if not transition.to_step_id:

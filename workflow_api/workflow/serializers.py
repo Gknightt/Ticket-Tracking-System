@@ -23,6 +23,7 @@ class WorkflowSerializer(serializers.ModelSerializer):
     class Meta:
         model = Workflows
         fields = (
+            "user_id",
             "workflow_id",
             "name",
             "description",
@@ -31,7 +32,7 @@ class WorkflowSerializer(serializers.ModelSerializer):
             "status",
             "is_published",
         )
-        read_only_fields = ("id", "status", "workflow_id", "user_id")
+        read_only_fields = ("id", "status", "workflow_id")
 
     def update_status(self, workflow):
         """
@@ -71,13 +72,18 @@ class RoleSerializer(serializers.ModelSerializer):
 
 
 class StepSerializer(serializers.ModelSerializer):
+    role_name = serializers.SerializerMethodField()
     class Meta:
         model = Steps
         fields = [
             'step_id', 'name', 'description', 'order',
             'is_initialized', 'created_at', 'updated_at',
-            'role_id', 'workflow_id'
+            'role_name', 
+            'workflow_id'
         ]
+
+    def get_role_name(self, obj):
+        return obj.role_id.name if obj.role_id else None
 
 
 class StepTransitionSerializer(serializers.ModelSerializer):

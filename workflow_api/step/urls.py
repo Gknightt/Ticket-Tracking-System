@@ -9,5 +9,5 @@ urlpatterns = [
     # path('step-actions/<int:id>/', StepActionDetailView.as_view(), name='step-action-detail'),
 
     path('step-transitions/', StepTransitionListCreateView.as_view(), name='step-transition-list-create'),
-    path('step-transitions/<uuid:transition_id>', StepTransitionDetailView.as_view(), name='step-transition-detail'),
+    path('step-transitions/<uuid:transition_id>/', StepTransitionDetailView.as_view(), name='step-transition-detail'),
 ]

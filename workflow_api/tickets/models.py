@@ -1,20 +1,22 @@
 from django.db import models
 
 class WorkflowTicket(models.Model):
-    PRIORITY_CHOICES = [
-        ('Low', 'Low'),
-        ('Medium', 'Medium'),
+    PRIORITY_LEVELS = [
+        ('Critical', 'Critical'),
         ('High', 'High'),
-        ('Urgent', 'Urgent'),
+        ('Medium', 'Medium'),
+        ('Low', 'Low'),
     ]
 
     STATUS_CHOICES = [
         ('New', 'New'),
         ('Open', 'Open'),
-        ('In Progress', 'In Progress'),
-        ('Resolved', 'Resolved'),
-        ('Closed', 'Closed'),
+        ('On Process', 'On Process'),
         ('On Hold', 'On Hold'),
+        ('Pending', 'Pending'),
+        ('Resolved', 'Resolved'),
+        ('Rejected', 'Rejected'),
+        ('Closed', 'Closed'),
     ]
 
     # Ticket identity fields
@@ -23,7 +25,7 @@ class WorkflowTicket(models.Model):
     source_service = models.CharField(max_length=50, default='ticket_service', db_index=True)
 
     # Customer info
-    customer = models.JSONField(blank=True, null=True)  # Dict with id, name, company_id, etc.
+    employee = models.JSONField(blank=True, null=True)  # Dict with id, name, company_id, etc.
 
     # Ticket metadata
     subject = models.CharField(max_length=255)
@@ -36,7 +38,7 @@ class WorkflowTicket(models.Model):
     assigned_to = models.CharField(max_length=255, blank=True, null=True)
 
     # Status tracking
-    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='Low', db_index=True,  blank=True, null=True)
+    priority = models.CharField(max_length=10, choices=PRIORITY_LEVELS, default='Low', db_index=True,  blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='New', db_index=True,  blank=True, null=True)
     department = models.CharField(max_length=100, db_index=True,  blank=True, null=True)
 
@@ -61,7 +63,7 @@ class WorkflowTicket(models.Model):
             models.Index(fields=['source_service']),
             models.Index(fields=['status']),
             models.Index(fields=['priority']),
-            models.Index(fields=['customer']),
+            models.Index(fields=['employee']),
             models.Index(fields=['department']),
         ]
 

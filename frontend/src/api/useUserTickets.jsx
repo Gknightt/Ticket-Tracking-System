@@ -5,14 +5,14 @@ import { useAuth } from './AuthContext';
 
 const useUserTickets = () => {
   const { user, loading: authLoading } = useAuth();
-  const [tickets, setTickets] = useState([]);
+  const [userTickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (!authLoading && user?.id) {
       api
-        .get(`workflow/instance/list/?user_id=${user.id}`)
+        .get(`instance/list/?user_id=${user.id}`)
         .then((res) => {
           setTickets(res.data);
         })
@@ -28,7 +28,7 @@ const useUserTickets = () => {
     }
   }, [user, authLoading]);
 
-  return { tickets, loading, error };
+  return { userTickets, loading, error };
 };
 
 export default useUserTickets;

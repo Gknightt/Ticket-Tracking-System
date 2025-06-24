@@ -2,32 +2,40 @@
 import { useEffect, useState } from 'react';
 import api from './axios';
 
-const useStepUpdater = ({ stepId, name, role_id, trigger = false }) => {
+const useStepUpdater = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (trigger && stepId && name && role_id) {
-      setLoading(true);
-      api
-        .patch(`workflow/steps/${stepId}/`, {
-          name,
-          role_id
-        })
-        .then((res) => {
-          setData(res.data);
-        })
-        .catch(() => {
-          setError("Failed to update step.");
-        })
-        .finally(() => {
-          setLoading(false);
-        });
+  const updateStep = async ({ stepId, name, role_id }) => {
+    setLoading(true);
+    try {
+      const res = await api.patch(`steps/${stepId}/`, { name, role_id });
+      setData(res.data);
+      return res.data;
+    } catch (err) {
+      setError("Failed to update step.");
+      return null;
+    } finally {
+      setLoading(false);
     }
-  }, [trigger, stepId, name, role_id]);
+  };
 
-  return { data, loading, error };
+  const deleteStep = async (stepId) => {
+    setLoading(true);
+    try {
+      await api.delete(`steps/${stepId}/`);
+      setData(null);  // Step is deleted
+      return true;
+    } catch (err) {
+      setError("Failed to delete step.");
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { updateStep, deleteStep, data, loading, error };
 };
 
 export default useStepUpdater;

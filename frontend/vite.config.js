@@ -7,7 +7,7 @@ export default defineConfig({
   server: {
     historyApiFallback: true,
     host: '0.0.0.0',
-    port: 9000
+    port: 1000
   }
 })
 

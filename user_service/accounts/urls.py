@@ -11,6 +11,7 @@ auth_patterns = [
     path("logout/", UserLogoutAPIView.as_view(), name="logout-user"),
     path("me/", Me.as_view(), name="me"),
     path("change-password/", ChangePasswordAPIView.as_view(), name="change-password"),
+    path("verify/", Verify.as_view(), name="verify-user"),
 ]
 
 password_patterns = [
@@ -22,6 +23,7 @@ password_patterns = [
 registration_patterns = [
     path("invite/", InviteUserView.as_view(), name="invite-user"),
     path("pending-invites/", PendingRegistrationListView.as_view(), name="pending-invites"),
+    path('pending-invites/<int:id>/', PendingRegistrationDeleteView.as_view()),
     path("register/<uuid:token>/", RegisterUserView.as_view(), name="register-user"),
     path("validate-token/", validate_registration_token),
 ]
@@ -44,4 +46,5 @@ urlpatterns = [
     path("registration/", include(registration_patterns)),
     path("users/", include(user_patterns)),
     path("account/", include(bypass_patterns)),
+    path('round-robin', UserIDsByRoleView.as_view()),
 ]

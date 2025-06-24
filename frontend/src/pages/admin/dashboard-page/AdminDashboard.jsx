@@ -1,57 +1,38 @@
-import AdminNav from "../../../components/navigations/admin-nav/AdminNav";
-import TitleCard from "../../../components/TitleCard";
-import DashboardTable from "../../../tables/admin/dashboard/dashboardTable";
-import { Reporting, Stats, VotingDonutChart } from "./components/Graphs.jsx";
-import style from "./AdminDashboard.module.css";
-import QuickAction from "./components/QuickAction";
+// styles
+import styles from "./admin-dashboard.module.css";
 
-export default function AgentDashboard() {
+// components
+import AdminNav from "../../../components/navigation/AdminNav";
+import TicketCard from "./components/TicketCard";
+
+export default function AdminDashboard() {
   return (
     <>
       <AdminNav />
-      <main className={style.main}>
-        <section className={style.dashboardTopSection}>
-          <div className={style.dbHeroSection}></div>
-        </section>{" "}
-        {/* top */}
-        <section>
-          <div className={style.title}>
-            <TitleCard title="Dashboard" name="jessa" />
-          </div>
-          <hr />
+      <main className={styles.adminDashboardPage}>
+        <section className={styles.adpHeader}>
+          <h1>Dashboard</h1>
         </section>
-        <section className={style.topContainer}>
-          <div className={style.whole}>
-            <div className={style.left}>
-              <h2 className={style.title}>Recent</h2>
-              <DashboardTable />
-            </div>
-            <div className={style.right}>
-              <h2 className={style.title}>Quick Actions</h2>
-              <QuickAction />
-            </div>
-          </div>
-        </section>
-        <section className={style.botContainer}>
-          <div className={style.column}>
-            <div>
-              <h2 className={style.title}>Monitor</h2>
-            </div>
-            <div className={style.row}>
-              <Stats />
-              <Stats />
-            </div>
-            <div className={style.row}>
-              <Reporting
-                title="Ticket Cancelled Per Day"
-                content="3"
-                description="Resolved Tickets"
-              />
-              <Reporting
-                title="Ticket Resolution Per Day"
-                content="12"
-                description="Resolved Tickets"
-              />
+        <section className={styles.adpBody}>
+          <div className={styles.adpCardSection}>
+            <div className={styles.adpWrapper}>
+              <div className={styles.adpLeftRight}>
+                <div className={styles.adpLeft}>
+                  <TicketCard number="9" label="New Tickets" />
+                  <TicketCard number="9" label="Open Tickets" />
+                </div>
+                <div className={styles.adpMid}>
+                  <TicketCard number="9" label="Resolved Tickets" />
+                  <TicketCard number="9" label="On Hold Tickets" />
+                </div>
+                <div className={styles.adpRight}>
+                  <TicketCard number="9" label="In Progress" />
+                  <TicketCard number="9" label="Rejected Tickets" />
+                </div>
+              </div>
+              <div className={styles.adpSide}>
+                <TicketCard number="9" label="Critical" />
+              </div>
             </div>
           </div>
         </section>

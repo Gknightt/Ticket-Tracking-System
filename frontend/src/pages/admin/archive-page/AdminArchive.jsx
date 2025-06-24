@@ -1,32 +1,26 @@
+// styles
+import styles from "./admin-archive.module.css";
 
-import AdminNav from "../../../components/navigations/admin-nav/AdminNav";
-import TitleCard from "../../../components/TitleCard";
-import AgentInvitation from "../../../tables/admin/Archive/AgentInvitation";
-import { useNavigate } from "react-router-dom";
+// components
+import AdminNav from "../../../components/navigation/AdminNav";
 
-
-import style from "./Agent.module.css"
-import forms from "../../../forms.module.css"
+// table
+import ArchiveTable from "../../../tables/admin/ArchiveTable";
 
 export default function AdminArchive() {
-    const navigate = useNavigate();
-  return(
+  return (
     <>
-    <AdminNav />
-    <main className={style.main}>
-      <section>
-        <div className={style.title}>
-          <TitleCard 
-          title="Archive"
-          name="jessa"/>
-        </div>
-
-        <hr/>
-      </section>
-      <section>
-        <AgentInvitation/>
-      </section>
-    </main>
+      <AdminNav />
+      <main className={styles.archivePage}>
+        {/* <section className={styles.apHeader}>
+          <h1>Archive</h1>
+        </section> */}
+        <section className={styles.apBody}>
+          <div className={styles.apTable}>
+            <ArchiveTable />
+          </div>
+        </section>
+      </main>
     </>
   );
 }
