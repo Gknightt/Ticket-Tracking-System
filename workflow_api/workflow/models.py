@@ -57,6 +57,7 @@ class Workflows(models.Model):
 
     category = models.CharField(max_length=64)
     sub_category = models.CharField(max_length=64)
+    department = models.CharField(max_length=64)
 
     is_published = models.BooleanField(default=False)
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="draft")

@@ -16,6 +16,13 @@ def assign_user_to_step_instance(sender, instance, created, **kwargs):
 
     try:
         logger.info("Assigning user to StepInstance...")
+        # ✅ Update ticket status if the step is not the first one
+        from_step = instance.step_transition_id.from_step_id
+        if from_step:
+            ticket = instance.task_id.ticket_id
+            ticket.status = "In Progress"  # or any status you want
+            ticket.save(update_fields=["status"])
+            logger.info(f"Ticket {ticket.ticket_id} status updated to 'In Progress'")
 
         # 1. Identify the role for the current step
         role = instance.step_transition_id.to_step_id.role_id
@@ -24,7 +31,6 @@ def assign_user_to_step_instance(sender, instance, created, **kwargs):
 
         # 2. Fetch users assigned to this role from the user service
         response = requests.get(f"{settings.USER_SERVICE_URL}/round-robin?role_id={role.id}")
-        print(response)
         logger.info(f"User service responded with {response.status_code}")
 
         if response.status_code != 200:
@@ -43,10 +49,7 @@ def assign_user_to_step_instance(sender, instance, created, **kwargs):
             role_id=role_id,
             defaults={"pointer": 0}
         )
-        if created_pointer:
-            logger.info(f"Created new pointer for role {role.name}")
-        else:
-            logger.info(f"Existing pointer found for role {role.name} at index {pointer.pointer}")
+        logger.info(f"{'Created new' if created_pointer else 'Existing'} pointer for role {role.name} at index {pointer.pointer}")
 
         index = pointer.pointer or 0
         selected_user_id = users[index % len(users)]
@@ -61,7 +64,7 @@ def assign_user_to_step_instance(sender, instance, created, **kwargs):
         pointer.save(update_fields=["pointer"])
         logger.info(f"Pointer updated to {pointer.pointer} for role {role_id}")
 
-
+        # 5. Send notification via Celery
         from celery import Celery
         celery = Celery(broker=settings.CELERY_BROKER_URL)
 
