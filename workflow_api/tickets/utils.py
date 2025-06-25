@@ -39,3 +39,40 @@ def allocate_task_for_ticket(ticket):
             created_any = True
 
     return created_any
+
+
+def manually_assign_task(ticket, workflow):
+    """
+    Manually assign a Task to the given ticket using the specified workflow.
+
+    Conditions:
+    - The ticket must not already be allocated (ticket.is_task_allocated is False).
+    - The workflow must have status 'initialized'.
+
+    If both conditions are met:
+    - Deletes any existing tasks for the ticket.
+    - Creates a new task and updates ticket.is_task_allocated = True.
+    
+    Returns True if task was created, False otherwise.
+    """
+
+    if ticket.is_task_allocated:
+        return False
+
+    if workflow.status != 'initialized':
+        return False
+
+    # Delete any prior tasks (if any)
+    Task.objects.filter(ticket_id=ticket).delete()
+
+    try:
+        Task.objects.create(
+            ticket_id=ticket,
+            workflow_id=workflow,
+            fetched_at=ticket.fetched_at or timezone.now()
+        )
+        ticket.is_task_allocated = True
+        ticket.save(update_fields=["is_task_allocated"])
+        return True
+    except IntegrityError:
+        return False

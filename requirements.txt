@@ -43,3 +43,5 @@ wcwidth==0.2.13
 
 #for deployment
 gunicorn==20.1.0
+
+psycopg2-binary

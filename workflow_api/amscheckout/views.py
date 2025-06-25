@@ -4,6 +4,7 @@ from rest_framework.views import APIView
 from .models import Checkout
 from .serializers import CheckoutSerializer
 from django_filters.rest_framework import DjangoFilterBackend
+from tickets.models import WorkflowTicket
 
 # GET /api/ams/checkout-tickets
 class CheckoutListView(generics.ListAPIView):
@@ -26,6 +27,16 @@ class CheckoutResolveView(APIView):
 
         checkout.is_resolved = is_resolved
         checkout.save()
+
+                # ✅ Update ticket status to "Resolved" if resolved
+        if is_resolved:
+            try:
+                ticket = WorkflowTicket.objects.get(id=ticket_id)
+                ticket.status = "Resolved"  # or your enum/choice value
+                ticket.save()
+            except WorkflowTicket.DoesNotExist:
+                return Response({"detail": "Related ticket not found"}, status=status.HTTP_404_NOT_FOUND)
+
         return Response(CheckoutSerializer(checkout).data, status=status.HTTP_200_OK)
 
 # POST /api/ams/checkout-create

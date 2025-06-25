@@ -21,11 +21,11 @@ class WorkflowTicket(models.Model):
 
     # Ticket identity fields
     ticket_id = models.CharField(max_length=20, blank=True, null=True)
-    original_ticket_id = models.CharField(max_length=20, db_index=True,  blank=True, null=True)  # ID from source service
+    original_ticket_id = models.CharField(max_length=20, db_index=True, blank=True, null=True)
     source_service = models.CharField(max_length=50, default='ticket_service', db_index=True)
 
     # Customer info
-    employee = models.JSONField(blank=True, null=True)  # Dict with id, name, company_id, etc.
+    employee = models.JSONField(blank=True, null=True)
 
     # Ticket metadata
     subject = models.CharField(max_length=255)
@@ -38,9 +38,9 @@ class WorkflowTicket(models.Model):
     assigned_to = models.CharField(max_length=255, blank=True, null=True)
 
     # Status tracking
-    priority = models.CharField(max_length=10, choices=PRIORITY_LEVELS, default='Low', db_index=True,  blank=True, null=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='New', db_index=True,  blank=True, null=True)
-    department = models.CharField(max_length=100, db_index=True,  blank=True, null=True)
+    priority = models.CharField(max_length=10, choices=PRIORITY_LEVELS, default='Low', db_index=True, blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='New', db_index=True, blank=True, null=True)
+    department = models.CharField(max_length=100, db_index=True, blank=True, null=True)
 
     # Timing info
     response_time = models.DurationField(blank=True, null=True)
@@ -48,10 +48,10 @@ class WorkflowTicket(models.Model):
     time_closed = models.DateTimeField(blank=True, null=True)
     rejection_reason = models.TextField(blank=True, null=True)
 
-    # Attachments as JSON
+    # Attachments
     attachments = models.JSONField(default=list, blank=True)
 
-    # Workflow-specific
+    # Workflow
     is_task_allocated = models.BooleanField(default=False)
     fetched_at = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -68,18 +68,27 @@ class WorkflowTicket(models.Model):
         ]
 
     def save(self, *args, **kwargs):
+        from tickets.tasks import send_ticket_status
         is_new = self.pk is None
+        old_status = None
+
+        if not is_new:
+            try:
+                old_status = WorkflowTicket.objects.get(pk=self.pk).status
+            except WorkflowTicket.DoesNotExist:
+                pass
+
         super().save(*args, **kwargs)
 
+        # Allocate task
         if is_new and not self.is_task_allocated:
             from tickets.utils import allocate_task_for_ticket
             success = allocate_task_for_ticket(self)
-
             if success:
-                # Important: prevent race condition from parallel creation
                 WorkflowTicket.objects.filter(pk=self.pk, is_task_allocated=False).update(
                     is_task_allocated=True
                 )
 
-    def __str__(self):
-        return f"WF-{self.id} ({self.original_ticket_id}) - {self.subject}"
+        # Send status update
+        if not is_new and old_status != self.status:
+            send_ticket_status.delay(self.original_ticket_id or self.ticket_id, self.status)

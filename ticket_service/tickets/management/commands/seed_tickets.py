@@ -21,11 +21,11 @@ ATTACHMENT_UPLOAD_DIR = 'uploads/tickets'
 
 # Valid workflow-aligned combinations
 VALID_WORKFLOWS = [
-    ("Asset Department", "Asset", "Asset Check-in"),
-    ("Asset Department", "Asset", "Asset Check-out"),
-    ("Budget Department", "Budget", "Project Proposal"),
-    ("IT Department", "IT", "Access Request"),
-    ("IT Department", "IT", "Software Installation"),
+    ("Asset Department", "Asset Category", "Asset Check-in"),
+    ("Asset Department", "Asset Category", "Asset Check-out"),
+    ("Budget Department", "Budget Category", "Project Proposal"),
+    ("IT Department", "IT Category", "Access Request"),
+    ("IT Department", "IT Category", "Software Installation"),
 ]
 
 class Command(BaseCommand):

@@ -193,4 +193,5 @@ BASE_URL = os.getenv('DJANGO_USER_SERVICE')
 
 CELERY_TASK_ROUTES = {
     "notifications.tasks.create_assignment_notification": {"queue": "notification-queue"},
+    'send_ticket_status': {'queue': 'ticket_status'},
 }

@@ -118,3 +118,18 @@ def receive_ticket(ticket_data):
             "error": str(e),
             "trace": traceback.format_exc()
         }
+
+
+# tickets/tasks.py
+
+import json
+
+@shared_task(name="send_ticket_status")
+def send_ticket_status(ticket_id, status):
+    data = {
+        "ticket_number": ticket_id,
+        "new_status": status
+    }
+    json_data = json.dumps(data)
+    print("Sending to queue:", json_data)
+    return json_data

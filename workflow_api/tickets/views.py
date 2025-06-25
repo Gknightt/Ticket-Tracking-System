@@ -4,8 +4,10 @@ from rest_framework.response import Response
 from django.db.models import Q, Count
 from django.utils import timezone
 from .models import WorkflowTicket
-from .serializers import WorkflowTicketSerializer, WorkflowTicketCreateSerializer
+from .serializers import *
 import logging
+
+from rest_framework.views import APIView
 
 logger = logging.getLogger(__name__)
 
@@ -191,3 +193,15 @@ class WorkflowTicketViewSet(viewsets.ModelViewSet):
         logger.info(f"Updated ticket {ticket.id} status to {new_status}")
         serializer = self.get_serializer(ticket)
         return Response(serializer.data)
+
+
+class ManualTaskAssignmentView(APIView):
+    def post(self, request):
+        serializer = ManualTaskAssignmentSerializer(data=request.data)
+        if serializer.is_valid():
+            result = serializer.save()
+            return Response({
+                "message": "Task assigned successfully.",
+                "data": result
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
