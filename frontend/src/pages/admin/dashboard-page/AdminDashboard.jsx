@@ -4,6 +4,14 @@ import styles from "./admin-dashboard.module.css";
 // components
 import AdminNav from "../../../components/navigation/AdminNav";
 import TicketCard from "./components/TicketCard";
+import QuickAction from "./components/QuickAction";
+
+// charts
+import ChartComponent from "./charts/ChartCompoent";
+import LineChart from './charts/LineChart';
+import BarChart from './charts/BarChart';
+import PieChart from './charts/PieChart';
+import RadarChart from './charts/RadarChart';
 
 export default function AdminDashboard() {
   return (
@@ -32,6 +40,18 @@ export default function AdminDashboard() {
               </div>
               <div className={styles.adpSide}>
                 <TicketCard number="9" label="Critical" />
+              </div>
+            </div>
+          </div>
+          <div className={styles.adpContentSection}>
+            <div className={styles.adpVisuals}>
+              <h2>Charts</h2>
+              <LineChart />
+            </div>
+            <div className={styles.adpQuickActionSection}>
+              <h2>Quick Actions</h2>
+              <div className={styles.adpQuicActions}>
+                <QuickAction />
               </div>
             </div>
           </div>
