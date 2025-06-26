@@ -2,20 +2,20 @@ import { useState, useEffect } from "react";
 import styles from "./manage-profile.module.css";
 
 // components
-import AdminNav from "../../components/navigation/AdminNav";
+import AgentNav from "../../components/navigation/AgentNav";
 
 // reacf
 import { useAuth } from "../../api/AuthContext";
 import { useNavigate } from "react-router-dom";
 
-export default function AdminProfile() {
+export default function AgentProfile() {
   const navigate = useNavigate();
   const { user, loading, logout } = useAuth();
 
   if (loading) return <p>Loading...</p>;
   return (
     <>
-      <AdminNav />
+      <AgentNav />
       <main className={styles.manageProfilePage}>
         <div className={styles.manageProfileContainer}>
           <h1>Manage Profile</h1>

@@ -36,13 +36,15 @@ export default function AdminProfileModal({ closeProfileAction }) {
             Account Settings
           </button>
           {/* <button onClick={() => navigate("/settings")}>Settings</button> */}
-          <button 
+          <button
             className={styles.pmButtonLogOut}
             onClick={() => {
               closeProfileAction(false); // close modal first
               logout(); // perform logout
             }}
-          >Log Out</button>
+          >
+            Log Out
+          </button>
         </div>
       </div>
     </div>
