@@ -191,8 +191,13 @@ CORS_ALLOW_ALL_ORIGINS = True
 # }
 
 # Celery settings
-CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL')
-CELERY_TASK_DEFAULT_QUEUE = 'workflow_send'
+CELERY_BROKER_URL = os.getenv('DJANGO_CELERY_BROKER_URL')
+
+# Queue names
+DJANGO_NOTIFICATION_QUEUE = os.getenv('DJANGO_NOTIFICATION_QUEUE', 'notification-queue-default')
+DJANGO_TICKET_STATUS_QUEUE = os.getenv('DJANGO_TICKET_STATUS_QUEUE', 'ticket_status-default')
+
+CELERY_TASK_DEFAULT_QUEUE = DJANGO_NOTIFICATION_QUEUE
 CELERY_TASK_DEFAULT_DELIVERY_MODE = 'persistent'
 CELERY_TASK_ACKS_LATE = True
 CELERY_ACCEPT_CONTENT = ['json']
@@ -203,8 +208,8 @@ USER_SERVICE_URL = os.getenv('DJANGO_USER_SERVICE')
 BASE_URL = os.getenv('DJANGO_USER_SERVICE')
 
 CELERY_TASK_ROUTES = {
-    "notifications.tasks.create_assignment_notification": {"queue": "notification-queue-prod"},
-    'send_ticket_status': {'queue': 'ticket_status-prod'},
+    "notifications.tasks.create_assignment_notification": {"queue": DJANGO_NOTIFICATION_QUEUE},
+    'send_ticket_status': {'queue': DJANGO_TICKET_STATUS_QUEUE},
 }
 
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
