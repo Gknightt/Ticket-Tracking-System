@@ -42,7 +42,7 @@ function AgentItem({ item, onActivateClick }) {
       <td>{item.is_active ? "🟢 Active" : "🔴 Inactive"}</td>
       <td>
         <button className={general.btn} onClick={() => onActivateClick(item)}>
-          👁
+          <i className="fa-solid fa-pen-to-square"></i>
         </button>
       </td>
     </tr>
