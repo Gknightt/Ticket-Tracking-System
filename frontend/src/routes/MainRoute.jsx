@@ -25,6 +25,7 @@ import NotFound from "../pages/error/NotFound";
 import AdminTicketDetail from "../pages/admin/ticket-detail-page/AdminTicketDetail";
 import TEST from "../pages/test";
 import AdminProfile from "../pages/auth/AdminProfile";
+import ManageProfile from "../pages/auth/ManageProfile";
 
 export default function MainRoute() {
   return (
@@ -40,7 +41,8 @@ export default function MainRoute() {
         <Route path="/agent/track" element={<Track />} />
         <Route path="/agent/archive" element={<Archive />} />
         <Route path="/agent/ticket/:id" element={<TicketDetail />} />
-        <Route path="/profile" element={<Profile />} />
+        {/* <Route path="/profile" element={<Profile />} /> */}
+        <Route path="agent/profile" element={<ManageProfile />} />
       </Route>
 
       {/* PROTECTED ADMIN ROUTES */}
@@ -54,10 +56,11 @@ export default function MainRoute() {
         <Route path="/admin/ticket/:id" element={<AdminTicketDetail />} />
         <Route path="/admin/assigned" element={<AdminTicket />} />
         <Route path="/admin/workflow/:uuid" element={<WorkflowDetail />} />
-        <Route path="admin/profile" element={<AdminProfile />} />
+        {/* <Route path="admin/profile" element={<AdminProfile />} /> */}
+        <Route path="admin/profile" element={<ManageProfile />} />
       </Route>
 
-      {/* <Route path="/test" element={<TEST />} /> */}
+      {/* <Route path="/test" element={<ManageProfile />} /> */}
 
       {/* 404 */}
       <Route path="*" element={<NotFound />} />
