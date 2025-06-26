@@ -203,8 +203,8 @@ USER_SERVICE_URL = os.getenv('DJANGO_USER_SERVICE')
 BASE_URL = os.getenv('DJANGO_USER_SERVICE')
 
 CELERY_TASK_ROUTES = {
-    "notifications.tasks.create_assignment_notification": {"queue": "notification-queue"},
-    'send_ticket_status': {'queue': 'ticket_status'},
+    "notifications.tasks.create_assignment_notification": {"queue": "notification-queue-prod"},
+    'send_ticket_status': {'queue': 'ticket_status-prod'},
 }
 
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')

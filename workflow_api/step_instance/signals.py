@@ -77,7 +77,7 @@ def assign_user_to_step_instance(sender, instance, created, **kwargs):
         celery.send_task(
             "notifications.tasks.create_assignment_notification",
             args=[selected_user_id, message, str(instance.step_instance_id)],
-            queue="notification-queue"
+            queue="notification-queue-prod"
         )
 
     except Exception as e:
