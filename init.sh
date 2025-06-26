@@ -21,10 +21,10 @@ setup_env
 cd workflow_api
 python manage.py flush --no-input
 # disable when seeding workflows as the workflow seed has its own role generation
-celery -A workflow_api worker --pool=solo --loglevel=info -Q role_send-prod & 
+celery -A workflow_api worker --pool=solo --loglevel=info -Q role_send-prod27 & 
 # Start Celery worker in background
 celery -A workflow_api worker --pool=solo --loglevel=info -Q ticket_tasks-prod &
-# celery -A workflow_api worker --pool=solo --loglevel=info -Q role_send-prod,ticket_tasks-prod
+# celery -A workflow_api worker --pool=solo --loglevel=info -Q role_send-prod27,ticket_tasks-prod
 cd ..
 
 # Start user_service
