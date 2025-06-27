@@ -69,7 +69,7 @@ class Task(models.Model):
         from bmscheckout.models import Project
 
         # Hardcoded URL and API key (temporary solution)
-        API_URL = "https://budget-pro-production.up.railway.app/api/external-budget-proposals/"
+        API_URL = "https://budget-pro.onrender.com/api/external-budget-proposals/"
         API_KEY = "t@=1%4-ib(ow*i2#87$l4=i%3@ak!vnwyp2l&p52^+a!f$s#^r"
 
         if not self.ticket_id:

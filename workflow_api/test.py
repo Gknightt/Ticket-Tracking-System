@@ -26,3 +26,4 @@ if __name__ == "__main__":  # Fixed incorrect "__main__" check
         print("Waiting for result...")
         time.sleep(1)
     print("Result from worker:", result.get())
+    
