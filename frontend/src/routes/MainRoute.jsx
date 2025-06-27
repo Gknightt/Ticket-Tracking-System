@@ -22,7 +22,6 @@ import AdminTicket from "../pages/admin/ticket-page/AdminTicket";
 import Login from "../pages/auth/Login";
 import PasswordReset from "../pages/auth/PasswordReset";
 import NotFound from "../pages/error/NotFound";
-import AdminTicketDetail from "../pages/admin/ticket-detail-page/AdminTicketDetail";
 import AdminProfile from "../pages/auth/AdminProfile";
 import ProtectedRegister from "./ProtectedRegister";
 import ManageProfile from "../pages/auth/ManageProfile";
@@ -30,6 +29,8 @@ import AgentProfile from "../pages/auth/AdminProfile";
 
 // test
 import Test from "../pages/test";
+import AdminTicketDetail from "../pages/admin/ticket-detail-page/AdminTicketDetail";
+import AdminArchiveDetail from "../pages/admin/archive-page/AdminArchiveDetail";
 
 export default function MainRoute() {
   return (
@@ -55,6 +56,7 @@ export default function MainRoute() {
         <Route path="/admin/workflow" element={<Workflow />} />
         <Route path="/admin/agent" element={<Agent />} />
         <Route path="/admin/archive" element={<AdminArchive />} />
+        <Route path="/admin/archive/:id" element={<AdminArchiveDetail />} />
         <Route path="/admin/workflow/detail" element={<WorkflowDetail />} />
         <Route path="/admin/ticket" element={<AdminTicket />} />
         <Route path="/admin/ticket/:id" element={<AdminTicketDetail />} />

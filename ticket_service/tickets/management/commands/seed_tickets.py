@@ -10,6 +10,8 @@ from django.utils.timezone import make_aware
 from django.conf import settings
 from tickets.models import Ticket
 
+# ... imports unchanged ...
+
 # Constants
 PRIORITIES = ['Low', 'Medium', 'High', 'Critical']
 STATUSES = ['Open']
@@ -28,11 +30,18 @@ VALID_WORKFLOWS = [
     ("IT Department", "IT Category", "Software Installation"),
 ]
 
+# Additional random categories and subcategories (used outside workflows)
+RANDOM_CATEGORIES = [
+    ("HR Department", "HR Category", ["Leave Request", "Payroll Issue", "New Hire"]),
+    ("Facilities", "Facility Category", ["Maintenance", "Room Booking", "Equipment Repair"]),
+    ("Logistics", "Logistics Category", ["Delivery", "Inventory", "Shipping Delay"]),
+]
+
 class Command(BaseCommand):
-    help = "Seed the Ticket model with actual file-based attachments matching defined workflows."
+    help = "Seed the Ticket model with valid and random category/subcategory combinations."
 
     def handle(self, *args, **kwargs):
-        self.stdout.write("📥 Seeding Tickets with valid workflow combinations and attachments...")
+        self.stdout.write("📥 Seeding Tickets with valid workflows and random categories...")
 
         if not os.path.isdir(SAMPLE_FOLDER):
             self.stdout.write(self.style.ERROR(f"❌ Attachment folder not found: {SAMPLE_FOLDER}"))
@@ -42,7 +51,7 @@ class Command(BaseCommand):
         dest_dir = os.path.join(settings.MEDIA_ROOT, ATTACHMENT_UPLOAD_DIR)
         os.makedirs(dest_dir, exist_ok=True)
 
-        # Gather files
+        # Gather sample files
         sample_files = [
             os.path.join(SAMPLE_FOLDER, f)
             for f in os.listdir(SAMPLE_FOLDER)
@@ -51,10 +60,15 @@ class Command(BaseCommand):
         if not sample_files:
             self.stdout.write(self.style.WARNING("⚠️ No sample attachment files found. Proceeding without attachments."))
 
-        # Shuffle combinations to randomize selection
-        random.shuffle(VALID_WORKFLOWS)
+        # Generate 10 valid + 10 random tickets
+        for i in range(10):
+            if i < len(VALID_WORKFLOWS):
+                department, category, subcategory = VALID_WORKFLOWS[i]
+            else:
+                dept, cat, subs = random.choice(RANDOM_CATEGORIES)
+                department, category = dept, cat
+                subcategory = random.choice(subs)
 
-        for i, (department, category, subcategory) in enumerate(VALID_WORKFLOWS):
             submit_date = make_aware(datetime.now() - timedelta(days=random.randint(1, 30)))
             update_date = submit_date + timedelta(days=random.randint(0, 5))
 
@@ -104,7 +118,7 @@ class Command(BaseCommand):
                 subject=f"Issue {i+1}: {subcategory}",
                 category=category,
                 subcategory=subcategory,
-                description="Generated ticket with actual attachment files.",
+                description="Generated ticket with valid or random category.",
                 scheduled_date=(submit_date + timedelta(days=random.randint(1, 5))).date(),
                 submit_date=submit_date,
                 update_date=update_date,
@@ -120,6 +134,8 @@ class Command(BaseCommand):
                 fetched_at=update_date,
             )
 
-            self.stdout.write(self.style.SUCCESS(f"✅ Created: {ticket.subject} ({department}, {category}, {subcategory})"))
+            self.stdout.write(self.style.SUCCESS(
+                f"✅ Created: {ticket.subject} ({department}, {category}, {subcategory})"
+            ))
 
         self.stdout.write(self.style.SUCCESS("🎉 Done seeding all tickets!"))

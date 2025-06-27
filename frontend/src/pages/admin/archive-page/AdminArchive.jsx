@@ -11,20 +11,26 @@ import { useEffect, useState } from "react";
 
 // table
 import TicketTable from "../../../tables/admin/TicketTable";
+import UnassignedTable from "../../../tables/admin/UnassignedTable"; // New table for Unassigned
+import TasksTable from "../../../tables/admin/TasksTable"; // Table for Active/Inactive
 
 // hook
 import useUserTickets from "../../../api/useUserTickets";
-import useFetchActionLogs from "../../../api/workflow-graph/useActionLogs";
-import useTicketsFetcher from "../../../api/useTickets";
+import useTasksFetcher from "../../../api/useTasksFetcher";
+import useTicketsFetcher from "../../../api/useTicketsFetcher";
+import AddAgent from "../agent-page/modals/AddAgent";
+import TicketTaskAssign from "./modals/ActivateAgent";
 
 export default function AdminArchive() {
-  const { userTickets, loading, error } = useUserTickets();
-  const {tickets, fetchTickets } = useTicketsFetcher();
-
-  
+  const { userTickets, loading: userTicketsLoading, error: userTicketsError } = useUserTickets();
+  const { tickets, fetchTickets, loading: ticketsLoading, error: ticketsError } = useTicketsFetcher();
+  const { tasks, fetchTasks, loading: tasksLoading, error: tasksError } = useTasksFetcher();
 
   // Tabs
   const [activeTab, setActiveTab] = useState("All");
+  const [openAddAgent, setOpenAddAgent] = useState(false);
+
+  const onInviteAgent = () => setOpenAddAgent(true);
 
   // Filters
   const [filters, setFilters] = useState({
@@ -37,27 +43,28 @@ export default function AdminArchive() {
 
   // Status options
   const [statusOptions, setStatusOptions] = useState([]);
-  const [fetchedTickets, setFetchedTickets] = useState();
 
-
-
+  // Fetch tickets and tasks on component mount
+  useEffect(() => {
+    fetchTickets();
+    fetchTasks();
+  }, [fetchTickets, fetchTasks]);
 
   // Extract all ticket data with step_instance_id
   const allTickets = (userTickets || [])
     .filter((entry) => entry.task?.ticket)
     .map((entry) => ({
       ...entry.task.ticket,
-      step_instance_id: entry.step_instance_id, // ✅ attach here
-      hasacted: entry.has_acted, // ✅ attach here
+      step_instance_id: entry.step_instance_id,
+      hasacted: entry.has_acted,
     }));
-  
+
   // Extract status options on ticket update
   useEffect(() => {
     const statusSet = new Set(
       allTickets.map((t) => t.status).filter(Boolean)
     );
     setStatusOptions(["All", ...Array.from(statusSet)]);
-    fetchTickets();
   }, [userTickets]);
 
   // Handle tab click
@@ -86,16 +93,9 @@ export default function AdminArchive() {
     });
   };
 
-  // Filter tickets
-  const filteredTickets = tickets.filter((ticket) => {
-    // Filter by tab
+  // Filter tickets for the "Unassigned" tab
+  const filteredTickets = (tickets || []).filter((ticket) => {
     if (activeTab === "Unassigned" && ticket.is_task_allocated !== false) return false;
-
-    if (activeTab === "Active" && !["Open", "In Progress"].includes(ticket.status)) return false;
-
-    if (activeTab === "Inactive" && !["Closed", "Resolved"].includes(ticket.status)) return false;
-
-    if (activeTab !== "All" && activeTab !== "Unassigned" && activeTab !== "Active" && activeTab !== "Inactive" && ticket.priority !== activeTab) return false;
 
     // Filter by category
     if (filters.category && ticket.category !== filters.category) return false;
@@ -118,6 +118,40 @@ export default function AdminArchive() {
         ticket.ticket_id.toLowerCase().includes(search) ||
         ticket.subject.toLowerCase().includes(search) ||
         ticket.description.toLowerCase().includes(search)
+      )
+    ) {
+      return false;
+    }
+
+    return true;
+  });
+
+  // Filter tasks for the "Active" and "Inactive" tabs
+  const filteredTasks = (tasks || []).filter((task) => {
+    if (activeTab === "Active" && !["Open", "In Progress"].includes(task.ticket?.status)) return false;
+    if (activeTab === "Inactive" && !["Closed", "Resolved"].includes(task.ticket?.status)) return false;
+
+    // Filter by category
+    if (filters.category && task.ticket?.category !== filters.category) return false;
+
+    // Filter by status
+    if (filters.status && task.ticket?.status !== filters.status) return false;
+
+    // Filter by date range
+    const openedDate = new Date(task.ticket?.opened_on);
+    const start = filters.startDate ? new Date(filters.startDate) : null;
+    const end = filters.endDate ? new Date(filters.endDate) : null;
+    if (start && openedDate < start) return false;
+    if (end && openedDate > end) return false;
+
+    // Filter by search
+    const search = filters.search.toLowerCase();
+    if (
+      search &&
+      !(
+        task.ticket?.ticket_id?.toLowerCase().includes(search) ||
+        task.ticket?.subject?.toLowerCase().includes(search) ||
+        task.ticket?.description?.toLowerCase().includes(search)
       )
     ) {
       return false;
@@ -163,27 +197,45 @@ export default function AdminArchive() {
           {/* Table */}
           <div className={styles.tpTableSection}>
             <div className={general.tpTable}>
-              {loading && (
+              {(userTicketsLoading || ticketsLoading || tasksLoading) && (
                 <div className={styles.loaderOverlay}>
                   <div className={styles.loader}></div>
                 </div>
               )}
-              <TicketTable
-                tickets={filteredTickets}
-                searchValue={filters.search}
-                onSearchChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    search: e.target.value,
-                  }))
-                }
-                error={error}
-                activeTab={activeTab}
-              />
+              {activeTab === "All" && (
+                <UnassignedTable
+                  tickets={filteredTickets}
+                  searchValue={filters.search}
+                  onSearchChange={(e) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      search: e.target.value,
+                    }))
+                  }
+                  error={userTicketsError || ticketsError || tasksError}
+                  activeTab={activeTab}
+                />
+              )}
+              {(activeTab === "Active" || activeTab === "Inactive") && (
+                <TasksTable
+                  tickets={filteredTasks}
+                  activeTab={activeTab}
+                  error={tasksError}
+                />
+              )}
+              {activeTab === "Unassigned" && (
+                <UnassignedTable
+
+                  tickets={filteredTickets}
+                  error={ticketsError}
+                />
+              )}
             </div>
           </div>
         </section>
       </main>
+
+      {openAddAgent && <TicketTaskAssign closeAddAgent={() => setOpenAddAgent(false)} />}
     </>
   );
 }

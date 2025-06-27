@@ -205,3 +205,27 @@ class ManualTaskAssignmentView(APIView):
                 "data": result
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+
+
+# tickets/views.py
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from tickets.models import WorkflowTicket
+from workflow.models import Workflows
+from tickets.utils import manually_assign_task
+
+class ManualTaskAssignmentView(APIView):
+    def post(self, request, ticket_id, workflow_id):
+        try:
+            ticket = WorkflowTicket.objects.get(pk=ticket_id)
+            workflow = WorkflowTicket.objects.get(pk=workflow_id)
+        except (WorkflowTicket.DoesNotExist, WorkflowTicket.DoesNotExist):
+            return Response({"detail": "Ticket or workflow not found."}, status=404)
+
+        success = manually_assign_task(ticket, workflow)
+        if success:
+            return Response({"detail": "Task manually assigned."}, status=200)
+        else:
+            return Response({"detail": "Task could not be assigned."}, status=400)
