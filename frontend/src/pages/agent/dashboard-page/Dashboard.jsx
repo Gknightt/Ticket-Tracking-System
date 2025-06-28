@@ -17,19 +17,9 @@ import useUserTickets from "../../../api/useUserTickets";
 export default function Dashboard() {
   const { userTickets, loading, error } = useUserTickets();
 
-  // old
-  // const allTickets = (userTickets || [])
-  //   .filter((e) => e.task?.ticket)
-  //   .map((e) => ({
-  //     ...e.task.ticket,
-  //     step_instance_id: e.step_instance_id,
-  //     has_acted: e.has_acted,
-  //     agent: e.agent, 
-  //   }));
-
   // fetch tickets and filter those tickets that !has_acted
   const allTickets = (userTickets || [])
-    .filter((e) => e.task?.ticket && !e.has_acted) 
+    .filter((e) => e.task?.ticket && !e.has_acted)
     .map((e) => ({
       ...e.task.ticket,
       step_instance_id: e.step_instance_id,
@@ -56,6 +46,9 @@ export default function Dashboard() {
 
     if (statusKey === "new") counts.new += 1;
     if (statusKey === "open") counts.open += 1;
+
+    if (statusKey === "inprogress") counts.open += 1;
+
     if (statusKey === "resolved") counts.resolved += 1;
     if (statusKey === "onhold") counts.onHold += 1;
     if (statusKey === "inprogress") counts.inProgress += 1;
@@ -74,11 +67,14 @@ export default function Dashboard() {
   }).length;
 
   // task today
-  const todayTasks = allTickets.filter((t) => {
-    const created = t.submit_date?.split("T")[0];
-    const updated = t.update_date?.split("T")[0];
-    return created === today || updated === today;
-  });
+  // const todayTasks = allTickets.filter((t) => {
+  //   const created = t.submit_date?.split("T")[0];
+  //   const updated = t.update_date?.split("T")[0];
+  //   return created === today || updated === today;
+  // });
+
+  // task today redefined: all unacted tickets
+  const todayTasks = allTickets; // already filtered with !has_acted
 
   // task ongoing
   const ongoingTasks = allTickets

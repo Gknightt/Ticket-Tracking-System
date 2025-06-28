@@ -1,13 +1,11 @@
-// styles
 import styles from "./workflow.module.css";
 import general from "../../../style/general.module.css";
 
 // components
 import AdminNav from "../../../components/navigation/AdminNav";
-import FilterPanel from "../../../components/component/FilterPanel";
-
-// modal
+import WorkflowFilterPanel from "../../../components/component/WorkflowFilterPanel";
 import AddWorkflow from "./modals/AddWorkflow";
+import LoadingSpinner from "../../../components/ui/LoadingSpinner";
 
 // react
 import { useEffect, useState } from "react";
@@ -15,27 +13,96 @@ import { useEffect, useState } from "react";
 // table
 import WorkflowTable from "../../../tables/admin/WorkflowTable";
 
-// axios
-import axios from "axios";
-import useFetchWorkflows from "../../../api/useFetchWorkflows";
 // api
-const workflowURL = import.meta.env.VITE_TICKET_API;
-
-
+import useFetchWorkflows from "../../../api/useFetchWorkflows";
 
 export default function Workflow() {
-  // open ticket action modal
   const [openAddWorkflow, setOpenAddWorkflow] = useState(false);
-  const {workflows, refetch} = useFetchWorkflows();
-  const [allworkflow, setAllWorkflow] = useState([]);
+  // const { workflows, refetch } = useFetchWorkflows();
+  const { workflows, refetch, loading } = useFetchWorkflows();
+  const isLoading = workflows.length === 0;
+  const [allWorkflow, setAllWorkflow] = useState([]);
 
+  // Status & Category options
+  const [statusOptions, setStatusOptions] = useState([]);
+  const [categoryOptions, setCategoryOptions] = useState([]);
+
+  // Filters
+  const [filters, setFilters] = useState({
+    category: "",
+    status: "",
+    startDate: "",
+    endDate: "",
+    search: "",
+  });
+
+  // Update workflow state on data fetch
   useEffect(() => {
     if (workflows.length > 0) {
-      // setOpenAddWorkflow(workflows)
-      setAllWorkflow(workflows)
-    }
-  }, [workflows])
+      setAllWorkflow(workflows);
 
+      // Extract filter options from data
+      const statusSet = new Set();
+      const categorySet = new Set();
+
+      workflows.forEach((w) => {
+        if (w.status) statusSet.add(w.status);
+        if (w.category) categorySet.add(w.category);
+      });
+
+      setStatusOptions([...Array.from(statusSet)]);
+      setCategoryOptions([...Array.from(categorySet)]);
+    }
+  }, [workflows]);
+
+  // Handle filter input
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  // Reset all filters
+  const resetFilters = () => {
+    setFilters({
+      category: "",
+      status: "",
+      startDate: "",
+      endDate: "",
+      search: "",
+    });
+  };
+
+  // Apply filters to workflows
+  const filteredWorkflows = allWorkflow.filter((workflow) => {
+    if (filters.category && workflow.category !== filters.category)
+      return false;
+    if (filters.status && workflow.status !== filters.status) return false;
+
+    const createdDate = new Date(workflow.created_at);
+    const start = filters.startDate ? new Date(filters.startDate) : null;
+    const end = filters.endDate ? new Date(filters.endDate) : null;
+
+    if (start && createdDate < start) return false;
+    if (end && createdDate > end) return false;
+
+    const search = filters.search.toLowerCase();
+    if (
+      search &&
+      !(
+        workflow.name.toLowerCase().includes(search) ||
+        workflow.category.toLowerCase().includes(search) ||
+        workflow.sub_category.toLowerCase().includes(search) ||
+        workflow.description.toLowerCase().includes(search)
+      )
+    ) {
+      return false;
+    }
+
+    return true;
+  });
 
   return (
     <>
@@ -44,21 +111,60 @@ export default function Workflow() {
         <section className={styles.wpHeader}>
           <h1>Workflow</h1>
         </section>
+
         <section className={styles.wpBody}>
+          {/* Filters */}
           <div className={styles.wpFilterSection}>
-            <FilterPanel />
+            <WorkflowFilterPanel
+              filters={filters}
+              onFilterChange={handleFilterChange}
+              categoryOptions={categoryOptions}
+              statusOptions={statusOptions}
+              onResetFilters={resetFilters}
+            />
           </div>
-          <div className={styles.wpTableSection}>
+
+          <br />
+
+          {/* Table */}
+          <div className={general.tpTable}>
+            {isLoading ? (
+              <LoadingSpinner height="200px" />
+            ) : (
+              <WorkflowTable
+                searchValue={filters.search}
+                onSearchChange={(e) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    search: e.target.value,
+                  }))
+                }
+                workflows={filteredWorkflows}
+                onAddWorkflow={setOpenAddWorkflow}
+              />
+            )}
+          </div>
+
+          {/* <div className={styles.wpTableSection}>
             <div className={general.tpTable}>
-              <WorkflowTable workflows={allworkflow} onAddWorkflow={setOpenAddWorkflow}/>
+              <WorkflowTable
+                searchValue={filters.search}
+                onSearchChange={(e) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    search: e.target.value,
+                  }))
+                }
+                workflows={filteredWorkflows}
+                onAddWorkflow={setOpenAddWorkflow}
+              />
             </div>
-          </div>
+          </div> */}
         </section>
       </main>
+
       {openAddWorkflow && (
-        <AddWorkflow closeAddWorkflow={() => 
-          setOpenAddWorkflow(false)
-        } />
+        <AddWorkflow closeAddWorkflow={() => setOpenAddWorkflow(false)} />
       )}
     </>
   );

@@ -53,7 +53,7 @@ export default function AdminDashboard() {
     if (priorityKey === "critical") counts.critical += 1;
 
     // Group new tickets by month
-    if (statusKey === "new" && t.created_at) {
+    if (statusKey === "open" && t.created_at) {
       const month = format(new Date(t.submit_date), "MMMM");
       monthlyNewTickets[month] = (monthlyNewTickets[month] || 0) + 1;
     }
@@ -98,7 +98,7 @@ export default function AdminDashboard() {
 
           <div className={styles.adpContentSection}>
             <div className={styles.adpVisuals}>
-              <h2>Charts</h2>
+              <h2>Monthly Tickets</h2>
               <LineChart chartData={monthlyNewTickets} />
             </div>
             <div className={styles.adpQuickActionSection}>
