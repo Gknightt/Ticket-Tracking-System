@@ -28,10 +28,11 @@ class CheckoutResolveView(APIView):
         checkout.is_resolved = is_resolved
         checkout.save()
 
-                # ✅ Update ticket status to "Resolved" if resolved
+        # ✅ Update ticket status to "Resolved" if resolved
         if is_resolved:
             try:
-                ticket = WorkflowTicket.objects.get(id=ticket_id)
+                # Query using the `ticket_id` field instead of `id`
+                ticket = WorkflowTicket.objects.get(ticket_id=ticket_id)
                 ticket.status = "Resolved"  # or your enum/choice value
                 ticket.save()
             except WorkflowTicket.DoesNotExist:
