@@ -124,6 +124,12 @@
   font-size: var(--base-font-size);
 }
 
+.errorText {
+  color: red;
+  font-size: 0.875rem;
+  margin-top: 4px;
+}
+
 /* textarea */
 textarea {
   resize: none;

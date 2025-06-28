@@ -89,6 +89,14 @@
   outline: none;
 }
 
+.roleDropdown {
+  border: none;
+  padding: 10px 10px;
+  border: var(--border-very-light-gray);
+  border-radius: 4px;
+  color: var(--table-color);
+}
+
 .submitBtn {
   background-color: var(--primary-color);
   color: var(--bg-color);

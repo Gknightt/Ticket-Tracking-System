@@ -240,6 +240,18 @@ input[type="password"]::-ms-reveal {
   display: inline-block;
 }
 
+
+.backButton {
+  border: none;
+  color: var(--primary-color);
+  background-color: var(--bg-color);
+  cursor: pointer;
+}
+
+.backButton:hover {
+  font-weight: bold;
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
