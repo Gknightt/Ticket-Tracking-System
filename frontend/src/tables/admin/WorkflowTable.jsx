@@ -54,7 +54,6 @@ export default function WorkflowTable({
   workflows,
   searchValue = "",
   onSearchChange,
-  activeTab,
   onAddWorkflow,
 }) {
   // Pagination state

@@ -78,6 +78,7 @@ export default function AddAgent({ closeAddAgent }) {
             <div className={styles.inputGroup}>
               <label htmlFor="role">Role</label>
               <select
+                className={styles.roleDropdown}
                 id="role"
                 value={inputRole}
                 onChange={(e) => setInputRole(e.target.value)}

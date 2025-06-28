@@ -1,8 +1,5 @@
-// style
 import useTriggerAction from "../../../../api/useTriggerAction";
 import styles from "./ticket-action.module.css";
-
-// hooks
 import { useState } from "react";
 
 export default function TicketAction({
@@ -12,10 +9,10 @@ export default function TicketAction({
   instance,
 }) {
   const [selectedActionId, setSelectedActionId] = useState("");
-  const [triggerNow, setTriggerNow] = useState(false);
   const [comment, setComment] = useState("");
+  const [triggerNow, setTriggerNow] = useState(false);
+  const [errors, setErrors] = useState({});
 
-  // Use the custom hook to trigger an action
   const { loading, error, response } = useTriggerAction({
     uuid: instance,
     action_id: selectedActionId,
@@ -24,44 +21,33 @@ export default function TicketAction({
     trigger: triggerNow,
   });
 
-  // OLD
-  // const handleClick = () => {
-  //   if (!selectedActionId) {
-  //     alert("Please select an action first.");
-  //     return;
-  //   }
-  //   setTriggerNow(true);
-  // };
-
-  // NEW
   const handleClick = () => {
+    const newErrors = {};
     if (!selectedActionId) {
-      alert("Please select an action first.");
-      return;
+      newErrors.action = "Please select an action.";
+    }
+    if (!comment.trim()) {
+      newErrors.comment = "Comment is required.";
     }
 
-    setTriggerNow(true); // Trigger the action
+    setErrors(newErrors);
 
-    // Reload the page after a short delay
+    if (Object.keys(newErrors).length > 0) return;
+
+    setTriggerNow(true);
     setTimeout(() => {
       window.location.reload();
-    }, 1000); // adjust the delay if needed
+    }, 1000);
   };
 
-  // Reset the trigger after the action is completed
+  // Reset the trigger after action completes
   if (triggerNow && !loading && (error || response)) {
-    setTimeout(() => setTriggerNow(false), 500); // Reset after 0.5s
+    setTimeout(() => setTriggerNow(false), 500);
   }
 
   return (
-    <div
-      className={styles.taOverlayWrapper}
-      onClick={() => closeTicketAction(false)}
-    >
-      <div
-        className={styles.ticketActionModal}
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className={styles.taOverlayWrapper} onClick={() => closeTicketAction(false)}>
+      <div className={styles.ticketActionModal} onClick={(e) => e.stopPropagation()}>
         <div className={styles.taExit} onClick={() => closeTicketAction(false)}>
           <i className="fa-solid fa-xmark"></i>
         </div>
@@ -77,13 +63,11 @@ export default function TicketAction({
         </div>
 
         <div className={styles.tdValidation}>
-          {error && error.comment && (
-            <p style={{ color: "red" }}>
-              {`Comment: ${error.comment.join(", ")}`}
-            </p>
-          )}
           {response && (
             <p style={{ color: "green" }}>Action triggered successfully!</p>
+          )}
+          {error && error.comment && (
+            <p style={{ color: "red" }}>{`Comment: ${error.comment.join(", ")}`}</p>
           )}
         </div>
 
@@ -109,6 +93,7 @@ export default function TicketAction({
                 </option>
               ))}
             </select>
+            {errors.action && <p className={styles.errorText}>{errors.action}</p>}
           </div>
 
           <div className={styles.taCommentCont}>
@@ -119,6 +104,7 @@ export default function TicketAction({
               value={comment}
               onChange={(e) => setComment(e.target.value)}
             />
+            {errors.comment && <p className={styles.errorText}>{errors.comment}</p>}
           </div>
 
           <button
