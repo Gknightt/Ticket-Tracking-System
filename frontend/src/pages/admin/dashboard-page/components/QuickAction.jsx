@@ -23,9 +23,12 @@ export default function QuickAction() {
         <i className="fas fa-edit"></i>
         Invite Agent
       </button>
-      <button className={styles.actionButton}>
-        <i className="fa-solid fa-users"></i>
-        Active Agent
+      <button
+        className={styles.actionButton}
+        onClick={() => navigate("/admin/archive")}
+      >
+        <i className="fa-solid fa-ticket"></i>
+        View All Tickets
       </button>
       {/* <button className={styles.actionButton}>
         <i className="fas fa-sync"></i>

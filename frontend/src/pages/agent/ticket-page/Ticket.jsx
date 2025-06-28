@@ -87,12 +87,45 @@ export default function AdminTicket() {
   };
 
   // Filter tickets
+  // const filteredTickets = allTickets.filter((ticket) => {
+  //   if (activeTab !== "All" && ticket.priority !== activeTab) return false;
+  //   if (filters.category && ticket.category !== filters.category) return false;
+  //   if (filters.status && ticket.status !== filters.status) return false;
+
+  //   const openedDate = new Date(ticket.submit_date);
+  //   const start = filters.startDate ? new Date(filters.startDate) : null;
+  //   const end = filters.endDate ? new Date(filters.endDate) : null;
+  //   if (start && openedDate < start) return false;
+  //   if (end && openedDate > end) return false;
+
+  //   const search = filters.search.toLowerCase();
+  //   if (
+  //     search &&
+  //     !(
+  //       ticket.ticket_id.toLowerCase().includes(search) ||
+  //       ticket.subject.toLowerCase().includes(search) ||
+  //       ticket.description.toLowerCase().includes(search)
+  //     )
+  //   ) {
+  //     return false;
+  //   }
+
+  //   return true;
+  // });
+
   const filteredTickets = allTickets.filter((ticket) => {
+    if (activeTab === "Acted") {
+      return ticket.hasacted === true;
+    }
+
+    // Exclude acted tickets from other tabs
+    if (ticket.hasacted === true) return false;
+
     if (activeTab !== "All" && ticket.priority !== activeTab) return false;
     if (filters.category && ticket.category !== filters.category) return false;
     if (filters.status && ticket.status !== filters.status) return false;
 
-    const openedDate = new Date(ticket.opened_on);
+    const openedDate = new Date(ticket.submit_date);
     const start = filters.startDate ? new Date(filters.startDate) : null;
     const end = filters.endDate ? new Date(filters.endDate) : null;
     if (start && openedDate < start) return false;
@@ -123,7 +156,7 @@ export default function AdminTicket() {
         <section className={styles.tpBody}>
           {/* Tabs */}
           <div className={styles.tpTabs}>
-            {["All", "Critical", "High", "Medium", "Low"].map((tab) => (
+            {["All", "Critical", "High", "Medium", "Low", "Acted"].map((tab) => (
               <a
                 key={tab}
                 href=""

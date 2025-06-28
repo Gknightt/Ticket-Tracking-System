@@ -136,11 +136,30 @@ export default function AdminTicketDetail() {
                 </p>
                 <div className={styles.tdMetaData}>
                   <p className={styles.tdDateOpened}>
-                    Opened On: {new Date(ticket?.created_at).toLocaleString()}
+                    Opened On:{" "}
+                    {new Date(ticket?.created_at).toLocaleDateString("en-US", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })}{" "}
+                    {new Date(ticket?.created_at).toLocaleTimeString("en-US", {
+                      hour: "numeric",
+                      minute: "2-digit",
+                      hour12: true,
+                    })}
                   </p>
                   <p className={styles.tdDateResolution}>
                     Expected Resolution:{" "}
-                    {new Date(ticket?.created_at).toLocaleString()}
+                    {new Date(ticket?.created_at).toLocaleDateString("en-US", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })}{" "}
+                    {new Date(ticket?.created_at).toLocaleTimeString("en-US", {
+                      hour: "numeric",
+                      minute: "2-digit",
+                      hour12: true,
+                    })}
                   </p>
                 </div>
               </div>
@@ -174,14 +193,6 @@ export default function AdminTicketDetail() {
             </div>
 
             <div className={styles.tdpRightCont}>
-              {/* <button
-                className={styles.actionButton}
-                onClick={() => {
-                  setOpenTicketAction(true);
-                }}
-              >
-                Make an Action
-              </button> */}
               <button
                 className={
                   ticket?.hasacted
