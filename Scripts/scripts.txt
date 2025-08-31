@@ -1,0 +1,7 @@
+change terminal to bash, for copy-paste
+
+./Scripts/dos2unix.sh
+./Scripts/env.sh
+./Scripts/init.sh
+./Scripts/reset.sh
+./Scripts/start_servers.sh

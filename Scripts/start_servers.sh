@@ -11,21 +11,28 @@ setup_env() {
         echo ".env already exists, skipping copy."
     fi
 }
-setup_env
 
-# not in public folder anymore
+# Set up environment for all services
+echo "Setting up environment for all services..."
+cd frontend
+setup_env
+cd ..
+
+cd user_service
+setup_env
+cd ..
+
+cd ticket_service
+setup_env
+cd ..
+
+# developmental part
+
 # Start JSON Server
 echo "Starting JSON server..."
 cd frontend
 npx json-server --watch db.json --port 5000 --host 0.0.0.0 &
 cd ..
-
-# Start workflow_service
-# echo "Starting workflow_service..."
-# cd workflow_service
-# python manage.py migrate
-# python manage.py runserver 0.0.0.0:2000 &
-# cd ..
 
 # Start user_service
 echo "Starting user_service..."
@@ -44,18 +51,11 @@ python manage.py seed_tickets
 python manage.py runserver 0.0.0.0:4000 &
 cd ..
 
-# # Start api gateway
-# echo "Starting API Gateway..."
-# cd api_gateway
-# python manage.py runserver 0.0.0.0:8001 &
-# cd ..
-
 # Start React app
 echo "Starting React app..."
 cd frontend
-setup_env
 npm install
 npm run dev &
-
 cd ..
-echo "Starting workflow_service..."
+
+echo "All services started successfully."
