@@ -1,0 +1,107 @@
+.fpShowFilter {
+  display: flex;
+  justify-content: flex-end;
+  /* margin-bottom: 10px; */
+}
+
+.fpShowFilter span{
+  color: var(--primary-color);
+  font-size: var(--table-head-size);
+  cursor: pointer;
+}
+
+.tfContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  background-color: var(--bg1-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e8e8e8;
+  border-radius: 16px;
+  padding: 20px;
+  justify-content: space-between;
+}
+
+.tfSelectGroup,
+.tfDateGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 250px;
+  /* Set minimum width */
+  max-width: 300px;
+  /* Optional: limit the max width */
+}
+
+.tfLabel {
+  font-weight: bold;
+  color: #333;
+  font-size: 14px;
+}
+
+.tfSelect {
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  font-size: 14px;
+}
+
+.tfButtonGroup {
+  display: flex;
+  justify-content: flex-start;
+  /* Align the buttons at the start */
+  gap: 1rem;
+  flex: 1;
+  min-width: 250px;
+  max-width: 350px;
+  align-self: flex-end;
+  /* Align the button group to the bottom of the row */
+}
+
+.tfButtonApply {
+  transition: background-color 0.3s ease;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 20px;
+  color: var(--bg-color);
+  background-color: var(--primary-color);
+  cursor: pointer;
+}
+
+.tfButton {
+  transition: background-color 0.3s ease;
+  padding: 10px 20px;
+  border-radius: 20px;
+  color: #333;
+  border: 2px solid var(--primary-color);
+  background-color: var(--bg-color);
+  cursor: pointer;
+}
+
+.tfButtonApply:hover {
+  background-color: var(--primary-color-hover);
+}
+
+.tfButton:hover {
+  background-color: var(--primary-color);
+  color: var(--bg-color);
+}
+.tfSelect,
+.tfButton,
+.tfButtonApply {
+  width: 100%;
+  /* Make select inputs and buttons full width within their container */
+}
+
+@media (max-width: 768px) {
+  .tfContainer {
+    flex-direction: column;
+    /* Stack elements vertically on smaller screens */
+  }
+
+  .tfButtonGroup {
+    justify-content: center;
+    /* Center buttons on smaller screens */
+  }
+}

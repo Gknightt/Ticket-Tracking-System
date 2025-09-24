@@ -23,7 +23,7 @@
 .rpBody {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 20px;
 }
 
 /* rpTabs */
@@ -58,8 +58,8 @@
 /* KPI Cards */
 .kpiGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
 }
 
 .kpiCard {
@@ -109,6 +109,7 @@
 .chartSection {
   width: 100%;
   background-color: var(--bg1-color);
+  /* background-color: red; */
   border-radius: 20px;
   padding: 20px;
   transition: all 0.3s ease;
@@ -133,7 +134,7 @@
   gap: 1.5rem;
 }
 
-.chartContainer {
+/* .chartContainer {
   background-color: var(--bg-content-color);
   padding: 1.5rem;
   border-radius: 8px;
@@ -149,7 +150,7 @@
 
 .chartPlaceholder {
   overflow: hidden;
-}
+} */
 
 .pieChart,
 .barChart,

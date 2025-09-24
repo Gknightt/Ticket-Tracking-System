@@ -7,17 +7,13 @@ import TicketCard from "./components/TicketCard";
 import QuickAction from "./components/QuickAction";
 
 // charts
-// import LineChart from "./charts/LineChart";
-import LineChart from "../../../components/charts/LineChart";
-import DoughnutChart from "../../../components/charts/DoughnutChart";
-import ChartContainer from "../../../components/charts/ChartContainer";
+import LineChart from "./charts/LineChart";
 
 // hooks
 import useUserTickets from "../../../api/useUserTickets";
 
 // date helper
 import { format } from "date-fns";
-import PieChart from "../../../components/charts/PieChart";
 
 export default function AdminDashboard() {
   const { userTickets, loading, error } = useUserTickets();
@@ -43,14 +39,10 @@ export default function AdminDashboard() {
   };
 
   const monthlyNewTickets = {};
-  const priorityCounts = {};
-  const statusCounts = {};
-  let actedCount = 0;
-  let notActedCount = 0;
 
   allTickets.forEach((t) => {
-    const statusKey = t.status?.toLowerCase().replace(/\s+/g, "");
-    const priorityKey = t.priority?.toLowerCase().replace(/\s+/g, "");
+    const statusKey = t.status.toLowerCase().replace(/\s+/g, "");
+    const priorityKey = t.priority.toLowerCase().replace(/\s+/g, "");
 
     if (statusKey === "new") counts.new += 1;
     if (statusKey === "open") counts.open += 1;
@@ -60,21 +52,8 @@ export default function AdminDashboard() {
     if (statusKey === "rejected") counts.rejected += 1;
     if (priorityKey === "critical") counts.critical += 1;
 
-    // Priority distribution
-    if (priorityKey) {
-      priorityCounts[priorityKey] = (priorityCounts[priorityKey] || 0) + 1;
-    }
-    // Status distribution
-    if (statusKey) {
-      statusCounts[statusKey] = (statusCounts[statusKey] || 0) + 1;
-    }
-
-    // Acted vs Not Acted
-    if (t.has_acted) actedCount += 1;
-    else notActedCount += 1;
-
     // Group new tickets by month
-    if (t.submit_date) {
+    if (statusKey === "open" && t.created_at) {
       const month = format(new Date(t.submit_date), "MMMM");
       monthlyNewTickets[month] = (monthlyNewTickets[month] || 0) + 1;
     }
@@ -117,39 +96,15 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div className={styles.layoutRow}>
-            <div className={styles.layoutSection}>
-              <h2>Ticket Analytics</h2>
-              <div className={styles.layoutRow}>
-                <ChartContainer title={"New Tickets This Month"}>
-                  <LineChart
-                    labels={Object.keys(monthlyNewTickets)}
-                    dataPoints={Object.values(monthlyNewTickets)}
-                    chartLabel="Tickets"
-                    chartTitle="Monthly New Tickets"
-                  />
-                </ChartContainer>
-                <ChartContainer title={"Priority Distribution"}>
-                  <PieChart
-                    labels={Object.keys(priorityCounts)}
-                    dataPoints={Object.values(priorityCounts)}
-                    chartLabel="Tickets"
-                    chartTitle="Ticket Priority Distribution"
-                  />
-                </ChartContainer>
-              </div>
+          <div className={styles.adpContentSection}>
+            <div className={styles.adpVisuals}>
+              <h2>Monthly Tickets</h2>
+              <LineChart chartData={monthlyNewTickets} />
             </div>
-            <div className={styles.layoutSection}>
-              <h2>Ticket Status</h2>
-              <div className={styles.layoutRow}>
-                <ChartContainer title={"Acted vs Not Acted"}>
-                  <DoughnutChart
-                    labels={["Acted", "Not Acted"]}
-                    values={[actedCount, notActedCount]}
-                    chartLabel="Tickets"
-                    chartTitle="Acted vs Not Acted Tickets"
-                  />
-                </ChartContainer>
+            <div className={styles.adpQuickActionSection}>
+              <h2>Quick Actions</h2>
+              <div className={styles.adpQuicActions}>
+                <QuickAction />
               </div>
             </div>
           </div>
