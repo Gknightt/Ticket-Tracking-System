@@ -1,0 +1,57 @@
+.container {
+  /* padding: 20px; */
+  /* max-width: 800px; */
+  /* margin: auto; */
+
+  background: var(--bg1-color);
+  border-radius: 20px;
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 10px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+}
+
+.headerCell,
+.cell {
+  padding: 15px;
+  text-align: left;
+  font-size: var(--table-font-size);
+  font-weight: 600;
+  color: var(--table-color);
+  border-top: var(--border-very-light-gray);
+  border-bottom: var(--border-very-light-gray);
+}
+
+.headerRow {
+  background-color: #f8f8f8;
+}
+
+.status {
+  padding: 6px 12px;
+  border-radius: 5px;
+  font-weight: bold;
+  display: inline-block;
+  text-transform: capitalize;
+}
+
+.statusConnected {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.statusError {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.statusDisconnected {
+  background-color: #e2e3e5;
+  color: #6c757d;
+}

@@ -22,13 +22,18 @@ ChartJS.register(
   Legend
 );
 
-const BarChart = () => {
+export default function BarChart({
+  labels = [],
+  dataPoints = [],
+  chartLabel = "Data",
+  chartTitle = "Bar Chart",
+}) {
   const data = {
-    labels: ["Red", "Blue", "Yellow", "Green", "Purple"],
+    labels,
     datasets: [
       {
-        label: "Votes",
-        data: [12, 19, 3, 5, 2],
+        label: chartLabel,
+        data: dataPoints,
         backgroundColor: "rgba(255, 99, 132, 0.2)",
         borderColor: "rgba(255, 99, 132, 1)",
         borderWidth: 1,
@@ -37,14 +42,21 @@ const BarChart = () => {
   };
 
   const options = {
+    responsive: true,
+    plugins: {
+      legend: { position: "top" },
+      title: { display: true, text: chartTitle },
+    },
     scales: { y: { beginAtZero: true } },
   };
 
   return (
     <div className={styles.chartCardCont}>
-      <Bar data={data} options={options} />
+      {labels.length && dataPoints.length ? (
+        <Bar data={data} options={options} />
+      ) : (
+        <div className={styles.noDataText}>No data available for this chart.</div>
+      )}
     </div>
   );
-};
-
-export default BarChart;
+}
