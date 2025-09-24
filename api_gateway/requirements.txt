@@ -1,0 +1,15 @@
+asgiref==3.8.1
+Django==5.2.1
+django-cors-headers==4.7.0
+djangorestframework==3.16.0
+djangorestframework_simplejwt==5.5.0
+PyJWT==2.9.0
+python-dotenv==1.1.0
+sqlparse==0.5.3
+tzdata==2025.2
+requests==2.31.0
+# For deployment
+gunicorn==20.1.0
+whitenoise
+# PostgreSQL support
+psycopg2-binary>=2.9

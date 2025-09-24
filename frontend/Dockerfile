@@ -11,11 +11,11 @@ RUN npm install
 # Copy project files
 COPY . .
 
-# Build the app
-RUN npm run build
+# Make the startup script executable
+RUN chmod +x start.sh
 
-# Expose ports (adjust if needed)
+# Expose port
 EXPOSE 1000
 
-# Serve the app using a static file server
-CMD ["npx", "serve", "-s", "dist", "-l", "1000"]
+# Use our start script instead of directly building
+CMD ["./start.sh"]

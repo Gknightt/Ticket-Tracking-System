@@ -1,9 +1,21 @@
 #!/bin/sh
 
-# Start json-server in background
-cd public
-json-server --watch db.json --port 5000 &
+# Generate .env file from environment variables
+echo "Generating .env file from environment variables..."
 
-# Go back to root folder and serve the React build
-cd ../
-serve -s dist -l 1000
+# Create or clear the .env file
+> .env
+
+# Add all environment variables starting with VITE_ to the .env file
+env | grep "^VITE_" > .env
+
+echo ".env file generated:"
+cat .env
+
+# Build the app with the generated .env
+echo "Building the application..."
+npm run build
+
+# Start the server
+echo "Starting server..."
+exec npx serve -s dist -l 1000

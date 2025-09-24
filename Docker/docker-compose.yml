@@ -116,6 +116,24 @@ services:
       - db
     command: sh -c "sleep 10 && ./start.sh"
 
+  # API Gateway service - 5 seconds sleep (starts before frontend)
+  api_gateway:
+    build:
+      context: ../api_gateway
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: "postgres://postgres:postgrespass@db:5432/apigateway"
+      DJANGO_DEBUG: "True"
+      DJANGO_ALLOWED_HOSTS: "*"
+    ports:
+      - "4000:4000"
+    depends_on:
+      - user-service
+      - ticket_service
+      - workflow_api
+      - db
+    command: sh -c "sleep 5 && ./start.sh"
+
   # Frontend service - No sleep
   frontend:
     build:
@@ -123,28 +141,26 @@ services:
       dockerfile: Dockerfile
     environment:
       VITE_VALUE_TEST: "Test"
-      VITE_AGENTS_API: "http://ticket_service:7000/agents"
-      VITE_ARCHIVE_API: "http://ticket_service:7000/archive"
-      VITE_WORKFLOW_API: "http://workflow_api:8000/workflow"
-      VITE_TICKET_API: "http://ticket_service:7000/tickets"
-      VITE_ADMINTICKET_API: "http://ticket_service:7000/adminTicket"
-      VITE_ARCHIVE_TICKETS_API: "http://ticket_service:7000/archived_tickets"
-      VITE_UPCOMING_TICKETS_API: "http://ticket_service:7000/upcoming_tickets"
-      VITE_LOGIN_API: "http://user-service:8000/auth/login/"
-      VITE_VERIFY_API: "http://user-service:8000/auth/verify/"
-      VITE_VERIFY_OTP_API: "http://user-service:8000/auth/login/verify-otp/"
-      VITE_BACKEND_API: "http://workflow_api:8000/"
-      VITE_USER_SERVER_API: "http://user-service:8000/"
-      VITE_LOGOUT_API: "http://user-service:8000/auth/logout/"
-      VITE_PASSWORD_RESET_API: "http://user-service:8000/password/reset/"
-      VITE_VALIDATE_RESET_TOKEN_API: "http://user-service:8000/password/reset/validate-token/"
-      VITE_CONFIRM_RESET_API: "http://user-service:8000/password/reset/confirm/"
+      VITE_AGENTS_API: "http://localhost:4000/TTS/Ticket/agents"
+      VITE_ARCHIVE_API: "http://localhost:4000/TTS/Ticket/archive"
+      VITE_WORKFLOW_API: "http://localhost:4000/TTS/Workflow/workflow"
+      VITE_TICKET_API: "http://localhost:4000/TTS/Ticket/tickets"
+      VITE_ADMINTICKET_API: "http://localhost:4000/TTS/Ticket/adminTicket"
+      VITE_ARCHIVE_TICKETS_API: "http://localhost:4000/TTS/Ticket/archived_tickets"
+      VITE_UPCOMING_TICKETS_API: "http://localhost:4000/TTS/Ticket/upcoming_tickets"
+      VITE_LOGIN_API: "http://localhost:4000/TTS/User/auth/login/"
+      VITE_VERIFY_API: "http://localhost:4000/TTS/User/auth/verify/"
+      VITE_VERIFY_OTP_API: "http://localhost:4000/TTS/User/auth/login/verify-otp/"
+      VITE_BACKEND_API: "http://localhost:4000/TTS/Workflow/"
+      VITE_USER_SERVER_API: "http://localhost:4000/TTS/User/"
+      VITE_LOGOUT_API: "http://localhost:4000/TTS/User/auth/logout/"
+      VITE_PASSWORD_RESET_API: "http://localhost:4000/TTS/User/password/reset/"
+      VITE_VALIDATE_RESET_TOKEN_API: "http://localhost:4000/TTS/User/password/reset/validate-token/"
+      VITE_CONFIRM_RESET_API: "http://localhost:4000/TTS/User/password/reset/confirm/"
     ports:
       - "1000:1000"
     depends_on:
-      - user-service
-      - ticket_service
-      - workflow_api
+      - api_gateway
 
 volumes:
   rabbitmq_data:
