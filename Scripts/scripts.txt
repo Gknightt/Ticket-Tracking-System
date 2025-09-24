@@ -1,5 +1,6 @@
 change terminal to bash, for copy-paste
 
+./Scripts/docker.sh
 ./Scripts/dos2unix.sh
 ./Scripts/env.sh
 ./Scripts/init.sh
