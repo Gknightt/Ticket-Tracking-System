@@ -24,3 +24,5 @@ uploads/
 bin/
 
 generated_docs/
+
+/auth
