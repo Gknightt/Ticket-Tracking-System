@@ -60,11 +60,9 @@ The system is divided into the following services:
    cd Ticket-Tracking-System
    ```
 
-2. **Build and Start Services**:
+2. **Run the Docker Starter Script**:
    ```bash
-   cd docker
-   docker-compose build
-   docker-compose up -d
+   bash ./Scripts/docker.sh
    ```
 
 3. **Access the Services**:
