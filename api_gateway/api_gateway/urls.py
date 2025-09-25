@@ -33,23 +33,15 @@ def forward_request(request, system, service, query):
         print(f"Method: {request.method}")
         print(f"Query params: {request.GET}")
 
-        # Forward the request to the target service
-        headers = {key: value for key, value in request.headers.items() if key not in ['Host', 'Content-Length']}
+        # Forward all headers from the original request except Host and Content-Length
+        # This will include X-CSRFToken if sent by the frontend
+        headers = {key: value for key, value in request.headers.items() 
+                  if key.lower() not in ['host', 'content-length']}
         
-        # Add CSRF-related headers to bypass CSRF protection on backend services
-        if request.method in ['POST', 'PUT', 'PATCH', 'DELETE']:
-            # Add X-CSRFToken header for Django backend services
-            csrf_token = request.META.get('CSRF_COOKIE', '')
-            if csrf_token:
-                headers['X-CSRFToken'] = csrf_token
-            
-            # Add additional headers to help Django recognize this as a safe request
-            headers['X-Requested-With'] = 'XMLHttpRequest'
-            
-            # Tell backend services that this request is from the trusted API gateway
-            headers['X-API-Gateway'] = 'true'
+        # Simply pass through all cookies from the original request
+        cookies = request.COOKIES
         
-        # Handle request body for different content types
+        # Handle request body 
         body = request.body
         
         # Make the request to the target service
@@ -57,22 +49,67 @@ def forward_request(request, system, service, query):
             method=request.method,
             url=target_url,
             headers=headers,
+            cookies=cookies,  # Forward the original cookies as-is
             data=body,
-            params=request.GET
+            params=request.GET,
+            allow_redirects=False  # Don't follow redirects, let the client handle them
         )
         
         # Print debug info about the response
         print(f"Response status code: {response.status_code}")
-        print(f"Response headers: {response.headers}")
-        print(f"Response content: {response.content[:100]}...")  # Print first 100 chars
+        print(f"Response headers: {dict(response.headers)}")
         
-        # Try to parse the response as JSON
-        try:
-            json_response = response.json()
-            return JsonResponse(json_response, status=response.status_code, safe=False)
-        except ValueError:
-            # If the response is not JSON, return the raw content
-            return HttpResponse(response.content, status=response.status_code, content_type=response.headers.get('Content-Type', 'text/plain'))
+        # Create Django response object
+        if response.headers.get('Content-Type', '').startswith('application/json'):
+            # For JSON responses
+            try:
+                json_response = response.json()
+                django_response = JsonResponse(json_response, status=response.status_code, safe=False)
+            except ValueError:
+                # If JSON parsing fails, fall back to raw response
+                django_response = HttpResponse(
+                    response.content, 
+                    status=response.status_code,
+                    content_type=response.headers.get('Content-Type', 'text/plain')
+                )
+        else:
+            # For non-JSON responses
+            django_response = HttpResponse(
+                response.content,
+                status=response.status_code,
+                content_type=response.headers.get('Content-Type', 'text/plain')
+            )
+        
+        # Copy all headers from the backend response to our Django response
+        # Skip certain headers that would be set by Django automatically
+        skip_headers = {'content-length', 'content-encoding', 'transfer-encoding', 'connection',
+                       'keep-alive', 'proxy-authenticate', 'proxy-authorization', 'te',
+                       'trailers', 'upgrade', 'content-type'}
+        
+        for header, value in response.headers.items():
+            if header.lower() not in skip_headers:
+                django_response[header] = value
+        
+        # Forward all cookies from the backend response
+        for cookie in response.cookies.items():
+            cookie_name, cookie_value = cookie
+            cookie_dict = requests.utils.dict_from_cookiejar(response.cookies)
+            cookie_obj = response.cookies.get(cookie_name)
+            
+            # Get all cookie attributes
+            django_response.set_cookie(
+                key=cookie_name,
+                value=cookie_value,
+                max_age=cookie_obj.get('max-age'),
+                expires=cookie_obj.get('expires'),
+                path=cookie_obj.get('path', '/'),
+                domain=cookie_obj.get('domain'),
+                secure=cookie_obj.get('secure', False),
+                httponly=cookie_obj.get('httponly', False),
+                samesite=cookie_obj.get('samesite', 'Lax')
+            )
+        
+        return django_response
             
     except ObjectDoesNotExist:
         return JsonResponse({"error": f"Service not found for {system}/{service}"}, status=404)

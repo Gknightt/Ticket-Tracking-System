@@ -46,9 +46,9 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',  # Add CORS middleware at the top
+    'corsheaders.middleware.CorsMiddleware',  # CORS middleware at the top
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # Add WhiteNoise middleware right after security middleware
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -64,7 +64,9 @@ CORS_ALLOW_ALL_ORIGINS = True  # For development only
 #     "http://localhost:1000",
 #     "http://127.0.0.1:1000",
 # ]
-CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_CREDENTIALS = True  # Essential for cookies and CSRF tokens
+
+# Allow all methods
 CORS_ALLOW_METHODS = [
     'DELETE',
     'GET',
@@ -72,7 +74,10 @@ CORS_ALLOW_METHODS = [
     'PATCH',
     'POST',
     'PUT',
+    'HEAD',
 ]
+
+# Allow a wide range of headers to ensure everything gets forwarded
 CORS_ALLOW_HEADERS = [
     'accept',
     'accept-encoding',
@@ -83,6 +88,25 @@ CORS_ALLOW_HEADERS = [
     'user-agent',
     'x-csrftoken',
     'x-requested-with',
+    'cookie',
+    'sessionid',
+    'cache-control',
+    'pragma',
+    'referer',
+    'connection',
+    'host',
+    '*',  # Allow any header - important for transparent proxying
+]
+
+# Expose headers that should be accessible to the frontend
+CORS_EXPOSE_HEADERS = [
+    'content-type',
+    'content-disposition',
+    'x-csrftoken',
+    'set-cookie',
+    'cookie',
+    'authorization',
+    '*',  # Expose all headers to frontend
 ]
 
 ROOT_URLCONF = 'api_gateway.urls'
