@@ -92,7 +92,7 @@ function Login() {
       <section className={styles.leftPanel}>
         <div className={styles.leftImage}>
           <img
-            src="./tts_bg.jpeg"
+            src="./TTS_MAP_BG.png"
             alt="Login illustration"
             className={styles.assetImage}
           />

@@ -145,21 +145,6 @@ export default function Workflow() {
             )}
           </div>
 
-          {/* <div className={styles.wpTableSection}>
-            <div className={general.tpTable}>
-              <WorkflowTable
-                searchValue={filters.search}
-                onSearchChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    search: e.target.value,
-                  }))
-                }
-                workflows={filteredWorkflows}
-                onAddWorkflow={setOpenAddWorkflow}
-              />
-            </div>
-          </div> */}
         </section>
       </main>
 

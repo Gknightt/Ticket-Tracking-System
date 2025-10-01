@@ -10,7 +10,11 @@ import Notification from "../modal/Notification";
 import ProfileModal from "../modal/ProfileModal";
 import AdminProfileModal from "../modal/AdminProfileModal";
 
+// hooks
+import { useAuth } from "../../api/AuthContext";
+
 export default function AdminNav() {
+  const { user, loading } = useAuth();
   const location = useLocation();
   const [openProfileModal, setOpenProfileModal] = useState(false);
   const [openNotifModal, setOpenNotifModal] = useState(false);
@@ -95,7 +99,7 @@ export default function AdminNav() {
             }
           >
             Tasks
-            </NavLink>
+          </NavLink>
           <NavLink
             to="/admin/workflow"
             className={({ isActive }) =>
@@ -141,7 +145,10 @@ export default function AdminNav() {
           </div>
           <img
             className={styles.userAvatar}
-            src="https://i.pinimg.com/736x/e6/50/7f/e6507f42d79520263d8d952633cedcf2.jpg"
+            src={
+              user?.profile_picture ||
+              "https://i.pinimg.com/736x/01/c2/09/01c209e18fd7a17c9c5dcc7a4e03db0e.jpg"
+            }
             alt="Anime Avatar"
             onClick={handleAvatarClick}
           />
@@ -151,7 +158,9 @@ export default function AdminNav() {
           <Notification closeNotifAction={() => setOpenNotifModal(false)} />
         )}
         {openProfileModal && (
-          <AdminProfileModal closeProfileAction={() => setOpenProfileModal(false)} />
+          <AdminProfileModal
+            closeProfileAction={() => setOpenProfileModal(false)}
+          />
         )}
       </nav>
     </>

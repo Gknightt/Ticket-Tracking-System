@@ -1,8 +1,8 @@
 // style
-import general from "../../style/general.module.css";
+// import styles from "../../style/styles.module.css";
+import styles from "./dynamic-table.module.css";
 
 // components
-import { SearchBar } from "../../components/component/General";
 import Pagination from "../../components/component/Pagination";
 
 // react
@@ -12,7 +12,7 @@ import { format } from "date-fns";
 
 function TableHeader({ headers }) {
   return (
-    <tr className={general.header}>
+    <tr className={styles.header}>
       {headers.map((header) => (
         <th key={header}>{header}</th>
       ))}
@@ -23,7 +23,7 @@ function TableHeader({ headers }) {
 function TableItem({ item, columns }) {
   const navigate = useNavigate();
   return (
-    <tr className={general.item}>
+    <tr className={styles.dtItem}>
       {columns.map((col) => (
         <td key={col.key}>
           {col.format ? col.format(item[col.key]) : item[col.key]}
@@ -33,7 +33,7 @@ function TableItem({ item, columns }) {
       {columns.some((col) => col.key === "action") && (
         <td>
           <button
-            className={general.btn}
+            className={styles.dtBtn}
             onClick={() => navigate(`/admin/archive/${item.id}`)} // Assuming 'id' is the unique identifier
           >
             👁
@@ -48,9 +48,6 @@ export default function DynamicTable({
   data = [],
   headers = [], // Column headers passed dynamically
   columns = [], // Column definitions with keys to access values dynamically
-  searchValue = "",
-  onSearchChange,
-  activeTab,
 }) {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -61,18 +58,11 @@ export default function DynamicTable({
   const paginatedData = data.slice(startIndex, endIndex);
 
   return (
-    <div className={general.ticketTableSection}>
-      <div className={general.tableHeader}>
-        {/* <h2>
-          {activeTab} ({data.length})
-        </h2>
-        <div className={general.tableActions}>
-          <SearchBar value={searchValue} onChange={onSearchChange} />
-          <button className={general.exportButton}>Export</button>
-        </div> */}
+    <div className={styles.dtSection}>
+      <div className={styles.dtHeader}>
       </div>
-      <div className={general.ticketTableWrapper}>
-        <table className={general.ticketTable}>
+      <div className={styles.dtWrapper}>
+        <table className={styles.dtTable}>
           <thead>
             <TableHeader headers={headers} />
           </thead>
@@ -83,7 +73,7 @@ export default function DynamicTable({
               ))
             ) : (
               <tr>
-                <td colSpan={headers.length} className={general.noData}>
+                <td colSpan={headers.length} className={styles.noData}>
                   No data found.
                 </td>
               </tr>
@@ -91,7 +81,7 @@ export default function DynamicTable({
           </tbody>
         </table>
       </div>
-      <div className={general.ttPagination}>
+      <div className={styles.dtPagination}>
         <Pagination
           currentPage={currentPage}
           pageSize={pageSize}

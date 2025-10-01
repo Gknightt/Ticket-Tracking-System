@@ -4,6 +4,7 @@
 .dashboard-container {
   padding: 2rem;
   color: var(--text-color);
+  /* width: 100%; */
 }
 
 /* Dashboard Title */
@@ -37,6 +38,7 @@
   box-shadow: var(--shadow);
   border: var(--border-bottom);
   transition: var(--transition);
+  width: 100%;
 }
 
 .card:hover {
@@ -60,9 +62,10 @@
 
 .summaryItem {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 5px;
-
+  width: 100%;
   flex: 1 1 45%;
   background-color: var(--bg-content-color);
   border-radius: 8px;

@@ -21,11 +21,12 @@ export default function PieChart({
         label: chartLabel,
         data: dataPoints,
         backgroundColor: [
-          "#FF6384",
-          "#36A2EB",
-          "#FFCE56",
-          "#9966FF",
-          "#4BC0C0",
+          "#00afb9", // Soft blue-gray for a gentle contrast
+          "#f07167", // Light, muted green for a natural vibe
+          "#0081a7", // Pale cream for balance and soft lightness
+          "#f2cc8f", // Soft coral for a warm, inviting touch
+          "#fed9b7", // Light lavender for a calm, soothing effect
+          "#c4f0f2", // Soft mint for freshness and clarity
         ],
       },
     ],

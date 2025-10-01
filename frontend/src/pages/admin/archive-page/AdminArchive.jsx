@@ -18,8 +18,10 @@ import TasksTable from "../../../tables/admin/TasksTable"; // Table for Active/I
 import useUserTickets from "../../../api/useUserTickets";
 import useTasksFetcher from "../../../api/useTasksFetcher";
 import useTicketsFetcher from "../../../api/useTicketsFetcher";
-import AddAgent from "../agent-page/modals/AddAgent";
+
+// modal
 import TicketTaskAssign from "./modals/ActivateAgent";
+import AddAgent from "../agent-page/modals/AddAgent";
 
 export default function AdminArchive() {
   const {
@@ -45,7 +47,9 @@ export default function AdminArchive() {
   const [openAssignTicket, setOpenAssignTicket] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState(null);
 
-  console.log("openAssignTicket:", openAssignTicket);
+  // console.log("openAssignTicket:", openAssignTicket);
+  console.log("Tickets fetched by useTicketsFetcher:", tickets);
+
 
   // Filters
   const [filters, setFilters] = useState({
