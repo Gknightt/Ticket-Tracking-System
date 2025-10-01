@@ -1,191 +1,48 @@
-/* MAIN CSS FOR EACH COMPONENTS */
-
-/* === BUTTON STYLES === */
-
-/* === TEXT INPUT STYLES === */
-/* SEARCH BAR */
-.searchBar {
-  font-size: var(--default-font-size);
-  border-radius: 5px;
-  width: 100%;
-  padding: 10px 16px;
-  border: none;
-  border: var(--border-very-light-gray);
-  border-radius: 20px;
-}
-
-.searchBar:hover {
-  border: 1px solid var(--primary-color);
-}
-
-.searchBar:focus {
-  border: none;
-  box-shadow: 0 4px 8px rgba(0, 123, 255, 0.2),
-    0 6px 16px rgba(0, 123, 255, 0.1);
-}
-
-/* === DATE INPUT STYLES === */
-/* DATETIME */
-.dateTime {
-  font-size: var(--table-font-size);
-  border-radius: 4px;
-  border: 1px solid #ccc;
-  font-variant: var(--border-very-light-gray);
-  padding: 10px 15px;
-  width: 100%;
-  cursor: pointer;
-  color: var(--text-color);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  background-color: var(--bg1-color);
-}
-
-.dateTime:hover,
-.dateTime:focus {
-  border-color: var(--primary-color);
-  outline: none;
-}
-
-/* === DROPDOWN INPUT STYLES === */
-/* DROPDOWN STYLE */
-/* .dropdown {
-  font-size: var(--table-font-size);
-  border-radius: 4px;
-  border: 1px solid #ccc;
-  font-variant: var(--border-very-light-gray);
-  padding: 10px 15px;
-  width: 100%;
-  cursor: pointer;
-  color: var(--text-color);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  background-color: var(--bg1-color);
-}
-
-.dropdown:hover,
-.dropdown:focus {
-  border-color: var(--primary-color);
-  outline: none;
-} */
-
-/* New dropdown */
-/* Dropdown.module.css */
-
-.dropdownContainer {
-  position: relative;
-}
-
-.dropdown {
-  width: 100%;
-  padding: 13px 16px;
-  background-color: #F8F8F8;
-  color: #0C0C0C;
-  border: 1px solid #E0E0E0;
-  border-radius: 4px;
-  font-size: 14px;
-  font-family: Arial, sans-serif;
-  appearance: none;
-  cursor: pointer;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.dropdown:hover {
-  border-color: #BDBDBD;
-  background-color: #F0F0F0;
-}
-
-.dropdown:focus {
-  outline: none;
-  border-color: #007BFF;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-}
-
-.dropdown option {
-  background-color: #F8F8F8;
-  color: #0C0C0C;
-}
-
-
 /* === TABLE STYLES === */
-.ticketTableSection {
-  /* background: var(--bg1-color);
-  border-radius: 20px;
-  box-shadow: var(--box-shadow);
-  border: var(--border-very-light-gray); */
-
+.dtSection {
   background-color: #ffffff;
   border-radius: 8px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
   border: 1px solid #cccccc;
 }
 
-.tableHeader {
+.dtHeader {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 15px 30px;
 }
 
-.tableHeader h2 {
+.dtHeader h2 {
   /* flex: 2; */
   font-size: var(--h2-font-size);
   color: var(--table-color);
 }
 
-.tableActions {
-  /* flex: 1; */
-  display: flex;
-  gap: 16px;
-  align-items: center;
-}
-
-/* if export */
-.exportButton {
-  padding: 8px;
-  background: white;
-  border: var(--border-very-light-gray);
-  border-radius: 20px;
-  color: #374151;
-  font-size: 14px;
-  cursor: pointer;
-  width: 100%;
-}
-
-/* if add */
-.addButton {
-  padding: 8px;
-  background: var(--primary-color);
-  border: var(--border-very-light-gray);
-  border-radius: 20px;
-  color: var(--bg-color);
-  font-size: 14px;
-  cursor: pointer;
-  max-width: 150px;
-  width: 100%;
-}
-
-.ticketTableWrapper {
+.dtWrapper {
   width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   margin-bottom: 10px;
 }
 
-.ticketTable {
+.dtTable {
   width: 100%;
   border-collapse: collapse;
   margin-bottom: 24px;
 }
 
-.ticketTable::-webkit-scrollbar {
+.dtTable::-webkit-scrollbar {
   height: 6px;
 }
 
-.ticketTable::-webkit-scrollbar-thumb {
+.dtTable::-webkit-scrollbar-thumb {
   height: 6px;
   background-color: rgba(0, 0, 0, 0.2);
   border-radius: 3px;
 }
 
-.ticketTable th {
+.dtTable th {
   padding: 15px;
   text-align: left;
   font-size: var(--table-font-size);
@@ -196,7 +53,7 @@
   background-color: #f0f1f2;
 }
 
-.ticketTable td {
+.dtTable td {
   padding: 18px;
   font-size: var(--default-font-size);
   color: var(--table-color);
@@ -207,7 +64,7 @@ tr:hover {
   background-color: #fcfcfc;
 }
 
-.btn {
+.dtBtn {
   border: none;
   border: var(--border-very-light-gray);
   padding: 5px 10px;
@@ -230,11 +87,11 @@ tr:hover {
 }
 
 /* PAGINATION - TABLE */
-.ttPagination {
+.dtPagination {
   padding: 0 20px;
 }
 
-.btn:hover {
+.dtBtn:hover {
   color: #111827;
 }
 
@@ -376,7 +233,6 @@ tr:hover {
   0% {
     transform: rotate(0deg);
   }
-
   100% {
     transform: rotate(360deg);
   }
@@ -387,11 +243,9 @@ tr:hover {
   0% {
     box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.4);
   }
-
   70% {
     box-shadow: 0 0 0 6px rgba(0, 0, 0, 0);
   }
-
   100% {
     box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
   }

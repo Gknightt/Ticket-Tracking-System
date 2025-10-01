@@ -29,6 +29,7 @@ export default function Agent() {
   const { users, fetchUsers, activateUser } = useUsersApi();
   const { pending, fetchPendingInvites, deleteInvite} = useInviteManager();
   
+  console.log("Users:", users);
 
   useEffect(() => {
     setAllAgents(users);

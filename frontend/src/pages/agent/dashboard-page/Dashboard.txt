@@ -6,7 +6,6 @@ import SLACard from "./components/SLACard";
 import PerformanceSnapshot from "./components/PerformanceSnapshot";
 import TodayTasks from "./components/TodayTasks";
 import OngoingTask from "./components/OngoingTask";
-import KPICard from "./components/KPICard";
 
 // style
 import styles from "./dashboard.module.css";
@@ -14,10 +13,9 @@ import general from "./components/Component.module.css";
 
 // hooks
 import useUserTickets from "../../../api/useUserTickets";
-import { useAuth } from "../../../api/AuthContext";
+import KPICard from "./components/KPICard";
 
 export default function Dashboard() {
-  const { user } = useAuth();
   const { userTickets, loading, error } = useUserTickets();
 
   // fetch tickets and filter those tickets that !has_acted
@@ -82,41 +80,31 @@ export default function Dashboard() {
       <AgentNav />
       <main className={styles.dashboardPage}>
         <section className={styles.dpHeader}>
-          <h1>
-            Welcome,{" "}
-            <span>{user?.first_name || user?.username || "MAP Employee"}!</span>
-          </h1>
+          <h1>Dashboard</h1>
         </section>
         <section className={styles.dpBody}>
           {/* Content here */}
-          <div className={styles.layoutSection}>
-            <h2>Ticket Overview</h2>
-            <div className={styles.dpCardSection}>
-              <div className={styles.dpLeft}>
-                <StatusCard number={counts.open} label="Open Tickets" />
-              </div>
-              <div className={styles.dpRight}>
-                <KPICard number={counts.critical} label="Critical" />
-                <KPICard number={counts.high} label="High" />
-                <KPICard number={counts.medium} label="Medium" />
-                <KPICard number={counts.low} label="Low" />
-              </div>
+          <div className={styles.dpCardSection}>
+            <div className={styles.dpLeft}>
+              <StatusCard number={counts.open} label="Open Tickets" />
+            </div>
+            <div className={styles.dpRight}>
+              <KPICard number={counts.critical} label="Critical" />
+              <KPICard number={counts.high} label="High" />
+              <KPICard number={counts.medium} label="Medium" />
+              <KPICard number={counts.low} label="Low" />
             </div>
           </div>
-          <div className={styles.flexSection}>
-            <div className={styles.layoutSection} style={{ flex: 2 }}>
-              <TicketSummary
-                inProgressCount={counts.inProgress}
-                resolvedTodayCount={resolvedTodayCount}
-                style={{ flex: 1 }}
-              />
-            </div>
-            <div className={styles.layoutColumn} style={{ flex: 1 }}>
-              <TodayTasks tasks={todayTasks} />
-              <OngoingTask tasks={ongoingTasks} />
-            </div>
+          <div className={general.dpCardLayout}>
+            <TicketSummary
+              inProgressCount={counts.inProgress}
+              resolvedTodayCount={resolvedTodayCount}
+            />
+            <TodayTasks tasks={todayTasks} />
+            <OngoingTask tasks={ongoingTasks} />
+            {/* <SLACard /> */}
+            <PerformanceSnapshot />
           </div>
-          <PerformanceSnapshot />
         </section>
       </main>
     </>

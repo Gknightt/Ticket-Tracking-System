@@ -35,7 +35,7 @@ function TicketHeader() {
 
 function TicketItem({ item }) {
   const navigate = useNavigate();
-  console.log("id", item);
+  // console.log("id", item);
   return (
     <tr className={general.item}>
       <td>{item.hasacted ? "Has Acted" : "Not Yet"}</td>

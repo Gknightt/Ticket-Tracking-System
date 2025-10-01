@@ -5,13 +5,13 @@ import styles from "./profile-modal.module.css";
 
 // react
 import { useNavigate } from "react-router-dom";
+
 export default function AdminProfileModal({ closeProfileAction }) {
   // navigate
   const navigate = useNavigate();
   const { logout } = useLogout();
-
   const { user, loading } = useAuth();
-  console.log(user);
+  // console.log(user);
 
   if (loading) return <p>Loading...</p>;
   return (

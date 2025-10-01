@@ -1,29 +1,33 @@
-// styles
+// style
 import styles from "./admin-dashboard.module.css";
 
 // components
 import AdminNav from "../../../components/navigation/AdminNav";
-import TicketCard from "./components/TicketCard";
+import KPICard from "./components/KPICard";
 import QuickAction from "./components/QuickAction";
+import PendingTask from "./components/PendingTask";
 
 // charts
-// import LineChart from "./charts/LineChart";
-import LineChart from "../../../components/charts/LineChart";
-import DoughnutChart from "../../../components/charts/DoughnutChart";
 import ChartContainer from "../../../components/charts/ChartContainer";
+import DoughnutChart from "../../../components/charts/DoughnutChart";
+import BarChart from "../../../components/charts/BarChart";
+import LineChart from "../../../components/charts/LineChart";
+import PieChart from "../../../components/charts/PieChart";
+import DynamicTable from "../../../tables/components/DynamicTable";
 
 // hooks
 import useUserTickets from "../../../api/useUserTickets";
+import { useAuth } from "../../../api/AuthContext";
 
 // date helper
 import { format } from "date-fns";
-import PieChart from "../../../components/charts/PieChart";
 
 export default function AdminDashboard() {
+  const { user } = useAuth();
   const { userTickets, loading, error } = useUserTickets();
 
-  // fetch tickets and filter those tickets that !has_acted
-  const allTickets = (userTickets || [])
+  // Only tickets that have not yet been acted
+  const pendingTickets = (userTickets || [])
     .filter((e) => e.task?.ticket && !e.has_acted)
     .map((e) => ({
       ...e.task.ticket,
@@ -34,31 +38,26 @@ export default function AdminDashboard() {
 
   const counts = {
     new: 0,
-    open: 0,
-    resolved: 0,
-    onHold: 0,
-    inProgress: 0,
-    rejected: 0,
     critical: 0,
+    high: 0,
+    medium: 0,
+    low: 0,
   };
-
   const monthlyNewTickets = {};
   const priorityCounts = {};
   const statusCounts = {};
   let actedCount = 0;
   let notActedCount = 0;
 
-  allTickets.forEach((t) => {
+  pendingTickets.forEach((t) => {
     const statusKey = t.status?.toLowerCase().replace(/\s+/g, "");
     const priorityKey = t.priority?.toLowerCase().replace(/\s+/g, "");
 
     if (statusKey === "new") counts.new += 1;
-    if (statusKey === "open") counts.open += 1;
-    if (statusKey === "resolved") counts.resolved += 1;
-    if (statusKey === "onhold") counts.onHold += 1;
-    if (statusKey === "inprogress") counts.inProgress += 1;
-    if (statusKey === "rejected") counts.rejected += 1;
     if (priorityKey === "critical") counts.critical += 1;
+    if (priorityKey === "high") counts.high += 1;
+    if (priorityKey === "medium") counts.medium += 1;
+    if (priorityKey === "low") counts.low += 1;
 
     // Priority distribution
     if (priorityKey) {
@@ -85,51 +84,35 @@ export default function AdminDashboard() {
       <AdminNav />
       <main className={styles.adminDashboardPage}>
         <section className={styles.adpHeader}>
-          <h1>Dashboard</h1>
+          <h1>
+            Welcome,{" "}
+            <span>{user?.first_name || user?.username || "Admin"}!</span>
+          </h1>
         </section>
-
         <section className={styles.adpBody}>
-          <div className={styles.adpCardSection}>
-            <div className={styles.adpWrapper}>
-              <div className={styles.adpLeftRight}>
-                <div className={styles.adpLeft}>
-                  <TicketCard number={counts.new} label="New Tickets" />
-                  <TicketCard number={counts.open} label="Open Tickets" />
-                </div>
-                <div className={styles.adpMid}>
-                  <TicketCard
-                    number={counts.resolved}
-                    label="Resolved Tickets"
-                  />
-                  <TicketCard number={counts.onHold} label="On Hold Tickets" />
-                </div>
-                <div className={styles.adpRight}>
-                  <TicketCard
-                    number={counts.rejected}
-                    label="Rejected Tickets"
-                  />
-                  <TicketCard number={counts.inProgress} label="In Progress" />
-                </div>
-              </div>
-              <div className={styles.adpSide}>
-                <TicketCard number={counts.critical} label="Critical" />
-              </div>
+          <div className={styles.layoutSection}>
+            <h2>Tickets Summary</h2>
+            <div className={styles.layoutRow}>
+              <KPICard label="New Tickets" number={counts.new} />
+              <KPICard label="Critical" number={counts.critical} />
+              <KPICard label="High" number={counts.high} />
+              <KPICard label="Medium" number={counts.medium} />
+              <KPICard label="Low" number={counts.low} />
             </div>
           </div>
-
-          <div className={styles.layoutRow}>
-            <div className={styles.layoutSection}>
-              <h2>Ticket Analytics</h2>
+          <div className={styles.flexSection}>
+            <div className={styles.layoutSection} style={{ flex: 2 }}>
+              <h2>Tickets Overview</h2>
               <div className={styles.layoutRow}>
-                <ChartContainer title={"New Tickets This Month"}>
-                  <LineChart
-                    labels={Object.keys(monthlyNewTickets)}
-                    dataPoints={Object.values(monthlyNewTickets)}
+                <ChartContainer title="Resolved Tickets">
+                  <DoughnutChart
+                    labels={["Acted", "Not Acted"]}
+                    values={[actedCount, notActedCount]}
                     chartLabel="Tickets"
-                    chartTitle="Monthly New Tickets"
+                    chartTitle="Acted vs Not Acted Tickets"
                   />
                 </ChartContainer>
-                <ChartContainer title={"Priority Distribution"}>
+                <ChartContainer title="Tickets by Priority">
                   <PieChart
                     labels={Object.keys(priorityCounts)}
                     dataPoints={Object.values(priorityCounts)}
@@ -139,19 +122,39 @@ export default function AdminDashboard() {
                 </ChartContainer>
               </div>
             </div>
-            <div className={styles.layoutSection}>
-              <h2>Ticket Status</h2>
-              <div className={styles.layoutRow}>
-                <ChartContainer title={"Acted vs Not Acted"}>
-                  <DoughnutChart
-                    labels={["Acted", "Not Acted"]}
-                    values={[actedCount, notActedCount]}
-                    chartLabel="Tickets"
-                    chartTitle="Acted vs Not Acted Tickets"
-                  />
-                </ChartContainer>
+            <div className={styles.layoutColumn} style={{ flex: 1 }}>
+              <div className={styles.layoutSection}>
+                <h2>Quick Actions</h2>
+                <QuickAction />
+              </div>
+              <div className={styles.layoutSection}>
+                <h2>Pending Tasks</h2>
+                <PendingTask tickets={pendingTickets} />
               </div>
             </div>
+          </div>
+          <div className={styles.layoutSection}>
+            <h2>Ticket Listed</h2>
+              <DynamicTable
+                data={pendingTickets}
+                headers={[
+                  "Ticket No.",
+                  "Title",
+                  "Priority",
+                  "Status",
+                  "Submit Date",
+                ]}
+                columns={[
+                  { key: "ticket_id" },
+                  { key: "subject" },
+                  { key: "priority" },
+                  { key: "status" },
+                  {
+                    key: "submit_date",
+                    format: (d) => (d ? format(new Date(d), "yyyy-MM-dd") : ""),
+                  },
+                ]}
+              />
           </div>
         </section>
       </main>

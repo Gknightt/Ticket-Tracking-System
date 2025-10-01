@@ -1,4 +1,5 @@
 // style
+import DynamicDropdown from "./Dropdown";
 import styles from "./filter-panel.module.css";
 
 // component
