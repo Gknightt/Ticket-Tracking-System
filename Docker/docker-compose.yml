@@ -32,20 +32,6 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./db-init:/docker-entrypoint-initdb.d
 
-  # Worker derived from user_service - 20 seconds sleep
-  user_worker:
-    build:
-      context: ../user_service
-      dockerfile: Dockerfile
-    environment:
-      DJANGO_CELERY_BROKER_URL: "amqp://admin:admin@rabbitmq:5672/"
-      DATABASE_URL: "postgres://postgres:postgrespass@db:5432/usermanagement"
-      DJANGO_ENV: "production"
-    command: sh -c "sleep 20 && celery -A user_service worker --pool=solo --loglevel=info -Q notification-queue-prod"
-    depends_on:
-      - rabbitmq
-      - db
-
   # Worker derived from workflow_api - 20 seconds sleep
   workflow_worker:
     build:
@@ -54,11 +40,16 @@ services:
     environment:
       DJANGO_CELERY_BROKER_URL: "amqp://admin:admin@rabbitmq:5672/"
       DATABASE_URL: "postgres://postgres:postgrespass@db:5432/workflowmanagement"
-      DJANGO_USER_SERVICE: "http://user-service:8000"
+      # the important thing in naming the service is to not use underscores (_)
+      # auth-service is different from auth_service
+      DJANGO_AUTH_SERVICE: "http://auth-service:8000"
       DJANGO_ENV: "production"
+      C_FORCE_ROOT: "false"
     volumes:
       - media_files:/app/media
-    command: sh -c "sleep 20 && celery -A workflow_api worker --pool=solo --loglevel=info -Q role_send-default,TICKET_TASKS_PRODUCTION"
+    command: >
+      sh -c "sleep 20 && 
+             celery -A workflow_api worker --pool=solo --loglevel=info -Q role_send-default,TICKET_TASKS_PRODUCTION"
     depends_on:
       - rabbitmq
       - db
@@ -82,29 +73,6 @@ services:
       - db
     command: sh -c "sleep 10 && ./start.sh"
 
-  # User service - 10 seconds sleep
-  user-service:
-    build:
-      context: ../user_service
-      dockerfile: Dockerfile
-    environment:
-      DJANGO_FRONTEND_URL: http://localhost:1000/
-      DJANGO_CELERY_BROKER_URL: "amqp://admin:admin@rabbitmq:5672/"
-      DATABASE_URL: "postgres://postgres:postgrespass@db:5432/usermanagement"
-      DJANGO_DEBUG: "True"
-      DJANGO_ALLOWED_HOSTS: "*"
-      DJANGO_ENV: "production"
-      DJANGO_NOTIFICATION_QUEUE: "notification-queue-default"  # Example: Queue for notifications
-      DJANGO_TICKET_STATUS_QUEUE: "ticket_status-default"  # Example: Queue for ticket status updates
-      DJANGO_ROLES_QUEUE: "role_send-prod27"  # Example: Queue for role-related tasks
-      SECRET_KEY: "your-secret-key-here"
-    ports:
-      - "8001:8000"
-    depends_on:
-      - rabbitmq
-      - db
-    command: sh -c "sleep 10 && ./start.sh"
-
   # Workflow API service - 10 seconds sleep
   workflow_api:
     build:
@@ -114,7 +82,8 @@ services:
       DJANGO_CELERY_BROKER_URL: "amqp://admin:admin@rabbitmq:5672/"
       DATABASE_URL: "postgres://postgres:postgrespass@db:5432/workflowmanagement"
       DJANGO_ENV: "production"
-      DJANGO_USER_SERVICE: "http://user-service:8000"
+      DJANGO_AUTH_SERVICE: "http://user_service:8000"
+      DJANGO_USER_SERVICE: "http://auth-service:8000"
       DJANGO_NOTIFICATION_QUEUE: notification-queue-default
       DJANGO_TICKET_STATUS_QUEUE: ticket_status-default
     ports:
@@ -124,35 +93,62 @@ services:
       - db
     command: sh -c "sleep 10 && ./start.sh"
 
+  # Auth service - 10 seconds sleep
+  auth-service:
+    build:
+      context: ../auth
+      dockerfile: Dockerfile
+    environment:
+      # DJANGO_FRONTEND_URL: http://localhost:1000/
+      DJANGO_CELERY_BROKER_URL: "amqp://admin:admin@rabbitmq:5672/"
+      DATABASE_URL: "postgres://postgres:postgrespass@db:5432/authservice"
+      DJANGO_DEBUG: "True"
+      DJANGO_ALLOWED_HOSTS: "*"
+      # DJANGO_ENV: "production"
+      SECRET_KEY: "your-auth-service-secret-key-here"
+      EMAIL_HOST: smtp.gmail.com
+      EMAIL_PORT: 587
+      EMAIL_HOST_USER: mayuga.marccedricc@gmail.com
+      EMAIL_HOST_PASSWORD: qlit lmbg siip vvkh
+      EMAIL_USE_TLS: True
+      DEFAULT_FROM_EMAIL: gensystest@mail.com
+      ALLOWED_HOSTS: "*"
+    ports:
+      - "8003:8000"
+    depends_on:
+      - rabbitmq
+      - db
+    command: sh -c "sleep 10 && ./entrypoint.sh"
+
   # Frontend service - No sleep
   # frontend:
-  #   build:
-  #     context: ../frontend
-  #     dockerfile: Dockerfile
-  #   environment:
-  #     VITE_VALUE_TEST: "Test"
-  #     VITE_AGENTS_API: "http://ticket_service:7000/agents"
-  #     VITE_ARCHIVE_API: "http://ticket_service:7000/archive"
-  #     VITE_WORKFLOW_API: "http://workflow_api:8000/workflow"
-  #     VITE_TICKET_API: "http://ticket_service:7000/tickets"
-  #     VITE_ADMINTICKET_API: "http://ticket_service:7000/adminTicket"
-  #     VITE_ARCHIVE_TICKETS_API: "http://ticket_service:7000/archived_tickets"
-  #     VITE_UPCOMING_TICKETS_API: "http://ticket_service:7000/upcoming_tickets"
-  #     VITE_LOGIN_API: "http://user-service:8000/auth/login/"
-  #     VITE_VERIFY_API: "http://user-service:8000/auth/verify/"
-  #     VITE_VERIFY_OTP_API: "http://user-service:8000/auth/login/verify-otp/"
-  #     VITE_BACKEND_API: "http://workflow_api:8000/"
-  #     VITE_USER_SERVER_API: "http://user-service:8000/"
-  #     VITE_LOGOUT_API: "http://user-service:8000/auth/logout/"
-  #     VITE_PASSWORD_RESET_API: "http://user-service:8000/password/reset/"
-  #     VITE_VALIDATE_RESET_TOKEN_API: "http://user-service:8000/password/reset/validate-token/"
-  #     VITE_CONFIRM_RESET_API: "http://user-service:8000/password/reset/confirm/"
-  #   ports:
-  #     - "1000:1000"
-  #   depends_on:
-  #     - user-service
-  #     - ticket_service
-  #     - workflow_api
+  # build:
+  #   context: ../frontend
+  #   dockerfile: Dockerfile
+  # environment:
+  #   VITE_VALUE_TEST: "Test"
+  #   VITE_AGENTS_API: "http://ticket_service:7000/agents"
+  #   VITE_ARCHIVE_API: "http://ticket_service:7000/archive"
+  #   VITE_WORKFLOW_API: "http://workflow_api:8000/workflow"
+  #   VITE_TICKET_API: "http://ticket_service:7000/tickets"
+  #   VITE_ADMINTICKET_API: "http://ticket_service:7000/adminTicket"
+  #   VITE_ARCHIVE_TICKETS_API: "http://ticket_service:7000/archived_tickets"
+  #   VITE_UPCOMING_TICKETS_API: "http://ticket_service:7000/upcoming_tickets"
+  #   VITE_LOGIN_API: "http://user-service:8000/auth/login/"
+  #   VITE_VERIFY_API: "http://user-service:8000/auth/verify/"
+  #   VITE_VERIFY_OTP_API: "http://user-service:8000/auth/login/verify-otp/"
+  #   VITE_BACKEND_API: "http://workflow_api:8000/"
+  #   VITE_USER_SERVER_API: "http://user-service:8000/"
+  #   VITE_LOGOUT_API: "http://user-service:8000/auth/logout/"
+  #   VITE_PASSWORD_RESET_API: "http://user-service:8000/password/reset/"
+  #   VITE_VALIDATE_RESET_TOKEN_API: "http://user-service:8000/password/reset/validate-token/"
+  #   VITE_CONFIRM_RESET_API: "http://user-service:8000/password/reset/confirm/"
+  # ports:
+  #   - "1000:1000"
+  # depends_on:
+  #   - user-service
+  #   - ticket_service
+  #   - workflow_api
 
 volumes:
   rabbitmq_data:

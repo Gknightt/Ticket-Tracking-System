@@ -11,27 +11,22 @@ RUN apk add --no-cache \
     postgresql-dev \
     && pip install --no-cache-dir --upgrade pip
 
-# Copy application requirements and install dependencies first (for better caching)
+# Copy application requirements and install
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install gunicorn
 
-# Set environment variables that will be overridden by docker-compose
-ENV PYTHONUNBUFFERED=1
-ENV DJANGO_SETTINGS_MODULE=workflow_api.settings
-ENV PYTHONDONTWRITEBYTECODE=1
-
-# Copy project files into the container (excluding files in .dockerignore)
+# Copy project files into the container
 COPY . .
 
-# Make start.sh executable
-RUN chmod +x start.sh
-
-# Create media directory for file uploads
-RUN mkdir -p media
+# Set the environment variables
+ENV PYTHONUNBUFFERED=1
 
 # Expose the application port
 EXPOSE 8000
 
-# Use start.sh as the entry point
-CMD ["./start.sh"]
+# Command to run the Django server
+COPY start.sh .
+RUN chmod +x start.sh
+
+CMD ["sh", "start.sh"]
