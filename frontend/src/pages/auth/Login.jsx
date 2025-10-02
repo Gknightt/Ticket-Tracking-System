@@ -1,91 +1,90 @@
-import { useLogin } from "../../api/useLogin";
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../../api/AuthContext";
+import { authApi } from "../../api/axios.jsx";
 import styles from "./login.module.css";
 
-const verifyURL = import.meta.env.VITE_VERIFY_API;
-const resetPasswordURL = import.meta.env.VITE_USER_SERVER_API;
+const resetPasswordURL = import.meta.env.VITE_AUTH_URL || "/api/v1";
 
 function Login() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
   const [forgotMode, setForgotMode] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
-  const [resetMessage, setResetMessage] = useState(""); // Generic message for both success and error
+  const [resetMessage, setResetMessage] = useState("");
 
+  const { login, user, isAdmin, hasTtsAccess } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const {
-    email,
-    setEmail,
-    password,
-    setPassword,
-    otp,
-    setOtp,
-    error,
-    showOTP,
-    handleLogin,
-    handleOTPSubmit,
-    handleBackToLogin,
-  } = useLogin();
+  // Check if user is already logged in and redirect accordingly
+  useEffect(() => {
+    if (user) {
+      // Get redirect destination from location state or default based on role
+      const from = location.state?.from?.pathname;
+      
+      if (from) {
+        // Redirect to original destination if available
+        navigate(from, { replace: true });
+      } else if (isAdmin()) {
+        // Redirect to admin dashboard if user has admin role
+        navigate("/admin/dashboard", { replace: true });
+      } else if (hasTtsAccess()) {
+        // Redirect to agent dashboard if user has TTS access
+        navigate("/agent/dashboard", { replace: true });
+      } else {
+        // Redirect to unauthorized page if user doesn't have appropriate role
+        navigate("/unauthorized", { replace: true });
+      }
+    }
+  }, [user, isAdmin, hasTtsAccess, navigate, location.state?.from?.pathname]);
 
-  const onLoginSubmit = async (e) => {
+  // Handle login form submission
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
+    setError("");
     setIsLoading(true);
+    
     try {
-      await handleLogin(e);
+      const result = await login({ email, password });
+      
+      if (!result.success) {
+        setError(result.error || "Login failed. Please check your credentials.");
+      }
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.");
+      console.error("Login error:", err);
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Handle password reset request
   const handlePasswordReset = async (e) => {
     e.preventDefault();
     setResetLoading(true);
-    setResetMessage(""); // Clear previous messages
+    setResetMessage("");
+    
     try {
-      await axios.post(`${resetPasswordURL}password/reset/`, { email });
-    } catch (err) {
-      // Do nothing specific for errors to avoid exposing account existence
-    } finally {
+      // Call the password reset endpoint from the auth service
+      await authApi.post(`${resetPasswordURL}/password/reset/`, { email });
       setResetMessage(
         "If an account with this email exists, reset instructions have been sent."
       );
-      setResetLoading(false);
       setResetSent(true);
+    } catch (err) {
+      // Security best practice: don't expose if account exists or not
+      setResetMessage(
+        "If an account with this email exists, reset instructions have been sent."
+      );
+      setResetSent(true);
+    } finally {
+      setResetLoading(false);
     }
   };
-
-  useEffect(() => {
-    const checkIfLoggedIn = async () => {
-      const accessToken = localStorage.getItem("accessToken");
-      if (!accessToken) return;
-
-      try {
-        const res = await axios.get(verifyURL, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        });
-
-        if (res.data.is_staff) {
-          navigate("/admin/dashboard");
-        } else {
-          navigate("/agent/dashboard");
-        }
-      } catch (err) {
-        console.error(
-          "JWT invalid or expired:",
-          err.response?.data || err.message
-        );
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
-      }
-    };
-
-    checkIfLoggedIn();
-  }, [navigate]);
 
   return (
     <main className={styles.loginPage}>
@@ -153,8 +152,8 @@ function Login() {
               Back to Login
             </button>
           </form>
-        ) : !showOTP ? (
-          <form className={styles.lpForm} onSubmit={onLoginSubmit}>
+        ) : (
+          <form className={styles.lpForm} onSubmit={handleLoginSubmit}>
             <fieldset>
               <label htmlFor="email">Email:</label>
               <input
@@ -202,43 +201,9 @@ function Login() {
               )}
             </button>
           </form>
-        ) : (
-          <form className={styles.lpForm} onSubmit={handleOTPSubmit}>
-            <fieldset>
-              <label htmlFor="otp">Enter OTP:</label>
-              <input
-                type="text"
-                id="otp"
-                name="otp"
-                placeholder="Enter the 6-digit OTP"
-                className={styles.input}
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
-                maxLength={6}
-                required
-                aria-label="OTP"
-              />
-              <small style={{ color: "#666", fontSize: "12px" }}>
-                OTP sent to {email}
-              </small>
-            </fieldset>
-
-            {error && <p className={styles.error}>{error}</p>}
-
-            <button type="submit" className={styles.logInButton}>
-              Verify OTP
-            </button>
-            <button
-              type="button"
-              onClick={handleBackToLogin}
-              className={styles.backButton}
-            >
-              Back to Login
-            </button>
-          </form>
         )}
 
-        {!showOTP && !forgotMode && (
+        {!forgotMode && (
           <a
             onClick={() => setForgotMode(true)}
             className={styles.forgotPassword}

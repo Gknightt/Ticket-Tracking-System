@@ -1,13 +1,26 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { useAuth } from "../api/AuthContext";
+import { useAuth } from "../api/AuthContext.jsx";
 
-export default function ProtectedRoute({ requireAdmin = false, requireAgent = false }) {
-  const { user, loading, initialized, isAdmin, hasTtsAccess } = useAuth();
+export default function ProtectedRoute({ requireAdmin = false }) {
+  const { user, loading, initialized } = useAuth();
   const location = useLocation();
 
+  // Avoid redundant calls to checkAuthStatus
+  useEffect(() => {
+    if (!user && !loading) {
+      console.log('ProtectedRoute: Skipping redundant auth check');
+    }
+  }, [location.pathname, user, loading]);
+
+  useEffect(() => {
+    console.log('ProtectedRoute: user =', user);
+    console.log('ProtectedRoute: loading =', loading);
+    console.log('ProtectedRoute: initialized =', initialized);
+  }, [user, loading, initialized]);
+
   // Show loading while authentication status is being checked
-  if (loading || !initialized) {
+  if (!initialized || loading) {
     return (
       <div style={{
         display: 'flex',
@@ -40,20 +53,9 @@ export default function ProtectedRoute({ requireAdmin = false, requireAgent = fa
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Check for TTS system access first
-  if (!hasTtsAccess()) {
-    return <Navigate to="/unauthorized" replace />;
-  }
-
   // Check admin requirements
-  if (requireAdmin && !isAdmin()) {
+  if (requireAdmin && !user.is_staff) {
     return <Navigate to="/unauthorized" replace />;
-  }
-
-  // Check agent requirements (non-admin users)
-  if (requireAgent && isAdmin()) {
-    // If agent-only route and user is admin, redirect to admin area
-    return <Navigate to="/admin/dashboard" replace />;
   }
 
   // If authenticated and meets requirements, render the protected content
