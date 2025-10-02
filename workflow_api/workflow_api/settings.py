@@ -16,7 +16,9 @@ if not os.getenv('DJANGO_ENV') == 'production':
 # Security settings - prioritize environment variables from docker-compose
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-$6412+n(t#!#4zo%akvxla5cub-u-i8!ulxck68_+97g_z066^')
 DEBUG = os.getenv('DJANGO_DEBUG', 'False') == 'True'  # Default to False for security
-ALLOWED_HOSTS = ['*'] if DEBUG else os.getenv('DJANGO_ALLOWED_HOSTS', '*').split(',')
+# ALLOWED_HOSTS = ['*'] if DEBUG else os.getenv('DJANGO_ALLOWED_HOSTS', '*').split(',')
+ALLOWED_HOSTS = ['*']
+
 
 # Queue names
 DJANGO_NOTIFICATION_QUEUE = os.getenv('DJANGO_NOTIFICATION_QUEUE', 'notification-queue-default')

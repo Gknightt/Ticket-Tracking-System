@@ -14,6 +14,7 @@ import TicketTable from "../../../tables/admin/TicketTable";
 
 // hook
 import useUserTickets from "../../../api/useUserTickets";
+import { use } from "react";
 
 export default function AdminTicket() {
   const { userTickets, loading, error } = useUserTickets();
