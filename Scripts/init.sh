@@ -35,7 +35,7 @@ python manage.py flush --no-input
 python manage.py makemigrations
 python manage.py migrate
 python manage.py seed_accounts
-python manage.py runserver 0.0.0.0:3000 &
+python manage.py runserver 0.0.0.0:8001 &
 cd ..
 
 
@@ -51,7 +51,7 @@ python manage.py migrate
 python manage.py seed_workflows2
 
 # Start Django server for workflow_api
-python manage.py runserver 0.0.0.0:2000 &
+python manage.py runserver 0.0.0.0:8002 &
 cd ..
 
 # Start ticket_service
@@ -61,7 +61,7 @@ python manage.py flush --no-input
 python manage.py makemigrations
 python manage.py migrate
 python manage.py seed_tickets
-python manage.py runserver 0.0.0.0:8000 &
+python manage.py runserver 0.0.0.0:8004 &
 cd ..
 
 # Optionally start task_service
@@ -73,13 +73,13 @@ cd ..
 # cd ..
 
 
-# Start React app
-echo "Starting React app..."
-cd frontend
-# setup_env
-# npx json-server --watch db.json --port 5000 --host 0.0.0.0 &
-npm install
-npm run dev &
+# # Start React app
+# echo "Starting React app..."
+# cd frontend
+# # setup_env
+# # npx json-server --watch db.json --port 5000 --host 0.0.0.0 &
+# npm install
+# npm run dev &
 
 
 echo "All services started."

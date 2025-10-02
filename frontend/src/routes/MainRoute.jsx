@@ -29,6 +29,7 @@ import AdminProfile from "../pages/auth/AdminProfile";
 import ProtectedRegister from "./ProtectedRegister";
 import ManageProfile from "../pages/auth/ManageProfile";
 import AgentProfile from "../pages/auth/AgentProfile";
+import Unauthorized from "../pages/error/Unauthorized";
 
 // test
 import Test from "../pages/test";
@@ -39,14 +40,20 @@ import ResetPassword from "../pages/auth/PasswordReset";
 export default function MainRoute() {
   return (
     <Routes>
-      <Route path="/register" element={<ProtectedRegister />} />
       {/* PUBLIC ROUTES */}
       <Route path="/" element={<Login />} />
+      <Route path="/login" element={<Login />} />
       <Route path="/reset-password/:uid/:token" element={<ResetPassword />} />
+      <Route path="/unauthorized" element={<Unauthorized />} />
+
+      {/* PROTECTED REGISTER - Special case that requires admin privileges */}
+      <Route path="/register" element={<ProtectedRegister />} />
+      
+      {/* PUBLIC REPORT - May need to be protected depending on requirements */}
       <Route path="/report" element={<Report />} />
 
-      {/* PROTECTED AGENT ROUTES */}
-      <Route element={<ProtectedRoute />}>
+      {/* PROTECTED AGENT ROUTES - Available to any user with TTS role */}
+      <Route element={<ProtectedRoute requireAgent={true} />}>
         <Route path="/agent/dashboard" element={<Dashboard />} />
         <Route path="/agent/ticket" element={<Ticket />} />
         <Route path="/agent/track" element={<Track />} />
@@ -55,7 +62,7 @@ export default function MainRoute() {
         <Route path="/agent/profile" element={<AgentProfile />} />
       </Route>
 
-      {/* PROTECTED ADMIN ROUTES */}
+      {/* PROTECTED ADMIN ROUTES - Only available to users with TTS Admin role */}
       <Route element={<ProtectedRoute requireAdmin={true} />}>
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
         <Route path="/admin/workflow" element={<Workflow />} />
@@ -70,9 +77,10 @@ export default function MainRoute() {
         <Route path="/admin/profile" element={<AdminProfile />} />
       </Route>
 
+      {/* TEST ROUTE - Consider protecting or removing in production */}
       <Route path="/test" element={<Test />} />
 
-      {/* 404 */}
+      {/* 404 ROUTE */}
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
