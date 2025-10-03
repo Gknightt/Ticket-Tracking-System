@@ -32,8 +32,8 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./db-init:/docker-entrypoint-initdb.d
 
-  # Worker derived from workflow_api - 20 seconds sleep
-  workflow_worker:
+  # Worker derived from workflow-api - 20 seconds sleep
+  workflow-worker:
     build:
       context: ../workflow_api
       dockerfile: Dockerfile
@@ -55,12 +55,12 @@ services:
       - db
 
   # Ticket service - 10 seconds sleep
-  ticket_service:
+  ticket-service:
     build:
       context: ../ticket_service
       dockerfile: Dockerfile
     environment:
-      BASE_URL: "http://ticket_service:7000"
+      BASE_URL: "http://ticket-service:7000"
       CELERY_BROKER_URL: "amqp://admin:admin@rabbitmq:5672/"
       DATABASE_URL: "postgres://postgres:postgrespass@db:5432/ticketmanagement"
       CELERY_TASK_DEFAULT_QUEUE: "TICKET_TASKS_PRODUCTION"
@@ -74,7 +74,7 @@ services:
     command: sh -c "sleep 10 && ./start.sh"
 
   # Workflow API service - 10 seconds sleep
-  workflow_api:
+  workflow-api:
     build:
       context: ../workflow_api
       dockerfile: Dockerfile
@@ -120,35 +120,21 @@ services:
       - db
     command: sh -c "sleep 10 && ./entrypoint.sh"
 
-  # Frontend service - No sleep
   # frontend:
-  # build:
-  #   context: ../frontend
-  #   dockerfile: Dockerfile
-  # environment:
-  #   VITE_VALUE_TEST: "Test"
-  #   VITE_AGENTS_API: "http://ticket_service:7000/agents"
-  #   VITE_ARCHIVE_API: "http://ticket_service:7000/archive"
-  #   VITE_WORKFLOW_API: "http://workflow_api:8000/workflow"
-  #   VITE_TICKET_API: "http://ticket_service:7000/tickets"
-  #   VITE_ADMINTICKET_API: "http://ticket_service:7000/adminTicket"
-  #   VITE_ARCHIVE_TICKETS_API: "http://ticket_service:7000/archived_tickets"
-  #   VITE_UPCOMING_TICKETS_API: "http://ticket_service:7000/upcoming_tickets"
-  #   VITE_LOGIN_API: "http://user-service:8000/auth/login/"
-  #   VITE_VERIFY_API: "http://user-service:8000/auth/verify/"
-  #   VITE_VERIFY_OTP_API: "http://user-service:8000/auth/login/verify-otp/"
-  #   VITE_BACKEND_API: "http://workflow_api:8000/"
-  #   VITE_USER_SERVER_API: "http://user-service:8000/"
-  #   VITE_LOGOUT_API: "http://user-service:8000/auth/logout/"
-  #   VITE_PASSWORD_RESET_API: "http://user-service:8000/password/reset/"
-  #   VITE_VALIDATE_RESET_TOKEN_API: "http://user-service:8000/password/reset/validate-token/"
-  #   VITE_CONFIRM_RESET_API: "http://user-service:8000/password/reset/confirm/"
-  # ports:
-  #   - "1000:1000"
-  # depends_on:
-  #   - user-service
-  #   - ticket_service
-  #   - workflow_api
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    environment:
+      # the following env var don't get used, the one's from the .env file in the frontend directory get used instead
+      VITE_AUTH_URL: http://auth-service:8000
+      VITE_WORKFLOW_API: http://workflow-api:8000/workflow
+      VITE_BACKEND_API: http://workflow-api:8000/
+    ports:
+      - "1000:1000"
+    depends_on:
+      - ticket-service
+      - workflow-api
 
 volumes:
   rabbitmq_data:
