@@ -10,6 +10,7 @@ const resetPasswordURL = import.meta.env.VITE_USER_SERVER_API;
 function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [forgotMode, setForgotMode] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
   const [resetMessage, setResetMessage] = useState(""); // Generic message for both success and error
@@ -172,17 +173,26 @@ function Login() {
 
             <fieldset>
               <label htmlFor="password">Password:</label>
-              <input
-                type="password"
-                id="password"
-                name="password"
-                placeholder="Enter your password"
-                className={styles.input}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                aria-label="Password"
-              />
+              <div className={styles.passwordContainer}>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  id="password"
+                  name="password"
+                  placeholder="Enter your password"
+                  className={styles.input}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  aria-label="Password"
+                />
+                <span
+                  className={styles.showPassword}
+                  onClick={() => setShowPassword(!showPassword)}
+                  title={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <div><i className="fa-solid fa-eye-slash"></i></div> : <div><i className="fa-solid fa-eye"></i></div>}
+                </span>
+              </div>
             </fieldset>
 
             {error && <p className={styles.error}>{error}</p>}
