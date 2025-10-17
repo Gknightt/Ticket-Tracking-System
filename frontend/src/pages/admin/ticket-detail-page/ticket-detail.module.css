@@ -109,7 +109,8 @@
 
 .tdpDescription {
   overflow-x: auto;
-  font-size: var(--base-font-size);
+  /* font-size: var(--table-head-size); */
+  font-size: var(--default-font-size);
   color: var(--text-color);
   line-height: 1.6;
 }
@@ -175,7 +176,8 @@
 
 /* RIGHT */
 .actionButton {
-  background-color: var(--primary-color);
+  /* background-color: var(--primary-color); */
+  background-color: var(--success-color);
   color: white;
   border: none;
   border-radius: 4px;

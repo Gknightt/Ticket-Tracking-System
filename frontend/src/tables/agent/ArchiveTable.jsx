@@ -37,7 +37,10 @@ function ArchiveItem({ item }) {
     <tr className={general.item}>
       <td>{item.ticket_id}</td>
       <td>{item.subject}</td>
-      <td>{item.description}</td>
+      {/* <td>{item.description}</td> */}
+      <td className={general.descriptionCell} title={item.description}>
+        {item.description}
+      </td>
       <td>
         <div className={general[`priority-${item.priority.toLowerCase()}`]}>
           {item.priority}

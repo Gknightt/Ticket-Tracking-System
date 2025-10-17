@@ -12,7 +12,19 @@ export default function KPICard(props) {
 
   return (
     <div
-      className={`${styles.statusCard} ${statusClassMap[props.label] || ""}`}
+      role={props.onClick ? "button" : undefined}
+      tabIndex={props.onClick ? 0 : undefined}
+      onKeyDown={(e) => {
+        if (!props.onClick) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          props.onClick();
+        }
+      }}
+      onClick={props.onClick}
+      className={`${styles.statusCard} ${statusClassMap[props.label] || ""} ${
+        props.onClick ? styles.clickable : ""
+      }`}
     >
       <div className={styles.contentWrapper}>
         <div

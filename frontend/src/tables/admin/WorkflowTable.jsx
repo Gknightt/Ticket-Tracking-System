@@ -36,7 +36,10 @@ function WorkflowItem({ item }) {
       <td>{item.name}</td>
       <td>{item.category}</td>
       <td>{item.sub_category}</td>
-      <td>{item.description}</td>
+      {/* <td>{item.description}</td> */}
+      <td className={general.descriptionCell} title={item.description}>
+        {item.description}
+      </td>
       <td>{item.status}</td>
       <td>
         <button
