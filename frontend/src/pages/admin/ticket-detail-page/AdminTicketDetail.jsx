@@ -14,6 +14,7 @@ import AdminNav from "../../../components/navigation/AdminNav";
 import WorkflowTracker2 from "../../../components/ticket/WorkflowVisualizer2";
 import DocumentViewer from "../../../components/ticket/DocumentViewer";
 import Messaging from "../../../components/component/Messaging";
+import ActionLog from "../../../components/ticket/ActionLog";
 
 // hooks
 import useFetchActionLogs from "../../../api/workflow-graph/useActionLogs";
@@ -260,7 +261,7 @@ export default function AdminTicketDetail() {
                   <i class="fa-solid fa-lightbulb"></i>
                   <h3>Instructions</h3>
                 </div>
-                <p>hahaha</p>
+                <p>{state.instructions}</p>
               </div>
               <div className={styles.tdAttachment}>
                 <h3>Attachment</h3>
@@ -376,6 +377,10 @@ export default function AdminTicketDetail() {
                         loading={loading}
                         error={error}
                       />
+                    </div>
+                    <div className={styles.actionLogs}>
+                      {/* Render a single highlighted ActionLog (e.g., most recent) */}
+                      <ActionLog log={logs && logs.length > 0 ? logs[0] : null} />
                     </div>
                   </>
                 )}
