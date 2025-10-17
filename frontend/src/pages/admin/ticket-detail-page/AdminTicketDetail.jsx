@@ -379,8 +379,7 @@ export default function AdminTicketDetail() {
                       />
                     </div>
                     <div className={styles.actionLogs}>
-                      {/* Render a single highlighted ActionLog (e.g., most recent) */}
-                      <ActionLog log={logs && logs.length > 0 ? logs[0] : null} />
+                      {/* <ActionLog log={logs && logs.length > 0 ? logs[0] : null} /> */}
                     </div>
                   </>
                 )}

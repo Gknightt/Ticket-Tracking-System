@@ -17,6 +17,7 @@ import DynamicTable from "../../../tables/components/DynamicTable";
 
 // hooks
 import useUserTickets from "../../../api/useUserTickets";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../api/AuthContext";
 
 // date helper
@@ -84,8 +85,24 @@ export default function AdminDashboard() {
     }
   });
 
-  console.log("has_acted counts:", { actedCount, notActedCount });
-  console.log("tickets: ", pendingTickets);
+  // console.log("has_acted counts:", { actedCount, notActedCount });
+  // console.log("tickets: ", pendingTickets);
+    
+  const navigate = useNavigate();
+
+  const handleKpiClick = (label) => {
+    // Map card labels to AdminTicket tab values
+    const map = {
+      "New Tickets": "All",
+      Critical: "Critical",
+      High: "High",
+      Medium: "Medium",
+      Low: "Low",
+    };
+
+    const tab = map[label] || "All";
+    navigate(`/admin/ticket?tab=${encodeURIComponent(tab)}`);
+  };
   return (
     <>
       <AdminNav />
@@ -100,11 +117,31 @@ export default function AdminDashboard() {
           <div className={styles.layoutSection}>
             <h2>Tickets Summary</h2>
             <div className={styles.layoutRow}>
-              <KPICard label="New Tickets" number={counts.new} />
-              <KPICard label="Critical" number={counts.critical} />
-              <KPICard label="High" number={counts.high} />
-              <KPICard label="Medium" number={counts.medium} />
-              <KPICard label="Low" number={counts.low} />
+              <KPICard
+                label="New Tickets"
+                number={counts.new}
+                onClick={() => handleKpiClick("New Tickets")}
+              />
+              <KPICard
+                label="Critical"
+                number={counts.critical}
+                onClick={() => handleKpiClick("Critical")}
+              />
+              <KPICard
+                label="High"
+                number={counts.high}
+                onClick={() => handleKpiClick("High")}
+              />
+              <KPICard
+                label="Medium"
+                number={counts.medium}
+                onClick={() => handleKpiClick("Medium")}
+              />
+              <KPICard
+                label="Low"
+                number={counts.low}
+                onClick={() => handleKpiClick("Low")}
+              />
             </div>
           </div>
           <div className={styles.flexSection}>

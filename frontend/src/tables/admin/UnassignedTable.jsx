@@ -32,14 +32,16 @@ function TicketHeader() {
 }
 
 function TicketItem({ item, onInviteAgent }) {
-  
   const navigate = useNavigate();
   console.log("id", item);
   return (
     <tr className={general.item}>
       <td>{item.ticket_id}</td>
       <td>{item.subject}</td>
-      <td>{item.description}</td>
+      {/* <td>{item.description}</td> */}
+      <td className={general.descriptionCell} title={item.description}>
+        {item.description}
+      </td>
       {/* <td>{item.priority}</td> */}
       <td>
         <div className={general[`priority-${item.priority.toLowerCase()}`]}>
@@ -49,7 +51,10 @@ function TicketItem({ item, onInviteAgent }) {
       <td>{item.status}</td>
       <td>{format(new Date(item.created_at), "yyyy-MM-dd hh:mm:ss a")}</td>
       <td>
-        <button className={general.btn} onClick={() => onInviteAgent(item.ticket_id)}>
+        <button
+          className={general.btn}
+          onClick={() => onInviteAgent(item.ticket_id)}
+        >
           <i className="fa-solid fa-plus"></i> Assign Task
         </button>
       </td>
@@ -74,7 +79,6 @@ export default function UnassignedTable({
   const paginatedTickets = tickets.slice(startIndex, endIndex);
 
   return (
-    
     <div className={general.ticketTableSection}>
       <div className={general.tableHeader}>
         <h2>
@@ -93,8 +97,11 @@ export default function UnassignedTable({
           <tbody>
             {tickets.length > 0 ? (
               paginatedTickets.map((ticket) => (
-              <TicketItem key={ticket.id} item={ticket} onInviteAgent={onInviteAgent} />
-
+                <TicketItem
+                  key={ticket.id}
+                  item={ticket}
+                  onInviteAgent={onInviteAgent}
+                />
               ))
             ) : (
               <tr>
@@ -115,8 +122,6 @@ export default function UnassignedTable({
           onPageSizeChange={setPageSize}
         />
       </div>
-
-      
     </div>
   );
 }

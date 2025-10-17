@@ -1,99 +1,187 @@
+// react
+import { useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
+import { useMemo } from "react";
+import { useEffect, useState, useCallback, useReducer } from "react";
+import { useSearchParams } from "react-router-dom";
+
 // style
 import styles from "./ticket-detail.module.css";
 import general from "../../../style/general.module.css";
 
-// component
+// components
+// import AdminNav from "../../../components/navigation/AdminNav";
 import AgentNav from "../../../components/navigation/AgentNav";
 import WorkflowTracker2 from "../../../components/ticket/WorkflowVisualizer2";
-import WorkflowVisualizer from "../../../components/ticket/WorkflowVisualizer";
 import DocumentViewer from "../../../components/ticket/DocumentViewer";
-
-// react
-import { useNavigate } from "react-router-dom";
-import { useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import Messaging from "../../../components/component/Messaging";
+import ActionLog from "../../../components/ticket/ActionLog";
 
 // hooks
 import useFetchActionLogs from "../../../api/workflow-graph/useActionLogs";
 import ActionLogList from "../../../components/ticket/ActionLogList";
 import { useWorkflowProgress } from "../../../api/workflow-graph/useWorkflowProgress";
+import useUserTickets from "../../../api/useUserTickets";
 
 // modal
 import TicketAction from "./modals/TicketAction";
-import useUserTickets from "../../../api/useUserTickets";
+import { min } from "date-fns";
 
-export default function TicketDetail() {
+export default function AdminTicketDetail() {
   const navigate = useNavigate();
-  const { id } = useParams(); // ticket_id from URL
+  const { id } = useParams();
   const { userTickets } = useUserTickets();
 
+  // Tabs with URL sync
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlTab = searchParams.get("tab") || "Details";
+  const [activeTab, setActiveTab] = useState(urlTab);
+
   // States
-  const [ticket, setTicket] = useState(null);
-  const [action, setAction] = useState([]);
-  const [instance, setInstance] = useState([]);
-  const [taskid, setTaskid] = useState();
-  const [instruction, setInstruction] = useState();
-  const [stepInstance, setStepInstance] = useState(null);
+  const initialState = {
+    ticket: null,
+    action: [],
+    instance: null,
+    instruction: "",
+    taskid: null,
+  };
+
+  function reducer(state, action) {
+    switch (action.type) {
+      case "SET_TICKET":
+        return {
+          ...state,
+          ticket: action.payload.ticket,
+          action: action.payload.action,
+          instruction: action.payload.instruction,
+          instance: action.payload.instance,
+          taskid: action.payload.taskid,
+        };
+      case "RESET":
+        return initialState;
+      default:
+        return state;
+    }
+  }
+
+  const [state, dispatch] = useReducer(reducer, initialState);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [openTicketAction, setOpenTicketAction] = useState(false);
   const [showTicketInfo, setShowTicketInfo] = useState(true);
 
-  const toggTicketInfosVisibility = () => {
+  const toggTicketInfosVisibility = useCallback(() => {
     setShowTicketInfo((prev) => !prev);
-  };
+  }, []);
+
+  const handleBack = useCallback(() => navigate(-1), [navigate]);
+
+  // Tab handling: update URL and component state
+  const handleTabClick = useCallback(
+    (tab) => {
+      setSearchParams({ tab });
+      setActiveTab(tab);
+    },
+    [setSearchParams]
+  );
+
+  // Keep activeTab in sync with the URL (respond to back/forward)
+  useEffect(() => {
+    const urlCurrent = searchParams.get("tab") || "Details";
+    if (urlCurrent !== activeTab) setActiveTab(urlCurrent);
+  }, [searchParams]);
+
+  const formattedDates = useMemo(() => {
+    if (!state.ticket?.created_at) return null;
+    const date = new Date(state.ticket.created_at);
+    return {
+      date: date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      }),
+      time: date.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      }),
+    };
+  }, [state.ticket?.created_at]);
 
   useEffect(() => {
     if (!userTickets || userTickets.length === 0) return;
 
-    // 1Filter step instance by ticket_id
     const matchedInstance = userTickets.find(
       (instance) => instance.step_instance_id === id
     );
 
-    console.log("🔍 Matched Instance:", matchedInstance);
-    console.log("📋 Step Instruction:", matchedInstance?.step?.instruction);
-
     if (!matchedInstance) {
       setError("Ticket not found.");
-      setTicket(null);
-      setAction([]);
-      setStepInstance(null);
+      dispatch({ type: "RESET" });
     } else {
-      setTicket({
-        ...matchedInstance.task.ticket,
-        hasacted: matchedInstance.has_acted,
+      dispatch({
+        type: "SET_TICKET",
+        payload: {
+          ticket: {
+            ...matchedInstance.task.ticket,
+            hasacted: matchedInstance.has_acted,
+          },
+          action: matchedInstance.available_actions || [],
+          instruction: matchedInstance.step.instruction,
+          instance: matchedInstance.step_instance_id,
+          taskid: matchedInstance.task.task_id,
+        },
       });
-      // setTicket(matchedInstance.task.ticket);
-      setInstance(matchedInstance.step_instance_id);
-      setAction(matchedInstance.available_actions || []);
-      setTaskid(matchedInstance.task.task_id);
-      setInstruction(matchedInstance.step.instruction);
-      console.log("✅ Instruction Set:", matchedInstance.step.instruction);
+      setError("");
     }
     setLoading(false);
   }, [userTickets, id]);
   const { fetchActionLogs, logs } = useFetchActionLogs();
   useEffect(() => {
-    if (taskid) {
-      fetchActionLogs(taskid);
+    if (state.taskid) {
+      fetchActionLogs(state.taskid);
     }
-  }, [taskid]);
+  }, [state.taskid]);
 
-  const { tracker } = useWorkflowProgress(taskid);
-  console.log("tracker", tracker);
+  const { tracker } = useWorkflowProgress(state.taskid);
 
-  console.log("loglog", logs);
-
+  if (loading) {
+    return (
+      <>
+        <AgentNav />
+        <main className={styles.ticketDetailPage}>
+          <section className={styles.tdpHeader}>
+            <button
+              className={styles.tdBack}
+              onClick={handleBack}
+              aria-label="Go back"
+              type="button"
+            >
+              <i className="fa fa-chevron-left"></i>
+            </button>
+            <h1>Loading...</h1>
+          </section>
+          <section className={styles.tdpBody}>
+            <div style={{ padding: "2rem" }}>Fetching ticket data...</div>
+          </section>
+        </main>
+      </>
+    );
+  }
   if (error) {
     return (
       <>
-        <AdminNav />
+        <AgentNav />
         <main className={styles.ticketDetailPage}>
           <section className={styles.tdpHeader}>
-            <div className={styles.tdBack} onClick={() => navigate(-1)}>
+            <button
+              className={styles.tdBack}
+              onClick={handleBack}
+              aria-label="Go back"
+              type="button"
+            >
               <i className="fa fa-chevron-left"></i>
-            </div>
+            </button>
             <h1>Error</h1>
           </section>
           <section className={styles.tdpBody}>
@@ -103,7 +191,7 @@ export default function TicketDetail() {
       </>
     );
   }
-  console.log("aaticket", ticket?.attachments);
+  // console.log("aaticket", ticket?.attachments);
 
   return (
     <>
@@ -111,62 +199,77 @@ export default function TicketDetail() {
       <main className={styles.ticketDetailPage}>
         <section className={styles.tdpHeader}>
           <div>
-            <span className={styles.tdpBack} onClick={() => navigate(-1)}>
+            <button
+              className={styles.wpdBack}
+              onClick={handleBack}
+              aria-label="Go back to tickets"
+              type="button"
+            >
               Tickets{" "}
-            </span>
-            <span className={styles.tdpCurrent}>/ Ticket Detail</span>
+            </button>
+            <span className={styles.wpdCurrent}> / Ticket Detail</span>
           </div>
         </section>
-        <div className={styles.headerTitle}>
-          <div>
-            <h1>Document Preview</h1>
-          </div>
-        </div>
+        <section className={styles.tdpHeaderTitle}>
+          <h1>Ticket Overview</h1>
+        </section>
         <section className={styles.tdpBody}>
-          <div className={styles.tdpWrapper}>
-            <div className={styles.tdpLeftCont}>
-              <div className={styles.tdHeader}>
-                <div className={styles.tdTitle}>
-                  <h3>Ticket No. {ticket?.ticket_id}</h3>
-                  <div
-                    className={
-                      general[`priority-${ticket?.priority.toLowerCase()}`]
-                    }
-                  >
-                    {ticket?.priority}
-                  </div>
+          <div className={styles.layoutFlex}>
+            {/* Left */}
+            <div className={styles.layoutSection} style={{ flex: 2 }}>
+              <div className={styles.tdpTicketNoWrapper}>
+                <h2 className={styles.tdpTicketNo}>
+                  Ticket No. {state.ticket?.ticket_id}
+                </h2>
+                <div
+                  className={
+                    general[`priority-${state.ticket?.priority.toLowerCase()}`]
+                  }
+                >
+                  {state.ticket?.priority}
                 </div>
-                <p className={styles.tdSubject}>
-                  <strong>Subject: {ticket?.subject}</strong>
-                </p>
-                <div className={styles.tdMetaData}>
-                  <p className={styles.tdDateOpened}>
-                    Opened On: {new Date(ticket?.created_at).toLocaleString()}
-                  </p>
-                  <p className={styles.tdDateResolution}>
-                    Expected Resolution:{" "}
-                    {new Date(ticket?.created_at).toLocaleString()}
-                  </p>
+                {/* <div>Low</div> */}
+              </div>
+              <div className={styles.tdpSection}>
+                <div className={styles.tdpTitle}>
+                  <strong>Subject: {state.ticket?.subject}</strong>
+                </div>
+                <div className={styles.tdpMeta}>
+                  Opened On:{" "}
+                  <span>
+                    {formattedDates?.date}
+                    {formattedDates?.time && ` at ${formattedDates?.time}`}
+                  </span>
+                </div>
+                <div className={styles.tdpMeta}>
+                  Expected Resolution:{" "}
+                  <span>
+                    {formattedDates?.date}
+                    {formattedDates?.time && ` at ${formattedDates?.time}`}
+                  </span>
                 </div>
               </div>
-              <div className={styles.tdDescription}>
-                <h3>Description</h3>
-                <p>{ticket?.description}</p>
+              <div className={styles.tdpSection}>
+                <div className={styles.tdpTitle}>
+                  <strong>Description: </strong>
+                </div>
+                <p className={styles.tdpDescription}>
+                  {state.ticket?.description}
+                </p>
               </div>
               <div className={styles.tdInstructions}>
                 <div className={styles.iHeaderWrapper}>
-                  <i class="fa-solid fa-lightbulb"></i>
+                  <i className="fa-solid fa-lightbulb"></i>
                   <h3>Instructions</h3>
                 </div>
-                <p>{instruction || "No instructions available for this step."}</p>
+                <p>{state.instruction || "No instructions available for this step."}</p>
               </div>
               <div className={styles.tdAttachment}>
                 <h3>Attachment</h3>
                 <div className={styles.tdAttached}>
                   <i className="fa fa-upload"></i>
                   <span className={styles.placeholderText}>
-                    <DocumentViewer attachments={ticket?.attachments} />; No
-                    file attached
+                    <DocumentViewer attachments={state.ticket?.attachments} />
                   </span>
                   <input
                     type="file"
@@ -177,88 +280,117 @@ export default function TicketDetail() {
                 </div>
               </div>
             </div>
-
-            <div className={styles.tdpRightCont}>
-              {/* <button
-                className={styles.actionButton}
-                onClick={() => {
-                  setOpenTicketAction(true);
-                }}
-              >
-                Make an Action
-              </button> */}
+            {/* Right */}
+            <div
+              className={styles.layoutColumn}
+              style={{ flex: 1, minWidth: "300px" }}
+            >
               <button
                 className={
-                  ticket?.hasacted
+                  state.ticket?.hasacted
                     ? styles.actionButtonDisabled
                     : styles.actionButton
                 }
                 onClick={() => setOpenTicketAction(true)}
-                disabled={ticket?.hasacted}
+                disabled={state.ticket?.hasacted}
               >
-                {ticket?.hasacted ? "Action Already Taken" : "Make an Action"}
+                {state.ticket?.hasacted
+                  ? "Action Already Taken"
+                  : "Make an Action"}
               </button>
-
-              <div className={styles.tdStatusCard}>
-                <div className={styles.tdStatusLabel}>Status</div>
-                <div
-                  className={
-                    general[
-                      `status-${ticket?.status
-                        .replace(/\s+/g, "-")
-                        .toLowerCase()}`
-                    ]
-                  }
-                >
-                  {ticket?.status}
-                </div>
-              </div>
-              <WorkflowTracker2 workflowData={tracker} />
-              <div className={styles.tdInfoWrapper}>
-                <div className={styles.tdInfoHeader}>
-                  <h3>Details</h3>
-                  <div
-                    className={styles.tdArrow}
-                    onClick={toggTicketInfosVisibility}
-                  >
-                    <i
-                      className={`fa-solid fa-caret-${
-                        showTicketInfo ? "down" : "up"
+              <div className={styles.layoutSection}>
+                <div className={styles.tdpTabs}>
+                  {["Details", "Messages"].map((tab) => (
+                    <button
+                      style={{ flex: 1 }}
+                      key={tab}
+                      onClick={() => handleTabClick(tab)}
+                      className={`${styles.tdpTabLink} ${
+                        activeTab === tab ? styles.active : ""
                       }`}
-                    ></i>
-                  </div>
+                      type="button"
+                    >
+                      {tab}
+                    </button>
+                  ))}
                 </div>
-                {showTicketInfo && (
-                  <div className={styles.tdInfoItem}>
-                    <div className={styles.tdInfoLabelValue}>
-                      <div className={styles.tdInfoLabel}>Ticket Owner</div>
-                      <div className={styles.tdInfoValue}>
-                        {" "}
-                        {`${ticket?.employee.first_name} ${ticket?.employee.last_name}`}
-                      </div>
-                    </div>
-                    <div className={styles.tdInfoLabelValue}>
-                      <div className={styles.tdInfoLabel}>Department</div>
-                      <div className={styles.tdInfoValue}>
-                        {" "}
-                        {`${ticket?.employee.department}`}
-                      </div>
-                    </div>
 
-                    {/* <div className={styles.tdInfoLabelValue}>
-                      <div className={styles.tdInfoLabel}>Position</div>
-                      <div className={styles.tdInfoValue}></div>
+                {/* Detail Section */}
+                {activeTab === "Details" && (
+                  <>
+                    <div className={styles.tdStatusCard}>
+                      <div className={styles.tdStatusLabel}>Status</div>
+                      <div
+                        className={
+                          general[
+                            `status-${state.ticket?.status
+                              .replace(/\s+/g, "-")
+                              .toLowerCase()}`
+                          ]
+                        }
+                      >
+                        {state.ticket?.status}
+                      </div>
                     </div>
-                    <div className={styles.tdInfoLabelValue}>
-                      <div className={styles.tdInfoLabel}>SLA</div>
-                      <div className={styles.tdInfoValue}></div>
-                    </div> */}
+                    <WorkflowTracker2 workflowData={tracker} />
+                    <div className={styles.tdInfoWrapper}>
+                      <div className={styles.tdInfoHeader}>
+                        <h3>Details</h3>
+                        <button
+                          className={styles.tdArrow}
+                          onClick={toggTicketInfosVisibility}
+                          aria-label={
+                            showTicketInfo ? "Hide details" : "Show details"
+                          }
+                          type="button"
+                        >
+                          <i
+                            className={`fa-solid fa-caret-${
+                              showTicketInfo ? "down" : "up"
+                            }`}
+                          ></i>
+                        </button>
+                      </div>
+                      {showTicketInfo && (
+                        <div className={styles.tdInfoItem}>
+                          <div className={styles.tdInfoLabelValue}>
+                            <div className={styles.tdInfoLabel}>
+                              Ticket Owner
+                            </div>
+                            <div className={styles.tdInfoValue}>
+                              {`${state.ticket?.employee.first_name} ${state.ticket?.employee.last_name}`}
+                            </div>
+                          </div>
+                          <div className={styles.tdInfoLabelValue}>
+                            <div className={styles.tdInfoLabel}>Department</div>
+                            <div className={styles.tdInfoValue}>
+                              {" "}
+                              {`${state.ticket?.employee.department}`}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className={styles.actionLogs}>
+                      <h4>Action Logs</h4>
+                      <ActionLogList
+                        logs={logs}
+                        loading={loading}
+                        error={error}
+                      />
+                    </div>
+                    <div className={styles.actionLogs}> 
+                      {/* <ActionLog log={logs && logs.length > 0 ? logs[0] : null} /> */}
+                    </div>
+                  </>
+                )}
+
+                {/* Message Section */}
+                {activeTab === "Messages" && (
+                  <div className={styles.messageSection}>
+                    <Messaging />
                   </div>
                 )}
-              </div>
-              <div className={styles.actionLogs}>
-                <h4>Action Logs</h4>
-                <ActionLogList logs={logs} loading={loading} error={error} />
               </div>
             </div>
           </div>
@@ -267,9 +399,9 @@ export default function TicketDetail() {
       {openTicketAction && (
         <TicketAction
           closeTicketAction={setOpenTicketAction}
-          ticket={ticket}
-          action={action}
-          instance={instance}
+          ticket={state.ticket}
+          action={state.action}
+          instance={state.instance}
         />
       )}
     </>

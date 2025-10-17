@@ -33,19 +33,26 @@ function TicketHeader() {
 
 function TicketItem({ item }) {
   const navigate = useNavigate();
-  console.log("id", item);
+  // console.log("id", item);
   return (
     <tr className={general.item}>
       <td>{item.ticket.ticket_id}</td>
       <td>{item.ticket.subject}</td>
-      <td>{item.ticket.description}</td>
+      {/* <td>{item.ticket.description}</td> */}
+      <td className={general.descriptionCell} title={item.ticket.description}>
+        {item.ticket.description}
+      </td>
       <td>
-        <div className={general[`priority-${item.ticket.priority.toLowerCase()}`]}>
+        <div
+          className={general[`priority-${item.ticket.priority.toLowerCase()}`]}
+        >
           {item.ticket.priority}
         </div>
       </td>
       <td>{item.ticket.status}</td>
-      <td>{format(new Date(item.ticket.created_at), "yyyy-MM-dd hh:mm:ss a")}</td>
+      <td>
+        {format(new Date(item.ticket.created_at), "yyyy-MM-dd hh:mm:ss a")}
+      </td>
       <td>
         <button
           className={general.btn}

@@ -101,7 +101,8 @@ export default function AdminTicket() {
       if (ticket.hasacted === true) return false;
 
       if (activeTab !== "All" && ticket.priority !== activeTab) return false;
-      if (filters.category && ticket.category !== filters.category) return false;
+      if (filters.category && ticket.category !== filters.category)
+        return false;
       if (filters.status && ticket.status !== filters.status) return false;
 
       const openedDate = new Date(ticket.submit_date);

@@ -9,102 +9,117 @@
   gap: 10px;
 }
 
-.tdpBack {
+.wpdBack {
+  border: none;
+  background: none;
   color: var(--heading-color);
   font-size: var(--base-font-size);
   font-weight: 400;
   cursor: pointer;
 }
 
-.tdpBack:hover {
+.wpdBack:hover {
   color: var(--primary-color);
 }
 
-.tdpCurrent {
+.wpdCurrent {
   color: var(--text-color);
   font-size: var(--base-font-size);
   font-weight: 400;
 }
 
-.headerTitle {
+.tdpHeaderTitle {
   padding-bottom: 20px;
   border-bottom: 1px solid #ddd;
-  margin-bottom: 10px;
+  margin-bottom: 20px;
 }
 
-.headerTitle h1 {
+.tdpHeaderTitle h1 {
   margin: 0;
-  font-size: var(--h1-font-size);
-  color: var(--table-color);
+  /* font-size: var(--h1-font-size); */
+  color: var(--text-color);
 }
 
 /* tdpBody */
-.tdpWrapper {
+.tdpBody {
   display: flex;
-  gap: 20px;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
-.tdpLeftCont {
+/* LEFT */
+.layoutSection {
+  width: 100%;
   background-color: var(--bg1-color);
-
-  flex: 2;
-  box-shadow: var(--box-shadow-as);
-  border-radius: 20px;
+  border-radius: 16px;
   padding: 20px;
+  transition: all 0.3s ease;
+  border: 1px solid #e8e8e8;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
 }
 
-/* tdHeader */
-.tdHeader {
-  color: var(--heading-color);
+.layoutColumn {
+  display: flex;
+  flex-direction: column;
+  /* gap: 1.5rem; */
+  gap: 1rem;
+}
+
+.layoutFlex {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  /* align-items: center; */
   margin-bottom: 20px;
 }
 
-.tdTitle {
-  margin-bottom: 20px;
-  padding-bottom: 5px;
-  border-bottom: var(--border-bottom);
-
+.tdpTicketNoWrapper {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  border-bottom: 1px solid #ddd;
+  margin-bottom: 20px;
+  padding: 10px 0;
 }
 
-.tdTitle h3 {
+.tdpTicketNo {
+  font-size: var(--h1-font-size);
+  color: var(--text-color);
+  margin: 0;
+}
+
+.tdpSection {
+  margin-bottom: 20px;
+
+  background-color: var(--bg1-color);
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  padding: 15px;
+}
+
+.tdpTitle {
   color: var(--heading-color);
-  font-size: var(--h2-font-size);
+  font-size: var(--h3-font-size);
 }
 
-.tdSubject {
-  font-size: var(--base-font-size);
-}
-
-.tdMetaData {
-  margin-top: 5px;
-}
-
-.tdDateOpened,
-.tdDateResolution {
-  font-size: var(--default-font-size);
+.tdpMeta {
+  font-size: var(--table-head-size);
   color: var(--table-color);
 }
 
-/* tdDescription */
-.tdDescription {
+.tdpDescription {
   overflow-x: auto;
+  /* font-size: var(--table-head-size); */
   font-size: var(--default-font-size);
   color: var(--text-color);
-  margin-bottom: 20px;
-}
-
-.tdDescription p {
   line-height: 1.6;
 }
 
-/* tdInstructions */
+/* Instructions */
 .tdInstructions {
   background-color: #f4f8ff;
   border-left: 5px solid var(--primary-color);
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 16px 20px;
   color: var(--text-color);
   margin-bottom: 20px;
@@ -137,13 +152,11 @@
 /* tdAttachment */
 .tdAttachment {
   color: var(--text-color);
-  /* margin-bottom: 20px; */
 }
 
 .tdAttachment h3 {
-  font-size: var(--base-font-size);
   color: var(--heading-color);
-  margin-bottom: 10px;
+  font-size: var(--h3-font-size);
 }
 
 .tdAttached {
@@ -161,16 +174,9 @@
   color: var(--secondary-color);
 }
 
-/* tdpRightCont */
-.tdpRightCont {
-  background-color: var(--bg1-color);
-  flex: 1;
-  box-shadow: var(--box-shadow-as);
-  border-radius: 20px;
-  padding: 20px;
-}
-
+/* RIGHT */
 .actionButton {
+  /* background-color: var(--primary-color); */
   background-color: var(--success-color);
   color: white;
   border: none;
@@ -181,7 +187,6 @@
   font-weight: bold;
   cursor: pointer;
   margin-bottom: 10px;
-  transition: background-color 0.3s, transform 0.5s ease-in;
 }
 
 .actionButtonDisabled {
@@ -196,6 +201,41 @@
   cursor: disabled;
   margin-bottom: 10px;
   transition: background-color 0.3s, transform 0.5s ease-in;
+}
+
+/* tabs */
+.tdpTabs {
+  display: flex;
+  gap: 32px;
+  margin-bottom: 32px;
+  border-bottom: 1px solid #e5e7eb;
+  /* justify-content: space-between; */
+}
+
+.tdpTabLink {
+  border: none;
+  background: none;
+  padding: 12px 10px;
+  color: var(--muted-text-color);
+  text-decoration: none;
+  font-size: var(--base-font-size);
+  position: relative;
+  cursor: pointer;
+}
+
+.tdpTabLink.active {
+  color: #0d6efd;
+  font-weight: 500;
+}
+
+.tdpTabLink.active::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background-color: #0d6efd;
 }
 
 .tdStatusCard {
@@ -247,8 +287,8 @@
   background-color: var(--bg-color);
   border: 3px solid #ccc;
 }
-/* tracking visual */
 
+/* info */
 .tdInfoHeader {
   display: flex;
   justify-content: space-between;
@@ -259,6 +299,8 @@
 .tdArrow {
   font-size: var(--default-font-size);
   color: var(--heading-color);
+  border: none;
+  background: none;
 }
 
 .tdInfoItem {
@@ -276,12 +318,12 @@
 
 .tdInfoLabel {
   font-weight: bold;
-  font-size: var(--default-font-size);
+  font-size: var(--table-head-size);
   color: var(--heading-color);
 }
 
 .tdInfoValue {
-  font-size: var(--default-font-size);
+  font-size: var(--table-head-size);
   color: var(--heading-color);
 }
 
@@ -290,102 +332,25 @@
   color: var(--heading-color);
 }
 
+
+
 /* ANIMATION */
 @keyframes fadeInUp {
   from {
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
   }
 }
 
-@media screen and (max-width: 1024px) {
-  .tdpWrapper {
-    flex-direction: column;
-  }
-
-  .tdpLeftCont,
-  .tdpRightCont {
-    width: 100%;
-  }
-}
-
+/* MEDIA QUERIES */
 @media screen and (max-width: 768px) {
-  .headerTitle h1,
-  .tdTitle h3 {
-    font-size: 1.2rem;
-  }
-
-  .tdTitle {
+  .layoutFlex {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-
-  .tdInfoLabelValue {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-  }
-
-  .tdAttached {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
-  }
-
-  .actionButton {
-    font-size: 14px;
-    padding: 10px;
-  }
-
-  .tdStatusCard {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
-  }
-
-  .tdInstructions {
-    padding: 12px;
-  }
-
-  .iHeaderWrapper h3 {
-    font-size: 1rem;
-  }
-
-  .tdSubject,
-  .tdDateOpened,
-  .tdDateResolution {
-    font-size: 14px;
-  }
-}
-
-@media screen and (max-width: 480px) {
-  .tdInfoHeader h3 {
-    font-size: 1rem;
-  }
-
-  .actionButton {
-    font-size: 13px;
-    padding: 8px;
-  }
-
-  .tdDescription p,
-  .tdInstructions p,
-  .tdAttached span {
-    font-size: 13px;
-  }
-
-  .tdpHeader {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .wpdBack,
-  .wpdCurrent {
-    font-size: 14px;
+    /* align-items: flex-start; */
   }
 }
