@@ -258,10 +258,10 @@ export default function AdminTicketDetail() {
               </div>
               <div className={styles.tdInstructions}>
                 <div className={styles.iHeaderWrapper}>
-                  <i class="fa-solid fa-lightbulb"></i>
+                  <i className="fa-solid fa-lightbulb"></i>
                   <h3>Instructions</h3>
                 </div>
-                <p>{state.instructions}</p>
+                <p>{state.instruction || "No instructions available for this step."}</p>
               </div>
               <div className={styles.tdAttachment}>
                 <h3>Attachment</h3>

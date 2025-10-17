@@ -19,7 +19,9 @@ const useTriggerAction = ({ uuid, action_id, method = "post", trigger = false,  
 
         try {
           const baseURL = import.meta.env.VITE_BACKEND_API;
-          const url = `${baseURL}instance/${uuid}/`;
+          // ✅ Remove trailing slash from baseURL if it exists
+          const cleanBaseURL = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
+          const url = `${cleanBaseURL}/instance/${uuid}/`;
 
           // ✅ Construct full user name
           const fullName = [user.first_name, user.middle_name, user.last_name, user.suffix]
@@ -46,7 +48,7 @@ const useTriggerAction = ({ uuid, action_id, method = "post", trigger = false,  
 
       sendAction();
     }
-  }, [trigger, uuid, action_id, method, user]);
+  }, [trigger, uuid, action_id, method, comment, user]); // ✅ Added comment to dependencies
 
   return { response, loading, error };
 };
