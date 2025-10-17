@@ -1,3 +1,6 @@
+// react
+import { useNavigate } from "react-router-dom";
+
 // components
 import AgentNav from "../../../components/navigation/AgentNav";
 import StatusCard from "./components/StatusCard";
@@ -19,6 +22,8 @@ import { useAuth } from "../../../api/AuthContext";
 export default function Dashboard() {
   const { user } = useAuth();
   const { userTickets, loading, error } = useUserTickets();
+
+  const navigate = useNavigate();
 
   // fetch tickets and filter those tickets that !has_acted
   const allTickets = (userTickets || [])
@@ -77,6 +82,20 @@ export default function Dashboard() {
     .filter((t) => t.status?.toLowerCase() === "in progress")
     .sort((a, b) => new Date(b.update_date) - new Date(a.update_date));
 
+  const handleKpiClick = (label) => {
+    // Map card labels to ticket tab values for agent ticket list
+    const map = {
+      "New Tickets": "All",
+      Critical: "Critical",
+      High: "High",
+      Medium: "Medium",
+      Low: "Low",
+    };
+
+    const tab = map[label] || "All";
+    navigate(`/agent/ticket?tab=${encodeURIComponent(tab)}`);
+  };
+
   return (
     <>
       <AgentNav />
@@ -93,13 +112,33 @@ export default function Dashboard() {
             <h2>Ticket Overview</h2>
             <div className={styles.dpCardSection}>
               <div className={styles.dpLeft}>
-                <StatusCard number={counts.open} label="Open Tickets" />
+                <KPICard
+                  number={counts.open}
+                  label="New Tickets"
+                  onClick={() => handleKpiClick("New Tickets")}
+                />
               </div>
               <div className={styles.dpRight}>
-                <KPICard number={counts.critical} label="Critical" />
-                <KPICard number={counts.high} label="High" />
-                <KPICard number={counts.medium} label="Medium" />
-                <KPICard number={counts.low} label="Low" />
+                <KPICard
+                  number={counts.critical}
+                  label="Critical"
+                  onClick={() => handleKpiClick("Critical")}
+                />
+                <KPICard
+                  number={counts.high}
+                  label="High"
+                  onClick={() => handleKpiClick("High")}
+                />
+                <KPICard
+                  number={counts.medium}
+                  label="Medium"
+                  onClick={() => handleKpiClick("Medium")}
+                />
+                <KPICard
+                  number={counts.low}
+                  label="Low"
+                  onClick={() => handleKpiClick("Low")}
+                />
               </div>
             </div>
           </div>

@@ -6,7 +6,7 @@ import useComments from "../../api/useComments";
 import styles from "./ticketComments.module.css";
 
 // Comment component to render individual comments
-const Comment = ({ comment, onReply, onReaction, currentUserId }) => {
+const Comment = ({ comment, onReply, onReaction, currentUserId, isReply = false }) => {
   const [showReplyForm, setShowReplyForm] = useState(false);
   const [replyContent, setReplyContent] = useState("");
   
@@ -98,12 +98,15 @@ const Comment = ({ comment, onReply, onReaction, currentUserId }) => {
           <i className="fa-solid fa-thumbs-down"></i> {getDislikeCount()}
         </button>
         
-        <button 
-          className={styles.actionButton} 
-          onClick={() => setShowReplyForm(!showReplyForm)}
-        >
-          <i className="fa-solid fa-reply"></i> Reply
-        </button>
+        {/* Only show reply button if this is not already a reply */}
+        {!isReply && (
+          <button 
+            className={styles.actionButton} 
+            onClick={() => setShowReplyForm(!showReplyForm)}
+          >
+            <i className="fa-solid fa-reply"></i> Reply
+          </button>
+        )}
       </div>
       
       {showReplyForm && (
@@ -130,6 +133,7 @@ const Comment = ({ comment, onReply, onReaction, currentUserId }) => {
               onReply={onReply}
               onReaction={onReaction}
               currentUserId={currentUserId}
+              isReply={true} // Mark this as a reply so it won't show the reply button
             />
           ))}
         </div>
