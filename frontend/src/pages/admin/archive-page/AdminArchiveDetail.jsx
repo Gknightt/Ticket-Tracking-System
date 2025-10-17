@@ -48,11 +48,15 @@ export default function AdminArchiveDetail() {
       (instance) => instance.step_instance_id === id
     );
 
+    console.log("🔍 Admin - Matched Instance:", matchedInstance);
+    console.log("📋 Admin - Step Instruction:", matchedInstance?.step?.instruction);
+
     if (!matchedInstance) {
     } else {
       setTicket(matchedInstance.task.ticket);
       setTaskid(matchedInstance.task.task_id); // ✅ FIXED: set actual task_id
       setInstruction(matchedInstance.step.instruction); // ✅ FIXED: set actual task_id
+      console.log("✅ Admin - Instruction Set:", matchedInstance.step.instruction);
       setError("");
     }
     setLoading(false);
@@ -149,7 +153,7 @@ export default function AdminArchiveDetail() {
                   <i class="fa-solid fa-lightbulb"></i>
                   <h3>Instructions</h3>
                 </div>
-                <p>{instruction}</p>
+                <p>{instruction || "No instructions provided."}</p>
               </div>
               <div className={styles.tdAttachment}>
                 <h3>Attachment</h3>

@@ -51,6 +51,9 @@ export default function TicketDetail() {
       (instance) => instance.step_instance_id === id
     );
 
+    console.log("🔍 Matched Instance:", matchedInstance);
+    console.log("📋 Step Instruction:", matchedInstance?.step?.instruction);
+
     if (!matchedInstance) {
       setError("Ticket not found.");
       setTicket(null);
@@ -66,6 +69,7 @@ export default function TicketDetail() {
       setAction(matchedInstance.available_actions || []);
       setTaskid(matchedInstance.task.task_id);
       setInstruction(matchedInstance.step.instruction);
+      console.log("✅ Instruction Set:", matchedInstance.step.instruction);
     }
     setLoading(false);
   }, [userTickets, id]);
@@ -154,7 +158,7 @@ export default function TicketDetail() {
                   <i class="fa-solid fa-lightbulb"></i>
                   <h3>Instructions</h3>
                 </div>
-                <p>{instruction}</p>
+                <p>{instruction || "No instructions available for this step."}</p>
               </div>
               <div className={styles.tdAttachment}>
                 <h3>Attachment</h3>
