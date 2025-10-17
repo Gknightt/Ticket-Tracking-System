@@ -11,7 +11,7 @@ export const useComments = (ticketId) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const { user, getTtsRole } = useAuth();
+  const { user } = useAuth();
 
   const refreshComments = useCallback(() => {
     setRefreshKey(prev => prev + 1);
@@ -19,11 +19,14 @@ export const useComments = (ticketId) => {
 
   // Helper function to get the user's role for comments
   const getUserRole = useCallback(() => {
-    // Get the user's tts role using the function from AuthContext
-    const ttsRole = getTtsRole();
+    // Get user role from user object if available
+    if (user) {
+      // Try to get role from common locations in the user object
+      return user.role || user.userRole || 'User';
+    }
     // Default to 'User' if no specific role is found
-    return ttsRole || 'User';
-  }, [getTtsRole]);
+    return 'User';
+  }, [user]);
 
   // Fetch comments for a ticket
   const fetchComments = useCallback(async () => {

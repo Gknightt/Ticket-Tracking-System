@@ -39,9 +39,9 @@
 }
 
 .commentContent {
-  margin: 8px 0;
-  font-size: 14px;
-  line-height: 1.4;
+  margin: 10px 0;
+  line-height: 1.5;
+  white-space: pre-line; /* This will preserve newlines in the text */
 }
 
 .commentActions {
