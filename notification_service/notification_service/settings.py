@@ -14,6 +14,7 @@ from pathlib import Path
 from decouple import config
 import os
 import dj_database_url
+from corsheaders.defaults import default_headers
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -51,6 +52,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'django_celery_results',  # Add Celery results backend
     'whitenoise',  # Add Whitenoise for static file serving
+    'corsheaders',  # Enable CORS handling
     
     # Local apps
     'notifications',
@@ -59,6 +61,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # Add CorsMiddleware early
     'whitenoise.middleware.WhiteNoiseMiddleware',  # Add Whitenoise middleware
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -219,3 +222,14 @@ CELERY_TASK_ROUTES = {
     'notifications.mark_notification_read': {'queue': INAPP_NOTIFICATION_QUEUE},
     'notifications.bulk_create_notifications': {'queue': INAPP_NOTIFICATION_QUEUE},
 }
+
+# CORS configuration
+# Allow the frontend dev server origin by default; can be overridden via env var CORS_ALLOWED_ORIGINS
+CORS_ALLOWED_ORIGINS = config(
+    'CORS_ALLOWED_ORIGINS',
+    default='http://localhost:1000',
+    cast=lambda v: [s.strip() for s in v.split(',')]
+)
+CORS_ALLOW_CREDENTIALS = True
+# Ensure common headers (Authorization, Content-Type, etc.) are allowed
+CORS_ALLOW_HEADERS = list(default_headers)

@@ -1,50 +1,48 @@
-// style
 import styles from "./notification.module.css";
 import { useEffect, useState } from "react";
-import { useAuthFetch } from "../../api/useAuthFetch"; // adjust if needed
-
-const BASE_URL = import.meta.env.VITE_USER_SERVER_API;
-const NOTIF_URL = `${BASE_URL}api/notifications/`;
+import { useNotifications } from "../../api/useNotification";
 
 export default function Notification({ closeNotifAction }) {
-  const authFetch = useAuthFetch();
-  const [notifications, setNotifications] = useState([]);
+  const {
+    notifications,
+    loading,
+    error,
+    fetchNotifications,
+    markAsRead,
+    markAllAsRead,
+  } = useNotifications();
 
-  // Load notifications
+  // Active tab: show 'unread' by default
+  const [activeTab, setActiveTab] = useState("unread");
+
+  // Prefetch all lists on mount so counts are available and tabs are responsive
   useEffect(() => {
-    authFetch(NOTIF_URL)
-      .then((res) => res.json())
-      .then((data) => setNotifications(data))
-      .catch((err) => console.error("Failed to fetch notifications", err));
-  }, []);
+    fetchNotifications('unread');
+    fetchNotifications('read');
+    fetchNotifications('all');
+  }, [fetchNotifications]);
 
-  // Mark one notification as read
-  const markAsRead = (id) => {
-    authFetch(`${NOTIF_URL}${id}/read/`, {
-      method: "PATCH",
-      body: JSON.stringify({ is_read: true }),
-    })
-      .then((res) => {
-        if (res.ok) {
-          setNotifications((prev) => prev.filter((n) => n.id !== id));
-        }
-      })
-      .catch((err) => console.error("Failed to mark as read", err));
+  const handleMarkAsRead = async (id) => {
+    await markAsRead(id);
+    // hook already refreshes lists after marking; no extra fetch needed here
   };
 
-  // Mark all notifications as read
-  const clearAll = () => {
-    Promise.all(
-      notifications.map((n) =>
-        authFetch(`${NOTIF_URL}${n.id}/read/`, {
-          method: "PATCH",
-          body: JSON.stringify({ is_read: true }),
-        })
-      )
-    )
-      .then(() => setNotifications([]))
-      .catch((err) => console.error("Failed to clear all", err));
+  const handleClearAll = async () => {
+    await markAllAsRead();
+    // hook already refreshes lists after marking all; no extra fetch needed here
   };
+
+  // Normalize list to ensure it's always an array before mapping
+  const rawList = notifications?.[activeTab] || [];
+  const list = Array.isArray(rawList) ? rawList : [];
+  if (rawList && !Array.isArray(rawList)) {
+    // eslint-disable-next-line no-console
+    console.warn("Notifications list is not an array, falling back to empty array", rawList);
+  }
+
+  const unreadCount = Array.isArray(notifications?.unread) ? notifications.unread.length : 0;
+  const readCount = Array.isArray(notifications?.read) ? notifications.read.length : 0;
+  const allCount = Array.isArray(notifications?.all) ? notifications.all.length : 0;
 
   return (
     <div
@@ -57,15 +55,43 @@ export default function Notification({ closeNotifAction }) {
       >
         <div className={styles.nHeader}>
           <h2>Notifications</h2>
-          <button className={styles.nClearButton} onClick={clearAll}>
-            Clear All
-          </button>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <div className={styles.tabGroup}>
+              <button
+                className={activeTab === "unread" ? styles.activeTab : styles.tab}
+                onClick={() => setActiveTab("unread")}
+              >
+                Unread ({unreadCount})
+              </button>
+              <button
+                className={activeTab === "read" ? styles.activeTab : styles.tab}
+                onClick={() => setActiveTab("read")}
+              >
+                Read ({readCount})
+              </button>
+              <button
+                className={activeTab === "all" ? styles.activeTab : styles.tab}
+                onClick={() => setActiveTab("all")}
+              >
+                All ({allCount})
+              </button>
+            </div>
+            {activeTab === "unread" && unreadCount > 0 && (
+              <button className={styles.nClearButton} onClick={handleClearAll}>
+                Mark All Read
+              </button>
+            )}
+          </div>
         </div>
+
+        {loading && <div className={styles.emptyState}>Loading...</div>}
+        {error && <div className={styles.emptyState}>{error}</div>}
+
         <div className={styles.nList}>
-          {notifications.length === 0 ? (
+          {!loading && !error && list.length === 0 ? (
             <p className={styles.emptyState}>No notifications.</p>
           ) : (
-            notifications.map((n) => (
+            list.map((n) => (
               <div key={n.id} className={styles.nItem}>
                 <div className={styles.nUserAvatar}>
                   <img
@@ -78,15 +104,13 @@ export default function Notification({ closeNotifAction }) {
                   />
                 </div>
                 <div className={styles.nContent}>
-                  <h3>{n.type || "No Type"}</h3>
+                  <h3>{n.subject || "no subject"}</h3>
                   <p>{n.message}</p>
-                  <span className={styles.nTime}>
-                    {n.created_at || "Just now"}
-                  </span>
+                  <span className={styles.nTime}>{n.created_at || "Just now"}</span>
                 </div>
                 <div
                   className={styles.nDeleteButton}
-                  onClick={() => markAsRead(n.id)}
+                  onClick={() => handleMarkAsRead(n.id)}
                 >
                   <i className="fa-solid fa-trash"></i>
                 </div>
