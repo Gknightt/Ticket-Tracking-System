@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -110,14 +111,28 @@ SPECTACULAR_SETTINGS = {
 }
 
 # CORS settings
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
-]
+_env_origins = os.environ.get('CORS_ALLOWED_ORIGINS')
+if _env_origins:
+    CORS_ALLOWED_ORIGINS = [origin.strip() for origin in _env_origins.split(',') if origin.strip()]
+else:
+    CORS_ALLOWED_ORIGINS = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://localhost:1000",
+        "http://127.0.0.1:1000",
+    ]
 
-CORS_ALLOW_ALL_ORIGINS = True  # For development only
+# IMPORTANT: When the frontend sends credentialed requests (withCredentials / credentials: 'include'),
+# the backend must return an explicit Access-Control-Allow-Origin header (not '*').
+# Therefore default CORS_ALLOW_ALL_ORIGINS is False. Use CORS_ALLOWED_ORIGINS or set
+# CORS_ALLOWED_ORIGINS via env to include your frontend origin(s).
+CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', 'False').lower() in ('1', 'true', 'yes')
+
+# Allow cookies/credentials to be sent in cross-site requests. Default True for dev,
+# but ensure CORS_ALLOW_ALL_ORIGINS is False when this is enabled.
+CORS_ALLOW_CREDENTIALS = os.environ.get('CORS_ALLOW_CREDENTIALS', 'True').lower() in ('1', 'true', 'yes')
 
 
 # Password validation
