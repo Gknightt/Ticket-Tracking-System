@@ -13,7 +13,7 @@ const useUsersApi = () => {
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`${baseUrl}users/`);
+      const response = await axios.get(`${baseUrl}/api/v1/system-roles/user-system-roles/`);
       setUsers(response.data);
       setError("");
     } catch (err) {
