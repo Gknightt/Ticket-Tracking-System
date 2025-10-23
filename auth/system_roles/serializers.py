@@ -177,7 +177,38 @@ class AdminInviteUserSerializer(serializers.Serializer):
     """
     email = serializers.EmailField()
     first_name = serializers.CharField(required=False, allow_blank=True)
+    middle_name = serializers.CharField(required=False, allow_blank=True)
     last_name = serializers.CharField(required=False, allow_blank=True)
+    suffix = serializers.ChoiceField(
+        choices=[
+            ('', 'None'),
+            ('Jr.', 'Jr.'),
+            ('Sr.', 'Sr.'),
+            ('II', 'II'),
+            ('III', 'III'),
+            ('IV', 'IV'),
+            ('V', 'V'),
+        ],
+        required=False,
+        allow_null=True,
+        allow_blank=True
+    )
+    phone_number = serializers.CharField(
+        max_length=20,
+        required=False,
+        allow_blank=True,
+        allow_null=True
+    )
+    department = serializers.ChoiceField(
+        choices=[
+            ('IT Department', 'IT Department'),
+            ('Asset Department', 'Asset Department'),
+            ('Budget Department', 'Budget Department'),
+        ],
+        required=False,
+        allow_null=True,
+        allow_blank=True
+    )
     role_id = serializers.ChoiceField(choices=[])
 
     def __init__(self, *args, **kwargs):
@@ -206,29 +237,35 @@ class AdminInviteUserSerializer(serializers.Serializer):
         role = validated_data.pop("role_id")
         email = validated_data.get("email")
 
-        user, created = User.objects.get_or_create(
-            email=email,
-            defaults={
-                **validated_data,
-                "username": email.split('@')[0],
-                "is_active": True,  # Optional: set to False if activation needed
-            }
-        )
-
-        temp_password = None
-        if created:
+        # Check if user already exists
+        try:
+            user = User.objects.get(email=email)
+            created = False
+            temp_password = None
+        except User.DoesNotExist:
+            # Create new user using the custom manager to ensure company_id is auto-generated
             temp_password = get_random_string(length=10)
-            user.set_password(temp_password)
-            user.save()
+            user = User.objects.create_user(
+                email=email,
+                password=temp_password,
+                username=email.split('@')[0],
+                first_name=validated_data.get('first_name', ''),
+                middle_name=validated_data.get('middle_name', ''),
+                last_name=validated_data.get('last_name', ''),
+                suffix=validated_data.get('suffix', None),
+                phone_number=validated_data.get('phone_number', None),
+                department=validated_data.get('department', None),
+                is_active=True,
+            )
+            created = True
             
             # Send invitation email with temporary password
-            if temp_password:
-                send_invitation_email(
-                    user=user,
-                    temp_password=temp_password,
-                    system_name=role.system.name,
-                    role_name=role.name
-                )
+            send_invitation_email(
+                user=user,
+                temp_password=temp_password,
+                system_name=role.system.name,
+                role_name=role.name
+            )
 
         # Assign role and system
         usr_role, _ = UserSystemRole.objects.get_or_create(

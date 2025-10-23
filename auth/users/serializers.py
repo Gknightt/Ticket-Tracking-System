@@ -4,6 +4,8 @@ from django.contrib.auth import authenticate
 from django.core.mail import send_mail
 from django.conf import settings
 from .models import User, UserOTP, PasswordResetToken
+from notification_client import notification_client
+from system_roles.models import UserSystemRole
 import hashlib
 import requests
 
@@ -44,10 +46,14 @@ import requests
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
-
+    company_id = serializers.CharField(read_only=True)  # Auto-generated, not user-editable
+    status = serializers.CharField(read_only=True)  # Auto-set to 'Pending'
     class Meta:
         model = User
-        fields = ('email', 'username', 'password', 'first_name', 'last_name', 'phone_number')
+        fields = (
+            'email', 'username', 'password', 'first_name', 'middle_name', 'last_name', 
+            'suffix', 'phone_number', 'company_id', 'department', 'status', 'notified'
+        )
 
     def validate_password(self, value):
         # NIST 800-63B password requirements
@@ -68,16 +74,11 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         if email and email.split('@')[0] in value.lower():
             raise serializers.ValidationError("Password must not contain part of your email address.")
 
-        # Check against common passwords (placeholder, replace with real check or API call)
-        common_passwords = {"password", "12345678", "qwerty", "letmein", "admin", "welcome", "admin123", "password123"}
-        if value.lower() in common_passwords:
-            raise serializers.ValidationError("Password is too common.")
-
         # Check against HaveIBeenPwned API for breached passwords
         is_pwned, breach_count = check_password_pwned(value)
         if is_pwned:
             raise serializers.ValidationError(
-                f"This password has been found in {breach_count:,} data breaches. Please choose a different password."
+                f"This password has been found in data breaches. Please choose a different password."
             )
 
         return value
@@ -89,18 +90,68 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             username=validated_data.get('username'),
             password=validated_data['password'],
             first_name=validated_data.get('first_name', ''),
+            middle_name=validated_data.get('middle_name', ''),
             last_name=validated_data.get('last_name', ''),
-            phone_number=validated_data.get('phone_number')
+            suffix=validated_data.get('suffix'),
+            phone_number=validated_data.get('phone_number'),
+            department=validated_data.get('department'),
+            notified=validated_data.get('notified', False)
         )
         return user
 
 # Protected Profile endpoint (accessible if provided valid access token in the request header)
 # Serializer to safely display user data (without showing password)
 class UserProfileSerializer(serializers.ModelSerializer):
+    system_roles = serializers.SerializerMethodField()
+    profile_picture = serializers.SerializerMethodField()
+    
     class Meta:
         model = User
-        fields = ('id', 'email', 'username', 'first_name', 'last_name', 'date_joined', 'otp_enabled')
+        fields = (
+            'id', 'email', 'username', 'first_name', 'middle_name', 'last_name', 
+            'suffix', 'phone_number', 'company_id', 'department', 'status', 
+            'notified', 'profile_picture', 'date_joined', 'otp_enabled', 'system_roles'
+        )
+    
+    def get_profile_picture(self, obj):
+        """Get the full URL for the profile picture."""
+        if obj.profile_picture:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.profile_picture.url)
+            return obj.profile_picture.url
+        return None
+    
+    def get_system_roles(self, obj):
+        """Get system roles for the user."""
+        system_roles = UserSystemRole.objects.filter(user=obj).select_related('system', 'role')
+        return [
+            {
+                'system_name': assignment.system.name,
+                'system_slug': assignment.system.slug,
+                'role_name': assignment.role.name,
+                'assigned_at': assignment.assigned_at
+            }
+            for assignment in system_roles
+        ]
+from django.core.exceptions import ValidationError
+from PIL import Image
 
+def validate_profile_picture_file_size(image):
+    max_file_size = 2 * 1024 * 1024  # 2MB
+    if image.size > max_file_size:
+        raise ValidationError(f"Profile picture file size must be less than {max_file_size // (1024 * 1024)}MB.")
+
+def validate_profile_picture_dimensions(image):
+    max_width = 1024
+    max_height = 1024
+    try:
+        img = Image.open(image)
+        width, height = img.size
+        if width > max_width or height > max_height:
+            raise ValidationError(f"Profile picture dimensions must not exceed {max_width}x{max_height} pixels.")
+    except Exception:
+        raise ValidationError("Invalid image file.")
 
 class UserProfileUpdateSerializer(serializers.ModelSerializer):
     """Serializer for updating user profile information."""
@@ -109,10 +160,36 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer):
     first_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
     last_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
     phone_number = serializers.CharField(max_length=20, required=False, allow_blank=True, allow_null=True)
+    profile_picture = serializers.ImageField(
+        required=False,
+        allow_null=True,
+        validators=[validate_profile_picture_file_size, validate_profile_picture_dimensions]
+    )
 
     class Meta:
         model = User
-        fields = ('email', 'username', 'first_name', 'last_name', 'phone_number')
+        fields = ('email', 'username', 'first_name', 'last_name', 'phone_number', 'profile_picture')
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Get the user from the request context
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            user = request.user
+            
+            # Check if user is admin or superuser
+            is_admin_or_superuser = user.is_superuser or user.is_staff
+            
+            # If not admin/superuser, restrict editable fields
+            if not is_admin_or_superuser:
+                # Only allow these fields for regular users
+                allowed_fields = {'username', 'phone_number', 'profile_picture'}
+                
+                # Remove fields that are not allowed
+                fields_to_remove = set(self.fields.keys()) - allowed_fields
+                for field_name in fields_to_remove:
+                    self.fields.pop(field_name)
 
     def validate_email(self, value):
         """Validate that email is unique (excluding current user)."""
@@ -188,6 +265,12 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                         user.failed_login_attempts = 0
                         user.lockout_time = None
                         user.save(update_fields=["is_locked", "failed_login_attempts", "lockout_time"])
+                        # Send account unlocked notification via microservice
+                        notification_client.send_account_unlocked_notification(
+                            user=user,
+                            ip_address=self.context.get('request').META.get('REMOTE_ADDR') if self.context.get('request') else None,
+                            user_agent=self.context.get('request').META.get('HTTP_USER_AGENT') if self.context.get('request') else None
+                        )
                     else:
                         raise serializers.ValidationError(
                             "Account is locked due to too many failed login attempts. Please try again later.",
@@ -207,6 +290,21 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                     if user.failed_login_attempts >= LOCKOUT_THRESHOLD:
                         user.is_locked = True
                         user.lockout_time = timezone.now()
+                        # Send account locked notification via microservice
+                        notification_client.send_account_locked_notification(
+                            user=user,
+                            failed_attempts=user.failed_login_attempts,
+                            ip_address=self.context.get('request').META.get('REMOTE_ADDR') if self.context.get('request') else None,
+                            user_agent=self.context.get('request').META.get('HTTP_USER_AGENT') if self.context.get('request') else None
+                        )
+                    else:
+                        # Send failed login attempt notification for multiple attempts (but not locked yet)
+                        if user.failed_login_attempts >= 3:  # Start notifying after 3 attempts
+                            notification_client.send_failed_login_notification(
+                                user=user,
+                                ip_address=self.context.get('request').META.get('REMOTE_ADDR') if self.context.get('request') else None,
+                                user_agent=self.context.get('request').META.get('HTTP_USER_AGENT') if self.context.get('request') else None
+                            )
                     user.save(update_fields=["failed_login_attempts", "is_locked", "lockout_time"])
                 raise serializers.ValidationError(
                     'Invalid email or password.',
@@ -431,7 +529,7 @@ def send_password_reset_email(user, reset_token, request=None):
     else:
         base_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
     
-    reset_url = f"{base_url}/reset-password?token={reset_token.token}"
+    reset_url = f"{base_url}/api/v1/users/password/reset?token={reset_token.token}"
     
     subject = 'Password Reset Request'
     message = f'''

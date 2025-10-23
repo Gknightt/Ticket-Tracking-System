@@ -1,12 +1,15 @@
 from rest_framework import generics, serializers as drf_serializers, status, viewsets, mixins
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework.exceptions import ValidationError
-from drf_spectacular.utils import extend_schema, OpenApiResponse, inline_serializer, extend_schema_view
+from drf_spectacular.utils import extend_schema, OpenApiResponse, inline_serializer, extend_schema_view, OpenApiExample
+from drf_spectacular.types import OpenApiTypes
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from django.contrib.auth import authenticate
 from .models import User, UserOTP, PasswordResetToken
 from .serializers import (
     UserRegistrationSerializer, 
@@ -22,6 +25,7 @@ from .serializers import (
     send_password_reset_email
 )
 from permissions import IsSystemAdminOrSuperUser, filter_users_by_system_access
+from system_roles.models import UserSystemRole
 
 # Simple serializer for logout - doesn't need any fields
 class LogoutSerializer(drf_serializers.Serializer):
@@ -83,8 +87,11 @@ class RegisterView(generics.CreateAPIView):
     patch=extend_schema(
         tags=['User Profile'],
         summary="Update authenticated user's profile",
-        description="Partially update the profile information for the authenticated user. Only provided fields will be updated.",
-        request=UserProfileUpdateSerializer,
+        description="Partially update the profile information for the authenticated user. Only provided fields will be updated. Supports both JSON and multipart/form-data for file uploads.",
+        request={
+            'multipart/form-data': UserProfileUpdateSerializer,
+            'application/json': UserProfileUpdateSerializer,
+        },
         responses={
             200: OpenApiResponse(
                 response=UserProfileSerializer,
@@ -111,16 +118,17 @@ class RegisterView(generics.CreateAPIView):
         }
     )
 )
-class ProfileView(generics.RetrieveAPIView, mixins.UpdateModelMixin):
+class ProfileView(generics.RetrieveUpdateAPIView):
     """
     API view to retrieve and partially update the profile of the currently authenticated user.
     
     GET: Returns the user's profile information
-    PATCH: Partially updates the user's profile information (only provided fields)
+    PATCH/PUT: Partially updates the user's profile information (only provided fields)
     """
     permission_classes = (IsAuthenticated,)
     serializer_class = UserProfileSerializer
-    http_method_names = ['get', 'patch', 'head', 'options']  # Only allow GET and PATCH
+    parser_classes = (MultiPartParser, FormParser, JSONParser)  # Support file uploads
+    http_method_names = ['get', 'patch', 'put', 'head', 'options']  # Allow GET, PATCH, and PUT
 
     def get_object(self):
         # get_object is overridden to return the user attached to the request
@@ -128,25 +136,40 @@ class ProfileView(generics.RetrieveAPIView, mixins.UpdateModelMixin):
 
     def get_serializer_class(self):
         """Return different serializers for different HTTP methods."""
-        if self.request.method == 'PATCH':
+        if self.request.method in ['PATCH', 'PUT']:
             return UserProfileUpdateSerializer
         return UserProfileSerializer
 
-    def patch(self, request, *args, **kwargs):
-        """Handle partial profile updates."""
-        kwargs['partial'] = True  # Force partial update for PATCH
-        return self.update(request, *args, **kwargs)
-
     def update(self, request, *args, **kwargs):
         """Handle profile updates with custom response."""
-        partial = kwargs.pop('partial', False)
+        partial = kwargs.get('partial', True)  # Default to partial update
         instance = self.get_object()
+        
+        # Check if user is admin or superuser
+        user = request.user
+        is_admin_or_superuser = user.is_superuser or user.is_staff
+        
+        # If not admin/superuser, restrict which fields can be updated
+        if not is_admin_or_superuser:
+            allowed_fields = {'username', 'phone_number', 'profile_picture'}
+            restricted_fields = set(request.data.keys()) - allowed_fields
+            
+            if restricted_fields:
+                return Response(
+                    {
+                        'error': 'Permission denied',
+                        'detail': f'You can only update: {", ".join(allowed_fields)}. '
+                                 f'Attempted to update restricted fields: {", ".join(restricted_fields)}'
+                    },
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
 
-        # Return the updated user profile using the read serializer
-        response_serializer = UserProfileSerializer(instance)
+        # Return the updated user profile using the read serializer with request context
+        response_serializer = UserProfileSerializer(instance, context={'request': request})
         return Response(response_serializer.data, status=status.HTTP_200_OK)
 
     def perform_update(self, serializer):
@@ -157,7 +180,7 @@ class ProfileView(generics.RetrieveAPIView, mixins.UpdateModelMixin):
 @extend_schema(
     tags=['Tokens'],
     summary="Obtain JWT token",
-    description="Authenticate user with email/password and OTP (if 2FA enabled) to obtain JWT access and refresh tokens as regular cookies (non-HTTP-only).",
+    description="Authenticate user with email/password and OTP (if 2FA enabled) to obtain JWT access and refresh tokens as regular cookies (non-HTTP-only). If 2FA is enabled and no OTP is provided, an OTP will be automatically generated and sent to the user's email.",
     request=CustomTokenObtainPairSerializer,
     responses={
         200: OpenApiResponse(
@@ -171,6 +194,9 @@ class ProfileView(generics.RetrieveAPIView, mixins.UpdateModelMixin):
         ),
         403: OpenApiResponse(
             description="Valid credentials but invalid or missing OTP"
+        ),
+        428: OpenApiResponse(
+            description="OTP required but not provided. An OTP has been sent to the user's email."
         )
     }
 )
@@ -199,8 +225,43 @@ class CustomTokenObtainPairView(TokenObtainPairView):
                         if hasattr(error, 'code'):
                             error_codes.append(error.code)
                 
-                # Return 403 for specific OTP-related errors (valid credentials but OTP issues)
+                # If OTP is required but not provided, automatically generate and send OTP
                 if 'otp_required' in error_codes:
+                    # Extract email and password from request data
+                    email = request.data.get('email')
+                    password = request.data.get('password')
+                    
+                    # Authenticate user
+                    user = authenticate(request=request, username=email, password=password)
+                    
+                    if user and user.otp_enabled:
+                        # Generate new OTP
+                        from .models import UserOTP
+                        otp_instance = UserOTP.generate_for_user(user, otp_type='email')
+                        
+                        # Send OTP via email
+                        from .serializers import send_otp_email
+                        send_success = send_otp_email(user, otp_instance.otp_code)
+                        
+                        if send_success:
+                            return Response(
+                                {
+                                    'detail': 'OTP code is required and has been sent to your email. Please provide your 2FA code.',
+                                    'error_code': 'otp_required',
+                                    'otp_sent': True
+                                },
+                                status=status.HTTP_428_PRECONDITION_REQUIRED
+                            )
+                        else:
+                            return Response(
+                                {
+                                    'detail': 'Failed to send OTP email. Please try again.',
+                                    'error_code': 'email_failed'
+                                },
+                                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                            )
+                    
+                    # Fall back to original response if something went wrong
                     return Response(
                         {'detail': 'OTP code is required. Please provide your 2FA code.', 'error_code': 'otp_required'},
                         status=status.HTTP_428_PRECONDITION_REQUIRED
@@ -226,16 +287,37 @@ class CustomTokenObtainPairView(TokenObtainPairView):
         
         # Create response with user data
         user = serializer.user
+        # Get system roles for the user
+        system_roles_data = []
+        user_system_roles = UserSystemRole.objects.filter(user=user).select_related('system', 'role')
+        for role_assignment in user_system_roles:
+            system_roles_data.append({
+                'system_name': role_assignment.system.name,
+                'system_slug': role_assignment.system.slug,
+                'role_name': role_assignment.role.name,
+                'assigned_at': role_assignment.assigned_at,
+            })
+
         response_data = {
             'message': 'Authentication successful',
             'user': {
                 'id': user.id,
                 'email': user.email,
                 'first_name': user.first_name,
+                'middle_name': user.middle_name,
                 'last_name': user.last_name,
+                'suffix': user.suffix,
                 'username': user.username,
+                'phone_number': user.phone_number,
+                'company_id': user.company_id,
+                'department': user.department,
+                'status': user.status,
+                'notified': user.notified,
                 'is_staff': user.is_staff,
+                'is_superuser': user.is_superuser,
                 'otp_enabled': user.otp_enabled,
+                'date_joined': user.date_joined,
+                'system_roles': system_roles_data,
             }
         }
         
@@ -253,7 +335,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             secure=not settings.DEBUG,  # Use secure cookies in production
             samesite='Lax',
             path='/',  # Make cookie available for all paths
-            domain=settings.COOKIE_DOMAIN  # Use configurable domain from settings
+            domain=None  # None for localhost compatibility (works for both localhost and 127.0.0.1)
         )
         
         # Set refresh token cookie
@@ -265,7 +347,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             secure=not settings.DEBUG,  # Use secure cookies in production
             samesite='Lax',
             path='/',  # Make cookie available for all paths
-            domain=settings.COOKIE_DOMAIN  # Use configurable domain from settings
+            domain=None  # None for localhost compatibility (works for both localhost and 127.0.0.1)
         )
         
         return response
@@ -444,7 +526,7 @@ class ForgotPasswordView(generics.CreateAPIView):
 @extend_schema(
     tags=['Password Reset'],
     summary="Reset password with token",
-    description="Reset user's password using a valid reset token received via email.",
+    description="Reset user's password using a valid reset token received via email. Token can be provided either as a URL parameter or in the request body.",
     request=ResetPasswordSerializer,
     responses={
         200: OpenApiResponse(
@@ -457,13 +539,53 @@ class ForgotPasswordView(generics.CreateAPIView):
         400: OpenApiResponse(description="Bad request - invalid token or password validation errors")
     }
 )
-class ResetPasswordView(generics.CreateAPIView):
+class ResetPasswordView(generics.GenericAPIView):
     """Reset password using reset token."""
     permission_classes = [AllowAny]
     serializer_class = ResetPasswordSerializer
     
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
+    def get(self, request, *args, **kwargs):
+        """Render the password reset form."""
+        # Get token from URL parameter
+        token = request.query_params.get('token', '')
+        
+        # Check if token is valid before rendering the form
+        reset_token = PasswordResetToken.get_valid_token(token)
+        if not reset_token:
+            # If token is invalid, render an error page
+            context = {
+                'error': 'Invalid or expired reset token. Please request a new password reset link.',
+                'token_valid': False
+            }
+        else:
+            # Token is valid, render the form
+            context = {
+                'token': token,
+                'token_valid': True
+            }
+            
+        # Render the template with context - using correct path without 'templates/'
+        from django.shortcuts import render
+        return render(request, 'reset_password.html', context)
+        
+    def post(self, request, *args, **kwargs):
+        """Process the password reset form submission."""
+        # Check if form data is submitted
+        token = request.POST.get('token') or request.query_params.get('token', '')
+        password = request.POST.get('password', '')
+        password_confirm = request.POST.get('password_confirm', '')
+        
+        # Create a data dict for serializer validation
+        data = {
+            'token': token,
+            'password': password,
+            'password_confirm': password_confirm
+        }
+        
+        serializer = self.get_serializer(data=data)
+        
+        from django.shortcuts import render
+        
         if serializer.is_valid():
             reset_token = serializer.validated_data['reset_token']
             password = serializer.validated_data['password']
@@ -479,11 +601,20 @@ class ResetPasswordView(generics.CreateAPIView):
             # Invalidate all existing OTP codes for security
             UserOTP.objects.filter(user=user, is_used=False).update(is_used=True)
             
-            return Response({
+            # Render success page with correct path
+            context = {
+                'success': True,
                 'message': 'Password has been reset successfully. You can now log in with your new password.'
-            }, status=status.HTTP_200_OK)
+            }
+            return render(request, 'users/reset_password_success.html', context)
         
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        # If validation fails, render the form again with errors
+        context = {
+            'token': token,
+            'token_valid': True,  # We assume token is valid since validation errors may be for password
+            'errors': serializer.errors
+        }
+        return render(request, 'reset_password.html', context)
 
 
 class UserViewSet(viewsets.ModelViewSet):

@@ -22,6 +22,7 @@ from .views import (
 class PasswordResetSerializer(serializers.Serializer):
     forgot = serializers.URLField()
     reset = serializers.URLField()
+    change = serializers.URLField()
 
 class TwoFASerializer(serializers.Serializer):
     request_otp = serializers.URLField()
@@ -41,10 +42,11 @@ def users_root(request):
     return Response({
         "register": request.build_absolute_uri("register/"),
         "profile": request.build_absolute_uri("profile/"),
-        "list_users": request.build_absolute_uri("users/"),
+        "list_users": request.build_absolute_uri("list/"),
         "password_reset": {
             "forgot": request.build_absolute_uri("password/forgot/"),
             "reset": request.build_absolute_uri("password/reset/"),
+            "change": request.build_absolute_uri("password/change/"),
         },
         "2fa": {
             "request_otp": request.build_absolute_uri("2fa/request-otp/"),
@@ -55,7 +57,7 @@ def users_root(request):
 
 # Create router for UserViewSet
 router = DefaultRouter()
-router.register(r'users', UserViewSet)
+# router.register(r'users', UserViewSet)
 
 urlpatterns = [
     # Root endpoint for users API discovery
@@ -79,6 +81,10 @@ urlpatterns = [
     # Password reset endpoints
     path('password/forgot/', ForgotPasswordView.as_view(), name='forgot-password'),
     path('password/reset/', ResetPasswordView.as_view(), name='reset-password'),
+    path('password/change/', ProfilePasswordResetView.as_view(), name='change-password'),
+    
+    # User listing endpoint (new path)
+    path('list/', UserViewSet.as_view({'get': 'list'}), name='user-list'),
     
     # User management endpoints (for admins) - include router URLs
     path('', include(router.urls)),
