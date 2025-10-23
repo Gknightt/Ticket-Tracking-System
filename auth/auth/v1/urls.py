@@ -22,6 +22,7 @@ def api_v1_root(request, format=None):
         "system-roles": request.build_absolute_uri("system-roles/"),
         "token": request.build_absolute_uri("token/"),
         "tts": request.build_absolute_uri("tts/"),
+        "hdts": request.build_absolute_uri("hdts/"),
     })
 
 urlpatterns = [
@@ -33,4 +34,5 @@ urlpatterns = [
     # Optional:
     path('token/', include('auth.token_urls')),
     path('tts/', include('tts.urls')),
+    path('hdts/', include('hdts.urls')),
 ]
