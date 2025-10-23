@@ -5,8 +5,49 @@ from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.utils import timezone
 
+# Choices for new fields
+SUFFIX_CHOICES = [
+    ('Jr.', 'Jr.'),
+    ('Sr.', 'Sr.'),
+    ('II', 'II'),
+    ('III', 'III'),
+    ('IV', 'IV'),
+    ('V', 'V'),
+]
+
+DEPARTMENT_CHOICES = [
+    ('IT Department', 'IT Department'),
+    ('Asset Department', 'Asset Department'),
+    ('Budget Department', 'Budget Department'),
+]
+
+STATUS_CHOICES = [
+    ('Pending', 'Pending'),
+    ('Approved', 'Approved'),
+    ('Rejected', 'Rejected'),
+]
+
 # Custom manager for handling user creation and superuser creation
 class CustomUserManager(BaseUserManager):
+
+    def get_next_company_id(self):
+        """Generate the next company ID with MA prefix and auto-increment."""
+        # Find the highest existing company_id
+        latest_user = self.filter(
+            company_id__startswith='MA'
+        ).order_by('company_id').last()
+        
+        if latest_user and latest_user.company_id:
+            # Extract the numeric part and increment
+            current_number = int(latest_user.company_id[2:])  # Remove 'MA' prefix
+            next_number = current_number + 1
+        else:
+            # Start with 1 if no existing company_ids
+            next_number = 1
+        
+        # Format as MA0001, MA0002, etc.
+        return f"MA{next_number:04d}"
+
     def create_user(self, email, password=None, **extra_fields):
         """
         Creates and saves a regular User with the given email and password.
@@ -20,6 +61,14 @@ class CustomUserManager(BaseUserManager):
         username = extra_fields.pop('username', None)
         if not username:
             username = email.split('@')[0]
+
+         # Auto-generate company_id if not provided
+        if 'company_id' not in extra_fields or not extra_fields.get('company_id'):
+            extra_fields['company_id'] = self.get_next_company_id()
+        
+        # Set default status if not provided
+        if 'status' not in extra_fields:
+            extra_fields['status'] = 'Pending'
 
         user = self.model(email=email, username=username, **extra_fields)
         user.set_password(password)
@@ -47,8 +96,14 @@ class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True)  # Used for login
     username = models.CharField(max_length=150, unique=True, null=True, blank=True)  # Optional username
     first_name = models.CharField(max_length=100, blank=True)  # Optional first name
+    middle_name = models.CharField(max_length=100, blank=True, null=True)  # Optional middle name
+    suffix = models.CharField(max_length=10, choices=SUFFIX_CHOICES, blank=True, null=True)  # Optional suffix
     last_name = models.CharField(max_length=100, blank=True)  # Optional last name
     phone_number = models.CharField(max_length=20, unique=True, null=True, blank=True)  # Optional phone number
+    company_id = models.CharField(max_length=8, unique=True, null=True, blank=True, editable=False)  # Auto-generated company ID
+    department = models.CharField(max_length=100, choices=DEPARTMENT_CHOICES, blank=True, null=True)  # Optional department
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='Pending')  # User status
+    notified = models.BooleanField(default=False)  # Whether user has been notified
     profile_picture = models.ImageField(upload_to='profile_pics/', null=True, blank=True)  # Optional profile image
 
     is_active = models.BooleanField(default=True)  # Can login
