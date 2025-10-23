@@ -28,9 +28,9 @@ from django.contrib.auth import login
 from permissions import IsSystemAdminOrSuperUser, filter_users_by_system_access
 from system_roles.models import UserSystemRole
 from django.shortcuts import render, redirect
-from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from .forms import ProfileSettingsForm
+from .decorators import jwt_cookie_required # <-- IMPORT THE NEW DECORATOR
 
 # Simple serializer for logout - doesn't need any fields
 class LogoutSerializer(drf_serializers.Serializer):
@@ -241,6 +241,28 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
         # Get the authenticated user
         user = serializer.user
+
+        # --- START: HDTS LOGIC ---
+        # Check if the user is an 'Employee' in the 'HDTS' system.
+        # We use system__slug='hdts' and role__name='Employee' for reverse lookup.
+        is_hdts_employee = UserSystemRole.objects.filter(
+            user=user,
+            system__slug='hdts',
+            role__name='Employee'
+        ).exists()
+        
+        # If they are an HDTS Employee, check their approval status
+        if is_hdts_employee and user.status != 'Approved':
+            error_message = 'Your account is pending approval by the HDTS system administrator.'
+            if user.status == 'Rejected':
+                error_message = 'Your account has been rejected by the HDTS system administrator.'
+            
+            # Return 403 Forbidden, blocking token issuance
+            return Response(
+                {'detail': error_message},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        # --- END: NEW LOGIC ---
 
         # *** NEW: Log the user into Django's session framework ***
         login(request, user)
@@ -850,15 +872,18 @@ class CookieLogoutView(generics.GenericAPIView):
         return response
 
 
-@login_required
+# REPLACE @login_required with @jwt_cookie_required
+@jwt_cookie_required 
 def profile_settings_view(request):
     """
-    Render and process the profile settings form for the authenticated user.
+    Render and process the profile settings form for the authenticated user
+    using JWT cookie authentication.
 
     Loosened version: non-admin users can only update allowed fields,
     but restricted fields are silently ignored instead of rejected.
     """
-    user = request.user
+    # The decorator now ensures request.user is set if the JWT is valid
+    user = request.user 
     is_admin_or_superuser = user.is_superuser or user.is_staff
     allowed_fields = {'username', 'phone_number', 'profile_picture'}
 
@@ -879,12 +904,13 @@ def profile_settings_view(request):
         if form.is_valid():
             form.save()
             messages.success(request, 'Profile updated successfully!')
-            return redirect('profile-settings')
+            return redirect('token') # Make sure 'profile-settings' is a valid URL name
         else:
             messages.error(request, 'Please correct the errors below.')
 
     else:
-        form = ProfileSettingsForm(instance=user, request_user=user)
+        # Pass the already authenticated user from the decorator
+        form = ProfileSettingsForm(instance=user, request_user=user) 
 
     context = {
         'form': form,
