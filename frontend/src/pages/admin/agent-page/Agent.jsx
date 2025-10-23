@@ -61,12 +61,16 @@ export default function Agent() {
   const filteredAgents = allAgents.filter((agent) => {
     if (activeTab === "Active" && !agent.is_active) return false;
     if (activeTab === "Inactive" && agent.is_active) return false;
-
-    const search = filters.search.toLowerCase();
-    const fullName = `${agent.first_name} ${agent.middle_name || ""} ${agent.last_name}`.toLowerCase();
-    const email = agent.email.toLowerCase();
-    const role = agent.role.toLowerCase();
-
+  
+    const search = (filters.search || "").toLowerCase();
+    
+    const fullName = [agent.first_name, agent.middle_name, agent.last_name]
+    .filter(Boolean)
+    .join(" ");
+  
+    const email = (agent.email || "").toLowerCase();
+    const role = (agent.role_name || "").toLowerCase(); // ✅ fixed here
+  
     return (
       !search ||
       fullName.includes(search) ||
@@ -74,6 +78,7 @@ export default function Agent() {
       role.includes(search)
     );
   });
+  
 
   const sharedProps = {
     agents: filteredAgents,

@@ -46,22 +46,52 @@ Authentication Service Team
         return False
 
 
+# New: serializer to represent full user details safely (read-only)
+class UserDetailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        # include non-sensitive fields only
+        fields = [
+            'id',
+            'email',
+            'username',
+            'first_name',
+            'last_name',
+            'is_active',
+            'is_staff',
+            'date_joined',
+        ]
+        read_only_fields = fields
+
+
 class UserSystemRoleSerializer(serializers.ModelSerializer):
     """Serializer for listing User-System-Role assignments with display fields."""
-    user_email = serializers.EmailField(source='user.email', read_only=True)
-    role_name = serializers.CharField(source='role.name', read_only=True)
+    # Flattened user fields (top-level) instead of nested `user` object
+    id = serializers.IntegerField(source='user.id', read_only=True)
+    email = serializers.EmailField(source='user.email', read_only=True)
+    username = serializers.CharField(source='user.username', read_only=True)
+    first_name = serializers.CharField(source='user.first_name', read_only=True)
+    last_name = serializers.CharField(source='user.last_name', read_only=True)
+    is_active = serializers.BooleanField(source='user.is_active', read_only=True)
+    is_staff = serializers.BooleanField(source='user.is_staff', read_only=True)
+    date_joined = serializers.DateTimeField(source='user.date_joined', read_only=True)
+
+    role = serializers.CharField(source='role.name', read_only=True)
     system_slug = serializers.SlugField(source='system.slug', read_only=True)
 
     class Meta:
         model = UserSystemRole
         fields = [
             'id',
-            'user',
-            'user_email',
-            'system',
+            'email',
+            'username',
+            'first_name',
+            'last_name',
+            'is_active',
+            'is_staff',
+            'date_joined',
             'system_slug',
             'role',
-            'role_name',
             'assigned_at',
         ]
         read_only_fields = ['id', 'assigned_at']
@@ -153,10 +183,10 @@ class AdminInviteUserSerializer(serializers.Serializer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         request = self.context.get('request')
-        if request and not request.user.is_superuser:
+        if (request and not request.user.is_superuser):
             from system_roles.models import UserSystemRole
-            user_systems = UserSystemRole.objects.filter(user=request.user).values_list('system_id', flat=True)
-            role_choices = Role.objects.filter(system_id__in=user_systems).values_list('id', 'name', 'system__name')
+            systems = UserSystemRole.objects.filter(user=request.user).values_list('system_id', flat=True)
+            role_choices = Role.objects.filter(system_id__in=systems).values_list('id', 'name', 'system__name')
         else:
             role_choices = Role.objects.select_related('system').values_list('id', 'name', 'system__name')
 
@@ -216,12 +246,11 @@ class AdminInviteUserSerializer(serializers.Serializer):
 
 class SystemUsersSerializer(serializers.ModelSerializer):
     """Serializer for listing users of a specific system with their roles."""
-    user_id = serializers.IntegerField(source='user.id', read_only=True)
-    user_email = serializers.EmailField(source='user.email', read_only=True)
-    user_first_name = serializers.CharField(source='user.first_name', read_only=True)
-    user_last_name = serializers.CharField(source='user.last_name', read_only=True)
-    role_id = serializers.IntegerField(source='role.id', read_only=True)
-    role_name = serializers.CharField(source='role.name', read_only=True)
+    id = serializers.IntegerField(source='user.id', read_only=True)
+    email = serializers.EmailField(source='user.email', read_only=True)
+    first_name = serializers.CharField(source='user.first_name', read_only=True)
+    last_name = serializers.CharField(source='user.last_name', read_only=True)
+    role = serializers.CharField(source='role.name', read_only=True)
     system_id = serializers.IntegerField(source='system.id', read_only=True)
     system_name = serializers.CharField(source='system.name', read_only=True)
     system_slug = serializers.SlugField(source='system.slug', read_only=True)
@@ -230,12 +259,11 @@ class SystemUsersSerializer(serializers.ModelSerializer):
         model = UserSystemRole
         fields = [
             'id',
-            'user_id',
-            'user_email',
-            'user_first_name',
-            'user_last_name',
-            'role_id',
-            'role_name',
+            'id',
+            'email',
+            'first_name',
+            'last_name',
+            'role',
             'system_id',
             'system_name',
             'system_slug',

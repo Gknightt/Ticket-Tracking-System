@@ -36,7 +36,13 @@ function AgentItem({ item, onActivateClick }) {
           />
         </div>
       </td>
-      <td>{`${item.first_name} ${item.middle_name} ${item.last_name}`}</td>
+      {/* <td>{`${item.first_name} ${item.middle_name} ${item.last_name}`}</td> */}
+      <td>
+        {[item.first_name, item.middle_name, item.last_name]
+          .filter(Boolean)
+          .join(" ")}
+      </td>
+
       <td>{item.email}</td>
       <td>{item.role}</td>
       <td>{item.is_active ? "🟢 Active" : "🔴 Inactive"}</td>
