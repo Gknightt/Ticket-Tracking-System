@@ -13,7 +13,7 @@ const createAuthRequest = () => {
     headers: {
       "Content-Type": "application/json",
     },
-    withCredentials: true
+    withCredentials: true,
   });
 };
 
@@ -37,7 +37,7 @@ function Login() {
     if (user) {
       // Get redirect destination from location state or default based on role
       const from = location.state?.from?.pathname;
-      
+
       if (from) {
         // Redirect to original destination if available
         navigate(from, { replace: true });
@@ -59,12 +59,14 @@ function Login() {
     e.preventDefault();
     setError("");
     setIsLoading(true);
-    
+
     try {
       const result = await login({ email, password });
-      
+
       if (!result.success) {
-        setError(result.error || "Login failed. Please check your credentials.");
+        setError(
+          result.error || "Login failed. Please check your credentials."
+        );
       }
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
@@ -79,7 +81,7 @@ function Login() {
     e.preventDefault();
     setResetLoading(true);
     setResetMessage("");
-    
+
     try {
       // Use the local auth request instance for password reset
       const authRequest = createAuthRequest();
@@ -201,7 +203,15 @@ function Login() {
                   onClick={() => setShowPassword(!showPassword)}
                   title={showPassword ? "Hide password" : "Show password"}
                 >
-                  {showPassword ? <div><i className="fa-solid fa-eye-slash"></i></div> : <div><i className="fa-solid fa-eye"></i></div>}
+                  {showPassword ? (
+                    <div>
+                      <i className="fa-solid fa-eye-slash"></i>
+                    </div>
+                  ) : (
+                    <div>
+                      <i className="fa-solid fa-eye"></i>
+                    </div>
+                  )}
                 </span>
               </div>
             </fieldset>

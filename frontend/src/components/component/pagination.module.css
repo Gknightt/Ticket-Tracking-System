@@ -58,3 +58,9 @@
   color: white;
   border-color: #007bff;
 }
+
+.ellipsis {
+  padding: 0 8px;
+  font-weight: bold;
+}
+

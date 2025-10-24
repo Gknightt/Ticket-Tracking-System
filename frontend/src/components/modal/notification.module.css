@@ -23,11 +23,12 @@
 }
 
 .notificationModalCont {
-  width: 400px;
+  width: 30vw;
   max-width: 90vw;
-  
+
   background-color: var(--bg-color);
-  border-radius: 40px;
+  /* border-radius: 40px; */
+  border-radius: 16px;
   box-shadow: 0 0 20px rgba(211, 211, 211, 0.8);
   border: 1px solid #d3d3d3;
   overflow: hidden;
@@ -55,13 +56,45 @@
   margin: 0;
 }
 
+.nHeaderRight {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* button */
+.tabGroup {
+  display: flex;
+  gap: 10px;
+}
+
+.tab {
+  border: none;
+  background-color: var(--bg1-color);
+  color: var(--muted-text-color);
+  font-size: var(--table-font-size);
+  cursor: pointer;
+}
+
+.activeTab {
+  border: none;
+  color: var(--primary-color);
+  background-color: var(--bg1-color);
+  border-bottom: 2px solid var(--primary-color);
+  font-size: var(--table-font-size);
+  font-weight: 600;
+  padding-bottom: 3px;
+  cursor: pointer;
+}
+
 .nClearButton {
   background-color: var(--primary-color);
   color: var(--bg-color);
   border: none;
-  border-radius: 20px;
-  padding: 8px 16px;
-  font-size: var(--table-head-size);
+  border-radius: 8px;
+  /* padding: 8px 16px; */
+  padding: 4px 8px;
+  font-size: var(--table-font-size);
   font-weight: 500;
   cursor: pointer;
   transition: background-color 0.3s ease;
@@ -81,6 +114,16 @@
   overflow-y: auto;
   max-height: calc(80vh - 60px);
   padding: 0;
+}
+
+/* no item */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: var(--muted-text-color);
 }
 
 .nItem {
@@ -124,17 +167,26 @@
 }
 
 .nContent h3 {
-  font-size: var(--default-font-size);
+  /* font-size: var(--default-font-size); */
+  font-size: var(--table-head-size);
   font-weight: 600;
   margin: 0 0 4px 0;
   color: var(--heading-color);
 }
 
 .nContent p {
-  font-size: var(--default-font-size);
+  /* font-size: var(--default-font-size); */
+  font-size: var(--table-head-size);
   margin: 0 0 8px 0;
   color: var(--table-color);
   line-height: 1.4;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+  text-overflow: ellipsis;
+  font-style: italic;
+  /* text-align: justify; */
+  /* Ensure text wraps normally */
 }
 
 .nTime {

@@ -1,19 +1,21 @@
 // react
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { useEffect, useState, useCallback, useReducer, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
+import { useMemo } from "react";
+import { useEffect, useState, useCallback, useReducer } from "react";
+import { useSearchParams } from "react-router-dom";
 
 // style
 import styles from "./ticket-detail.module.css";
 import general from "../../../style/general.module.css";
 
 // components
-// import AdminNav from "../../../components/navigation/AdminNav";
 import AgentNav from "../../../components/navigation/AgentNav";
 import WorkflowTracker2 from "../../../components/ticket/WorkflowVisualizer2";
 import DocumentViewer from "../../../components/ticket/DocumentViewer";
 import TicketComments from "../../../components/ticket/TicketComments";
-import Messaging from "../../../components/component/Messaging";
 import ActionLog from "../../../components/ticket/ActionLog";
+import Messaging from "../../../components/component/Messaging";
 
 // hooks
 import useFetchActionLogs from "../../../api/workflow-graph/useActionLogs";
@@ -25,7 +27,7 @@ import useUserTickets from "../../../api/useUserTickets";
 import TicketAction from "./modals/TicketAction";
 import { min } from "date-fns";
 
-export default function AdminTicketDetail() {
+export default function TicketDetail() {
   const navigate = useNavigate();
   const { id } = useParams();
   const { userTickets } = useUserTickets();
@@ -277,7 +279,8 @@ export default function AdminTicketDetail() {
                   />
                 </div>
               </div>
-              {/* Pass the actual ticket_id, not the step_instance_id */}
+              
+              {/* Comments section under attachments */}
               <TicketComments ticketId={state.ticket?.ticket_id} />
             </div>
             {/* Right */}
@@ -379,7 +382,7 @@ export default function AdminTicketDetail() {
                         error={error}
                       />
                     </div>
-                    <div className={styles.actionLogs}> 
+                    <div className={styles.actionLogs}>
                       {/* <ActionLog log={logs && logs.length > 0 ? logs[0] : null} /> */}
                     </div>
                   </>
@@ -389,6 +392,7 @@ export default function AdminTicketDetail() {
                 {activeTab === "Messages" && (
                   <div className={styles.messageSection}>
                     <Messaging />
+                    {/* Comments section is now displayed under attachments in the left column */}
                   </div>
                 )}
               </div>
