@@ -1,50 +1,57 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../api/AuthContext";
+import styles from "./unauthorized.module.css";
 
 const Unauthorized = () => {
-  const { user, isAdmin, hasTtsAccess } = useAuth();
+  const { user, isAdmin, hasTtsAccess, logout } = useAuth();
 
-  // Determine where to redirect the user based on their permissions
   const getRedirectPath = () => {
-    if (!user) {
-      return "/login";
-    }
-    if (isAdmin()) {
-      return "/admin/dashboard";
-    }
-    if (hasTtsAccess()) {
-      return "/agent/dashboard";
-    }
+    if (!user) return "/login";
+    if (isAdmin()) return "/admin/dashboard";
+    if (hasTtsAccess()) return "/agent/dashboard";
     return "/login";
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <div className="text-center p-8 bg-white rounded-lg shadow-lg max-w-md">
-        <div className="text-6xl text-red-500 mb-4">
-          <i className="fas fa-exclamation-circle"></i>
+    <div className={styles.container}>
+      <div className={styles.card}>
+        <div className={styles.iconWrapper}>
+          <i className={`fas fa-lock ${styles.icon}`}></i>
         </div>
-        <h1 className="text-2xl font-bold mb-2">Access Denied</h1>
-        <p className="text-gray-600 mb-6">
-          You don't have permission to access this page.
-          This area requires specific role permissions that your account doesn't have.
+
+        <h1 className={styles.title}>Access Denied</h1>
+        <p className={styles.message}>
+          You don’t have permission to view this page.
+          <br />
+          Please check your account permissions or return to a safe page.
         </p>
-        <div className="flex flex-col space-y-2">
-          <Link 
-            to={getRedirectPath()}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition duration-200"
-          >
+
+        <div className={styles.buttonGroup}>
+          {/* <Link to={getRedirectPath()} className={styles.primaryButton}>
             Return to Dashboard
-          </Link>
-          {!user && (
-            <Link 
-              to="/login"
-              className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 transition duration-200"
+          </Link> */}
+
+          {user ? (
+            <button
+              onClick={logout}
+              className={styles.secondaryButton}
+              aria-label="Back to login and sign out"
             >
+              Log Out
+            </button>
+          ) : (
+            <Link to="/login" className={styles.secondaryButton}>
               Log In
             </Link>
           )}
+        </div>
+
+        <div className={styles.footer}>
+          Need help?{" "}
+          <Link to="/support" className={styles.supportLink}>
+            Contact Support
+          </Link>
         </div>
       </div>
     </div>

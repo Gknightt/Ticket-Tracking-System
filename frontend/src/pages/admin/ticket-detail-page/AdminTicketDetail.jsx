@@ -15,6 +15,7 @@ import WorkflowTracker2 from "../../../components/ticket/WorkflowVisualizer2";
 import DocumentViewer from "../../../components/ticket/DocumentViewer";
 import TicketComments from "../../../components/ticket/TicketComments";
 import ActionLog from "../../../components/ticket/ActionLog";
+import Messaging from "../../../components/component/Messaging";
 
 // hooks
 import useFetchActionLogs from "../../../api/workflow-graph/useActionLogs";
@@ -390,7 +391,7 @@ export default function AdminTicketDetail() {
                 {/* Message Section */}
                 {activeTab === "Messages" && (
                   <div className={styles.messageSection}>
-                    {/* Comments section is now displayed under attachments in the left column */}
+                    <Messaging />
                   </div>
                 )}
               </div>
