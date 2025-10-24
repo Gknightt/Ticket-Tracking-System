@@ -37,7 +37,15 @@ export default function ProfileModal({ closeProfileAction }) {
         <div className={styles.pmBody}>
           <button
             className={styles.pmButton}
-            onClick={() => navigate("/agent/profile")}
+            onClick={() => {
+              // close modal first
+              closeProfileAction(false);
+              // construct external URL from Vite env var and endpoint
+              const base = import.meta.env.VITE_AUTH_URL || '';
+              const url = `${base.replace(/\/$/, '')}/api/v1/users/settings/profile/`;
+              // open in a new browser window/tab safely
+              window.open(url, '_blank', 'noopener,noreferrer');
+            }}
           >
             Account Settings
           </button>
