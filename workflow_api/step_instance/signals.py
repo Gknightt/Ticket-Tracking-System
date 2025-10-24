@@ -73,7 +73,7 @@ def assign_user_to_step_instance(sender, instance, created, **kwargs):
         message = (
             f"You have been assigned to the step '{instance.step_transition_id.to_step_id.name}' "
             f"in workflow '{instance.step_transition_id.workflow_id.name}' "
-            f"for ticket '{instance.task_id.ticket_id}'."
+            f"for ticket '{instance.task_id.ticket_id.ticket_id}'."
         )
         subject = f"New Step Assigned: {instance.step_transition_id.to_step_id.name}"
 
