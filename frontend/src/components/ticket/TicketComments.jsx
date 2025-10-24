@@ -6,10 +6,35 @@ import useComments from "../../api/useComments";
 import styles from "./ticketComments.module.css";
 
 // Comment component to render individual comments
-const Comment = ({ comment, onReply, onReaction, currentUserId, isReply = false }) => {
+const Comment = ({
+  comment,
+  onReply,
+  onReaction,
+  onDelete,
+  canDelete = false,
+  currentUserId,
+  isReply = false,
+}) => {
   const [showReplyForm, setShowReplyForm] = useState(false);
   const [replyContent, setReplyContent] = useState("");
-  
+
+  console.log("Comment data:", comment);
+
+  // === track if content is expanded
+  const [isContentExpanded, setIsContentExpanded] = useState(false); // Track content expansion
+  const MAX_CONTENT_LENGTH = 200;
+
+  // Truncate comment content if it's too long
+  const truncatedContent =
+    comment.content.length > MAX_CONTENT_LENGTH
+      ? comment.content.slice(0, MAX_CONTENT_LENGTH) + "..."
+      : comment.content;
+
+  const handleToggleContent = () => {
+    setIsContentExpanded(!isContentExpanded);
+  };
+  // ===
+
   const formatDate = (dateString) => {
     try {
       const date = new Date(dateString);
@@ -21,7 +46,7 @@ const Comment = ({ comment, onReply, onReaction, currentUserId, isReply = false 
 
   // Check if the current user has already reacted
   const userReaction = comment.reactions?.find(
-    reaction => reaction.user_id === currentUserId
+    (reaction) => reaction.user_id === currentUserId
   );
 
   const handleReplySubmit = (e) => {
@@ -55,7 +80,9 @@ const Comment = ({ comment, onReply, onReaction, currentUserId, isReply = false 
       return comment.thumbs_up_count;
     }
     // Fallback to the original calculation method
-    return comment.reactions?.filter(r => r.reaction_type === "like").length || 0;
+    return (
+      comment.reactions?.filter((r) => r.reaction_type === "like").length || 0
+    );
   };
 
   const getDislikeCount = () => {
@@ -64,51 +91,96 @@ const Comment = ({ comment, onReply, onReaction, currentUserId, isReply = false 
       return comment.thumbs_down_count;
     }
     // Fallback to the original calculation method
-    return comment.reactions?.filter(r => r.reaction_type === "dislike").length || 0;
+    return (
+      comment.reactions?.filter((r) => r.reaction_type === "dislike").length ||
+      0
+    );
   };
 
   return (
     <div className={styles.commentCard}>
-      <div className={styles.commentHeader}>
-        <div className={styles.userInfo}>
-          <span className={styles.commentAuthor}>
-            {comment.firstname || comment.user?.first_name} {comment.lastname || comment.user?.last_name}
+      <div className={styles.commentBody}>
+        <div className={styles.commentHeader}>
+          <div className={styles.userInfo}>
+            <span className={styles.commentAuthor}>
+              {comment.firstname || comment.user?.first_name}{" "}
+              {comment.lastname || comment.user?.last_name}
+            </span>
+            {(comment.role || comment.user?.role) && (
+              <span className={styles.userRole}>
+                {comment.role || comment.user?.role}
+              </span>
+            )}
+          </div>
+          <span className={styles.commentTime}>
+            {formatDate(comment.created_at)}
           </span>
-          {(comment.role || comment.user?.role) && (
-            <span className={styles.userRole}>{comment.role || comment.user?.role}</span>
+        </div>
+        {/* <div className={styles.commentContent}>{comment.content}</div> */}
+        <div className={styles.commentContent}>
+          {isContentExpanded || comment.content.length <= MAX_CONTENT_LENGTH
+            ? comment.content
+            : truncatedContent}
+          {comment.content.length > MAX_CONTENT_LENGTH && (
+            <button
+              className={styles.seeMoreButton}
+              onClick={handleToggleContent}
+            >
+              {isContentExpanded ? "See Less" : "See More"}
+            </button>
           )}
         </div>
-        <span className={styles.commentTime}>{formatDate(comment.created_at)}</span>
       </div>
-      
-      <div className={styles.commentContent}>{comment.content}</div>
-      
+
       <div className={styles.commentActions}>
-        <button 
-          className={`${styles.actionButton} ${userReaction?.reaction_type === "like" ? styles.actionButtonActive : ""}`}
+        <button
+          className={`${styles.actionButton} ${
+            userReaction?.reaction_type === "like"
+              ? styles.actionButtonActive
+              : ""
+          }`}
           onClick={handleLikeClick}
         >
           <i className="fa-solid fa-thumbs-up"></i> {getLikeCount()}
         </button>
-        
-        <button 
-          className={`${styles.actionButton} ${userReaction?.reaction_type === "dislike" ? styles.actionButtonActive : ""}`}
+
+        <button
+          className={`${styles.actionButton} ${
+            userReaction?.reaction_type === "dislike"
+              ? styles.actionButtonActive
+              : ""
+          }`}
           onClick={handleDislikeClick}
         >
           <i className="fa-solid fa-thumbs-down"></i> {getDislikeCount()}
         </button>
-        
+
         {/* Only show reply button if this is not already a reply */}
         {!isReply && (
-          <button 
-            className={styles.actionButton} 
+          <button
+            className={styles.actionButton}
             onClick={() => setShowReplyForm(!showReplyForm)}
           >
             <i className="fa-solid fa-reply"></i> Reply
           </button>
         )}
+
+        {/* Delete button shown only when user can delete */}
+        {canDelete && (
+          <button
+            className={styles.actionButton}
+            onClick={() => {
+              if (onDelete) {
+                const confirmed = window.confirm("Delete this comment?");
+                if (confirmed) onDelete(comment.id);
+              }
+            }}
+          >
+            <i className="fa-solid fa-trash"></i> Delete
+          </button>
+        )}
       </div>
-      
+
       {showReplyForm && (
         <form className={styles.replyForm} onSubmit={handleReplySubmit}>
           <input
@@ -123,7 +195,7 @@ const Comment = ({ comment, onReply, onReaction, currentUserId, isReply = false 
           </button>
         </form>
       )}
-      
+
       {comment.replies && comment.replies.length > 0 && (
         <div className={styles.repliesContainer}>
           {comment.replies.map((reply) => (
@@ -157,7 +229,9 @@ const LoadingSpinner = () => (
 const EmptyState = () => (
   <div className={styles.emptyStateContainer}>
     <i className="fa-regular fa-comments styles.emptyStateIcon"></i>
-    <p className={styles.emptyStateText}>No comments yet. Be the first to start a conversation!</p>
+    <p className={styles.emptyStateText}>
+      No comments yet. Be the first to start a conversation!
+    </p>
   </div>
 );
 
@@ -174,9 +248,9 @@ const ErrorState = ({ message, onRetry }) => (
 );
 
 const TicketComments = ({ ticketId }) => {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [newComment, setNewComment] = useState("");
-  
+
   const {
     comments,
     loading,
@@ -185,8 +259,23 @@ const TicketComments = ({ ticketId }) => {
     addReply,
     addReaction,
     removeReaction,
-    refreshComments
+    deleteComment,
+    refreshComments,
   } = useComments(ticketId);
+
+  const handleDelete = async (commentId) => {
+    if (!commentId) return;
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this comment? This cannot be undone."
+    );
+    if (!confirmed) return;
+
+    const success = await deleteComment(commentId);
+    if (!success) {
+      // Optionally: show a user-facing notification here
+      console.error("Failed to delete comment", commentId);
+    }
+  };
 
   const handleSendComment = async (e) => {
     e.preventDefault();
@@ -200,7 +289,11 @@ const TicketComments = ({ ticketId }) => {
     await addReply(parentId, content);
   };
 
-  const handleReaction = async (commentId, existingReactionId, reactionType) => {
+  const handleReaction = async (
+    commentId,
+    existingReactionId,
+    reactionType
+  ) => {
     if (!reactionType && existingReactionId) {
       // Remove reaction
       await removeReaction(existingReactionId);
@@ -220,12 +313,12 @@ const TicketComments = ({ ticketId }) => {
   // Organize comments into a tree structure (root comments and their replies)
   const organizedComments = React.useMemo(() => {
     if (!comments) return [];
-    
-    console.log("Raw comments data:", comments);
-    
+
+    // console.log("Raw comments data:", comments);
+
     // Map the comments to include the 'id' field expected by the component
     // Use the already nested 'replies' structure from the API
-    const mappedComments = comments.map(comment => {
+    const mappedComments = comments.map((comment) => {
       // Process the main comment
       const processedComment = {
         ...comment,
@@ -235,19 +328,19 @@ const TicketComments = ({ ticketId }) => {
 
       // Process any replies that come pre-nested from the API
       if (comment.replies && Array.isArray(comment.replies)) {
-        processedComment.replies = comment.replies.map(reply => ({
+        processedComment.replies = comment.replies.map((reply) => ({
           ...reply,
           id: reply.comment_id,
-          parent_id: reply.parent || comment.comment_id
+          parent_id: reply.parent || comment.comment_id,
         }));
       }
-      
+
       return processedComment;
     });
-    
+
     // Filter to only include root comments (those without a parent)
-    const rootComments = mappedComments.filter(comment => !comment.parent);
-    
+    const rootComments = mappedComments.filter((comment) => !comment.parent);
+
     console.log("Organized comments:", rootComments);
     return rootComments;
   }, [comments]);
@@ -263,15 +356,12 @@ const TicketComments = ({ ticketId }) => {
   return (
     <div className={styles.commentsSection}>
       <h3>Comments</h3>
-      
+
       <div className={styles.commentsList}>
         {loading ? (
           <LoadingSpinner />
         ) : error ? (
-          <ErrorState 
-            message={error} 
-            onRetry={refreshComments} 
-          />
+          <ErrorState message={error} onRetry={refreshComments} />
         ) : organizedComments.length === 0 ? (
           <EmptyState />
         ) : (
@@ -281,12 +371,23 @@ const TicketComments = ({ ticketId }) => {
               comment={comment}
               onReply={handleReply}
               onReaction={handleReaction}
+              onDelete={handleDelete}
+              // canDelete={
+              //   (user?.id &&
+              //     (user?.id === comment.user_id ||
+              //       user?.id === comment.user?.id)) ||
+              //   (typeof isAdmin === "function" ? isAdmin() : false)
+              // }
+              canDelete={
+                (user?.id && String(user.id) === String(comment.user_id)) ||
+                (typeof isAdmin === "function" ? isAdmin() : false)
+              }
               currentUserId={user?.id}
             />
           ))
         )}
       </div>
-      
+
       <form onSubmit={handleSendComment} className={styles.commentForm}>
         <textarea
           className={styles.commentInput}
@@ -295,8 +396,8 @@ const TicketComments = ({ ticketId }) => {
           onChange={(e) => setNewComment(e.target.value)}
           disabled={loading}
         />
-        <button 
-          className={styles.commentButton} 
+        <button
+          className={styles.commentButton}
           type="submit"
           disabled={loading || !newComment.trim()}
         >
