@@ -153,6 +153,24 @@ export const useComments = (ticketId) => {
     }
   }, [refreshComments, user, getUserRole]);
 
+  // Delete a comment
+  const deleteComment = useCallback(async (commentId) => {
+    if (!commentId) {
+      setError('Unable to delete comment: Missing comment id');
+      return false;
+    }
+
+    try {
+      await api.delete(`${MESSAGING_API}/api/comments/comments/${commentId}/`);
+      refreshComments();
+      return true;
+    } catch (err) {
+      console.error('Error deleting comment:', err);
+      setError('Failed to delete comment. Please try again.');
+      return false;
+    }
+  }, [refreshComments]);
+
   // Effect to fetch comments when ticketId changes or refreshKey is updated
   useEffect(() => {
     fetchComments();
@@ -166,6 +184,7 @@ export const useComments = (ticketId) => {
     addReply,
     addReaction,
     removeReaction,
+    deleteComment,
     refreshComments
   };
 };
