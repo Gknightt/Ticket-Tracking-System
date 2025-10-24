@@ -9,7 +9,7 @@ class UserSystemRole(models.Model):
     system = models.ForeignKey('systems.System', on_delete=models.CASCADE, related_name='user_roles')
     role = models.ForeignKey('roles.Role', on_delete=models.CASCADE, related_name='user_assignments')
     assigned_at = models.DateTimeField(default=now)
-
+    is_active = models.BooleanField(default=True)  # Can login
     class Meta:
         unique_together = ('user', 'system', 'role')  # Prevent duplicate assignments
 

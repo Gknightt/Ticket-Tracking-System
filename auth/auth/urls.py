@@ -9,6 +9,7 @@ from rest_framework import serializers
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 from drf_spectacular.utils import extend_schema
 from users.views import CustomTokenObtainPairView, CookieLogoutView
+from django.views.static import serve
 
 class APIRootSerializer(serializers.Serializer):
     api_v1 = serializers.URLField()
@@ -42,8 +43,15 @@ urlpatterns = [
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('docs/', SpectacularRedocView.as_view(url_name='schema'), name='redoc-ui'),
+
+    # ignores debug
+    path(
+    f'{settings.MEDIA_URL.lstrip("/")}<path:path>',
+    serve,
+        {'document_root': settings.MEDIA_ROOT},
+    ),
 ]
 
-# Serve media files in development
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# # Serve media files in development
+# if settings.DEBUG:
+#     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
