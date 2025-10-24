@@ -110,7 +110,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'email', 'username', 'first_name', 'middle_name', 'last_name', 
             'suffix', 'phone_number', 'company_id', 'department', 'status', 
-            'notified', 'profile_picture', 'date_joined', 'otp_enabled', 'system_roles'
+            'notified', 'is_active', 'profile_picture', 'date_joined', 'otp_enabled', 'system_roles'
         )
     
     def get_profile_picture(self, obj):
@@ -204,6 +204,44 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer):
         if User.objects.filter(username=value).exclude(pk=user.pk).exists():
             raise serializers.ValidationError("A user with this username already exists.")
         return value
+
+    def validate_phone_number(self, value):
+        """Validate that phone number is unique (excluding current user)."""
+        if value:  # Only validate if phone number is provided
+            user = self.instance
+            if User.objects.filter(phone_number=value).exclude(pk=user.pk).exists():
+                raise serializers.ValidationError("A user with this phone number already exists.")
+        return value
+
+
+class AdminUserProfileUpdateSerializer(serializers.ModelSerializer):
+    """
+    Serializer for admins to update user profile information.
+    Allows admins to edit more fields than regular users, excluding ID fields.
+    Admins can activate/deactivate agent accounts in their systems.
+    """
+    first_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    middle_name = serializers.CharField(max_length=100, required=False, allow_blank=True, allow_null=True)
+    last_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    suffix = serializers.ChoiceField(choices=[('Jr.', 'Jr.'), ('Sr.', 'Sr.'), ('II', 'II'), ('III', 'III'), ('IV', 'IV'), ('V', 'V')], required=False, allow_blank=True, allow_null=True)
+    phone_number = serializers.CharField(max_length=20, required=False, allow_blank=True, allow_null=True)
+    department = serializers.ChoiceField(choices=[('IT Department', 'IT Department'), ('Asset Department', 'Asset Department'), ('Budget Department', 'Budget Department')], required=False, allow_blank=True, allow_null=True)
+    status = serializers.ChoiceField(choices=[('Pending', 'Pending'), ('Approved', 'Approved'), ('Rejected', 'Rejected')], required=False)
+    is_active = serializers.BooleanField(required=False, help_text="Set to false to deactivate user account, true to activate")
+    profile_picture = serializers.ImageField(
+        required=False,
+        allow_null=True,
+        validators=[validate_profile_picture_file_size, validate_profile_picture_dimensions]
+    )
+
+    class Meta:
+        model = User
+        fields = (
+            'first_name', 'middle_name', 'last_name', 'suffix', 
+            'phone_number', 'department', 'status', 'is_active', 'profile_picture'
+        )
+        # Explicitly exclude ID fields and other sensitive fields
+        # email, username, company_id, is_staff, is_superuser, otp_enabled are not editable by admins
 
     def validate_phone_number(self, value):
         """Validate that phone number is unique (excluding current user)."""

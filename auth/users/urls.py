@@ -17,7 +17,8 @@ from .views import (
     ResetPasswordView,
     UserViewSet,
     ProfilePasswordResetView,
-    profile_settings_view
+    profile_settings_view,
+    agent_management_view
 )
 
 class PasswordResetSerializer(serializers.Serializer):
@@ -56,14 +57,18 @@ def users_root(request):
         },
         "settings": {
             "profile": request.build_absolute_uri("settings/profile/"),
+            "agent_management": request.build_absolute_uri("agent-management/"),
         }
     })
 
 # Create router for UserViewSet
 router = DefaultRouter()
-# router.register(r'users', UserViewSet)
+router.register(r'', UserViewSet)
 
 urlpatterns = [
+    # Root endpoint for users API discovery 
+    path('', users_root, name='users-root'),
+    
     # Authentication endpoints
     path('register/', RegisterView.as_view(), name='user-register'),
     path('login/', CustomTokenObtainPairView.as_view(), name='token-obtain-pair'),
@@ -77,6 +82,9 @@ urlpatterns = [
     # Template-based Profile Settings URL
     path('settings/profile/', profile_settings_view, name='profile-settings'),
     
+    # Agent Management URL - MUST come before router includes
+    path('agent-management/', agent_management_view, name='agent-management'),
+    
     # 2FA endpoints
     path('2fa/request-otp/', RequestOTPView.as_view(), name='request-otp'),
     path('2fa/enable/', Enable2FAView.as_view(), name='enable-2fa'),
@@ -87,12 +95,12 @@ urlpatterns = [
     path('password/reset/', ResetPasswordView.as_view(), name='reset-password'),
     path('password/change/', ProfilePasswordResetView.as_view(), name='change-password'),
     
-    # User listing endpoint (new path)
+    # User listing endpoint
     path('list/', UserViewSet.as_view({'get': 'list'}), name='user-list'),
     
-    # User management endpoints (for admins) - include router URLs if UserViewSet is used elsewhere
-    # path('', include(router.urls)),
-
-    # Root endpoint for users API discovery
-    path('', users_root, name='users-root'),
+    # User management endpoints (for admins) - CRUD operations
+    path('management/', include(router.urls)),
+    
+    # Router URLs - keep this at the end
+    path('', include(router.urls)),
 ]

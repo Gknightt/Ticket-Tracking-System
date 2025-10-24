@@ -32,7 +32,7 @@
                                 <div class="profileImageContainer">
                                     <img
                                         id="profile-preview"
-                                        src="{% if user.profile_picture %}{{ user.profile_picture.url }}{% else %}https://i.pinimg.com/736x/01/c2/09/01c209e18fd7a17c9c5dcc7a4e03db0e.jpg{% endif %}"
+                                        src="{% if user.profile_picture %}{{ user.profile_picture.url }}{% else %}https://i.pinimg.com/1200x/a9/a8/c8/a9a8c8258957c8c7d6fcd320e9973203.jpg{% endif %}"
                                         alt="Profile"
                                         class="profileImage"
                                     />
@@ -68,6 +68,9 @@
 
                             <div class="quickLinksCard">
                                 <h3>Quick Links</h3>
+                                <div id="admin-links" style="display: none;">
+                                    <a href="{% url 'agent-management' %}" class="linkItem">Manage Agents</a>
+                                </div>
                                 <a href="{% url 'cookie-logout' %}" class="linkItem">Logout</a>
                             </div>
                         </div>
@@ -327,7 +330,48 @@
 
             // Set initial state
             setFormEnabled(false);
+            
+            // Check if user has admin privileges and show admin links
+            checkAdminPrivileges();
         });
+        
+        // Function to check if user has admin privileges
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+        
+        async function checkAdminPrivileges() {
+            try {
+                const csrfToken = getCookie('csrftoken');
+                const response = await fetch('/api/v1/users/list/', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    // If user can access the users list endpoint, they have admin privileges
+                    document.getElementById('admin-links').style.display = 'block';
+                }
+            } catch (error) {
+                // If there's an error, user likely doesn't have admin privileges
+                console.log('User does not have admin privileges');
+            }
+        }
     </script>
     </body>
 </html>

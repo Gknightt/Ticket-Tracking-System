@@ -1,5 +1,5 @@
 from rest_framework import generics, serializers as drf_serializers, status, viewsets, mixins
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -15,6 +15,7 @@ from .serializers import (
     UserRegistrationSerializer, 
     UserProfileSerializer,
     UserProfileUpdateSerializer,
+    AdminUserProfileUpdateSerializer,
     CustomTokenObtainPairSerializer,
     OTPRequestSerializer,
     Enable2FASerializer,
@@ -215,22 +216,42 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
         try:
             serializer.is_valid(raise_exception=True)
-        # ... (keep your existing exception handling for OTP etc.) ...
         except ValidationError as e:
-             # ... (your existing OTP/error handling code) ...
-             # If OTP is required but not provided...
-             if 'otp_required' in error_codes:
-                 # ... (your existing code to send OTP) ...
-                 pass # Placeholder for existing code
-             elif 'otp_invalid' in error_codes:
-                 # ... (your existing code) ...
-                 pass # Placeholder for existing code
-             elif 'otp_expired' in error_codes:
-                 # ... (your existing code) ...
-                 pass # Placeholder for existing code
+            # Extract error codes from validation error
+            error_detail = e.detail
+            error_codes = []
+            
+            # Handle different error detail formats
+            if isinstance(error_detail, dict):
+                for field, errors in error_detail.items():
+                    if isinstance(errors, list):
+                        for error in errors:
+                            if hasattr(error, 'code'):
+                                error_codes.append(error.code)
+                            elif isinstance(error, str):
+                                error_codes.append(error)
+                    elif hasattr(errors, 'code'):
+                        error_codes.append(errors.code)
+            elif isinstance(error_detail, list):
+                for error in error_detail:
+                    if hasattr(error, 'code'):
+                        error_codes.append(error.code)
+                    elif isinstance(error, str):
+                        error_codes.append(error)
+            
+            # Check for specific OTP-related errors
+            if 'otp_required' in error_codes:
+                # Handle OTP required case
+                pass # Placeholder for existing code
+            elif 'otp_invalid' in error_codes:
+                # Handle invalid OTP case
+                pass # Placeholder for existing code
+            elif 'otp_expired' in error_codes:
+                # Handle expired OTP case
+                pass # Placeholder for existing code
 
-             # For other validation errors, return the original response
-             raise e # Make sure to re-raise if it's not an OTP error handled here
+            # For other validation errors, return the original response
+            raise e
 
         # --- Authentication successful ---
 
@@ -603,10 +624,88 @@ class ResetPasswordView(generics.GenericAPIView):
         return render(request, 'reset_password.html', context)
 
 
+@extend_schema_view(
+    list=extend_schema(
+        tags=['User Management'],
+        summary="List all users",
+        description="Retrieve a list of all users. Superusers see all users, system admins see only users in their managed systems.",
+        responses={
+            200: OpenApiResponse(
+                response=inline_serializer(
+                    name='UserListResponse',
+                    fields={
+                        'users_count': drf_serializers.IntegerField(),
+                        'users': UserProfileSerializer(many=True)
+                    }
+                ),
+                description="Successfully retrieved user list"
+            ),
+            401: OpenApiResponse(description="Unauthorized - authentication required"),
+            403: OpenApiResponse(description="Forbidden - admin privileges required")
+        }
+    ),
+    retrieve=extend_schema(
+        tags=['User Management'],
+        summary="Retrieve a specific user",
+        description="Get detailed information about a specific user by ID. Access is granted based on user permissions.",
+        responses={
+            200: OpenApiResponse(response=UserProfileSerializer, description="User details retrieved successfully"),
+            401: OpenApiResponse(description="Unauthorized - authentication required"),
+            403: OpenApiResponse(description="Forbidden - access denied to this user"),
+            404: OpenApiResponse(description="User not found or access denied")
+        }
+    ),
+    create=extend_schema(
+        tags=['User Management'],
+        summary="Create a new user",
+        description="Create a new user. This endpoint is restricted - only superusers can directly create users. System admins should use the admin invite endpoint instead.",
+        request=UserRegistrationSerializer,
+        responses={
+            201: OpenApiResponse(response=UserRegistrationSerializer, description="User created successfully"),
+            400: OpenApiResponse(description="Bad request - validation errors"),
+            403: OpenApiResponse(description="Forbidden - only superusers can create users directly")
+        }
+    ),
+    update=extend_schema(
+        tags=['User Management'],
+        summary="Update a user profile (full update)",
+        description="Fully update a user's profile. Users can update their own profile with limited fields. Admins can update non-admin users in their systems with extended fields (name, department, status, is_active, etc.) and can activate/deactivate agent accounts, but cannot edit ID fields (email, username, company_id). Admins cannot edit other admins.",
+        request=AdminUserProfileUpdateSerializer,
+        responses={
+            200: OpenApiResponse(response=UserProfileSerializer, description="User profile updated successfully"),
+            400: OpenApiResponse(description="Bad request - validation errors"),
+            403: OpenApiResponse(description="Forbidden - access denied or attempting to edit another admin"),
+            404: OpenApiResponse(description="User not found or access denied")
+        }
+    ),
+    partial_update=extend_schema(
+        tags=['User Management'],
+        summary="Partially update a user profile",
+        description="Partially update a user's profile (PATCH). Users can update their own profile with limited fields. Admins can update non-admin users in their systems with extended fields (name, department, status, is_active, etc.) and can activate/deactivate agent accounts, but cannot edit ID fields (email, username, company_id). Admins cannot edit other admins.",
+        request=AdminUserProfileUpdateSerializer,
+        responses={
+            200: OpenApiResponse(response=UserProfileSerializer, description="User profile updated successfully"),
+            400: OpenApiResponse(description="Bad request - validation errors"),
+            403: OpenApiResponse(description="Forbidden - access denied or attempting to edit another admin"),
+            404: OpenApiResponse(description="User not found or access denied")
+        }
+    ),
+    destroy=extend_schema(
+        tags=['User Management'],
+        summary="Delete a user",
+        description="Delete a user. This is a restricted operation - only superusers can delete users. Superusers cannot delete other superusers.",
+        responses={
+            204: OpenApiResponse(description="User deleted successfully"),
+            403: OpenApiResponse(description="Forbidden - only superusers can delete users"),
+            404: OpenApiResponse(description="User not found or access denied")
+        }
+    )
+)
 class UserViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing users with CRUD operations.
     Superusers can see all users, system admins can only see users in their systems.
+    Admins can edit agent (non-admin) profiles in their systems but not other admins.
     """
     queryset = User.objects.all()
     serializer_class = UserProfileSerializer
@@ -659,8 +758,14 @@ class UserViewSet(viewsets.ModelViewSet):
         try:
             user = self.get_queryset().get(pk=pk)
             
-            # Users can only update themselves unless they're superuser
-            if not request.user.is_superuser and user != request.user:
+            # Users can only update themselves unless they're superuser or admin
+            if user == request.user:
+                # User is updating their own profile - use regular serializer
+                serializer = UserProfileUpdateSerializer(user, data=request.data, context={'request': request})
+            elif request.user.is_superuser:
+                # Superuser can use admin serializer
+                serializer = AdminUserProfileUpdateSerializer(user, data=request.data, context={'request': request})
+            else:
                 # Check if requesting user is admin of any system the target user belongs to
                 from system_roles.models import UserSystemRole
                 admin_systems = UserSystemRole.objects.filter(
@@ -672,16 +777,33 @@ class UserViewSet(viewsets.ModelViewSet):
                     user=user
                 ).values_list('system_id', flat=True)
                 
-                if not set(admin_systems).intersection(set(user_systems)):
+                # Check for common systems
+                common_systems = set(admin_systems).intersection(set(user_systems))
+                if not common_systems:
                     return Response(
                         {"error": "Access denied to modify this user"}, 
                         status=status.HTTP_403_FORBIDDEN
                     )
+                
+                # Check if target user is NOT an admin in any of those common systems
+                target_is_admin = UserSystemRole.objects.filter(
+                    user=user,
+                    system_id__in=common_systems,
+                    role__name='Admin'
+                ).exists()
+                
+                if target_is_admin:
+                    return Response(
+                        {"error": "Admins cannot edit other admins' profiles"}, 
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+                
+                # Admin is editing a non-admin user - use admin serializer
+                serializer = AdminUserProfileUpdateSerializer(user, data=request.data, context={'request': request})
             
-            serializer = self.get_serializer(user, data=request.data)
             if serializer.is_valid():
                 serializer.save()
-                return Response(serializer.data)
+                return Response(UserProfileSerializer(user, context={'request': request}).data)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except User.DoesNotExist:
             return Response(
@@ -694,8 +816,14 @@ class UserViewSet(viewsets.ModelViewSet):
         try:
             user = self.get_queryset().get(pk=pk)
             
-            # Users can only update themselves unless they're superuser
-            if not request.user.is_superuser and user != request.user:
+            # Users can only update themselves unless they're superuser or admin
+            if user == request.user:
+                # User is updating their own profile - use regular serializer
+                serializer = UserProfileUpdateSerializer(user, data=request.data, partial=True, context={'request': request})
+            elif request.user.is_superuser:
+                # Superuser can use admin serializer
+                serializer = AdminUserProfileUpdateSerializer(user, data=request.data, partial=True, context={'request': request})
+            else:
                 # Check if requesting user is admin of any system the target user belongs to
                 from system_roles.models import UserSystemRole
                 admin_systems = UserSystemRole.objects.filter(
@@ -707,16 +835,33 @@ class UserViewSet(viewsets.ModelViewSet):
                     user=user
                 ).values_list('system_id', flat=True)
                 
-                if not set(admin_systems).intersection(set(user_systems)):
+                # Check for common systems
+                common_systems = set(admin_systems).intersection(set(user_systems))
+                if not common_systems:
                     return Response(
                         {"error": "Access denied to modify this user"}, 
                         status=status.HTTP_403_FORBIDDEN
                     )
+                
+                # Check if target user is NOT an admin in any of those common systems
+                target_is_admin = UserSystemRole.objects.filter(
+                    user=user,
+                    system_id__in=common_systems,
+                    role__name='Admin'
+                ).exists()
+                
+                if target_is_admin:
+                    return Response(
+                        {"error": "Admins cannot edit other admins' profiles"}, 
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+                
+                # Admin is editing a non-admin user - use admin serializer
+                serializer = AdminUserProfileUpdateSerializer(user, data=request.data, partial=True, context={'request': request})
             
-            serializer = self.get_serializer(user, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
-                return Response(serializer.data)
+                return Response(UserProfileSerializer(user, context={'request': request}).data)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except User.DoesNotExist:
             return Response(
@@ -917,3 +1062,30 @@ def profile_settings_view(request):
         'user': user,
     }
     return render(request, 'users/profile_settings.html', context)
+
+
+@jwt_cookie_required
+def agent_management_view(request):
+    """
+    Render the agent management page for system admins and superusers.
+    This view uses the same permissions as the UserViewSet API.
+    """
+    user = request.user
+    
+    # Check if user has permission to manage agents
+    # Use the same permission logic as IsSystemAdminOrSuperUser
+    if not user.is_superuser:
+        # Check if user is a system admin
+        is_system_admin = UserSystemRole.objects.filter(
+            user=user,
+            role__name='Admin'
+        ).exists()
+        
+        if not is_system_admin:
+            messages.error(request, 'Access denied. You need admin privileges to access agent management.')
+            return redirect('profile-settings')
+    
+    context = {
+        'user': user,
+    }
+    return render(request, 'users/agent_management.html', context)

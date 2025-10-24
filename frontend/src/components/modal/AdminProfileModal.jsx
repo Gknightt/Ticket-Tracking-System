@@ -54,6 +54,20 @@ export default function AdminProfileModal({ closeProfileAction }) {
           >
             Account Settings
           </button>
+          <button
+            className={styles.pmButton}
+            onClick={() => {
+              // close modal first
+              closeProfileAction(false);
+              // construct external URL from Vite env var and endpoint
+              const base = import.meta.env.VITE_AUTH_URL || '';
+              const url = `${base.replace(/\/$/, '')}/api/v1/users/agent-management/`;
+              // open in a new browser window/tab safely
+              window.open(url, '_blank', 'noopener,noreferrer');
+            }}
+          >
+            Agent Management
+          </button>
           {/* <button onClick={() => navigate("/settings")}>Settings</button> */}
           <button
             className={styles.pmButton}
