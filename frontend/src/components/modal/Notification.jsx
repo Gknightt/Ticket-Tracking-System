@@ -9,7 +9,10 @@ import styles from "./notification.module.css";
 
 import { formatDistanceToNow, parseISO } from "date-fns";
 
-export default function Notification({ closeNotifAction }) {
+export default function Notification({
+  closeNotifAction,
+  parentFetchNotifications,
+}) {
   const {
     notifications,
     loading,
@@ -32,11 +35,30 @@ export default function Notification({ closeNotifAction }) {
   const handleMarkAsRead = async (id) => {
     await markAsRead(id);
     // hook already refreshes lists after marking; no extra fetch needed here
+    // But the parent (nav) uses its own hook instance -> ask parent to refresh
+    if (typeof parentFetchNotifications === "function") {
+      try {
+        parentFetchNotifications("unread");
+      } catch (e) {
+        // swallow - best-effort
+        // eslint-disable-next-line no-console
+        console.warn("parentFetchNotifications failed:", e);
+      }
+    }
   };
 
   const handleClearAll = async () => {
     await markAllAsRead();
     // hook already refreshes lists after marking all; no extra fetch needed here
+    // Tell parent nav to refresh its unread count too (best-effort)
+    if (typeof parentFetchNotifications === "function") {
+      try {
+        parentFetchNotifications("unread");
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn("parentFetchNotifications failed:", e);
+      }
+    }
   };
 
   // Normalize list to ensure it's always an array before mapping
@@ -78,28 +100,6 @@ export default function Notification({ closeNotifAction }) {
         <div className={styles.nHeader}>
           <h2>Notifications</h2>
           <div className={styles.nHeaderRight}>
-            {/* <div className={styles.tabGroup}>
-              <button
-                className={
-                  activeTab === "unread" ? styles.activeTab : styles.tab
-                }
-                onClick={() => setActiveTab("unread")}
-              >
-                Unread ({unreadCount})
-              </button>
-              <button
-                className={activeTab === "read" ? styles.activeTab : styles.tab}
-                onClick={() => setActiveTab("read")}
-              >
-                Read ({readCount})
-              </button>
-              <button
-                className={activeTab === "all" ? styles.activeTab : styles.tab}
-                onClick={() => setActiveTab("all")}
-              >
-                All ({allCount})
-              </button>
-            </div> */}
             <div className={styles.tabGroup}>
               <button
                 className={
@@ -166,6 +166,18 @@ export default function Notification({ closeNotifAction }) {
                     {n.created_at ? formatDate(n.created_at) : "Just now"}
                   </span>
                 </div>
+                {/* show a small blue unread dot for notifications that are not read */}
+                {(() => {
+                  const isUnread =
+                    n?.is_read === false ||
+                    n?.is_read === 0 ||
+                    n?.read === false ||
+                    n?.read === 0 ||
+                    // some backends use `is_read` being undefined for unread
+                    (typeof n?.is_read === "undefined" && activeTab === "unread");
+                  return isUnread ? <span className={styles.nUnreadDot} /> : null;
+                })()}
+
                 <div
                   className={styles.nDeleteButton}
                   onClick={() => handleMarkAsRead(n.id)}

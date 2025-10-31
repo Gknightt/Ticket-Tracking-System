@@ -81,83 +81,94 @@
       <!-- Edit Agent Modal -->
       <div id="edit-modal" class="modal hidden">
         <div class="modalContent">
-          <div class="modalHeader">
-            <h3>Edit Agent</h3>
-            <button onclick="closeEditModal()" class="modalClose">
-              &times;
-            </button>
-          </div>
-          <form id="edit-form">
-            <div class="formGroup">
-              <label for="edit-username">Username</label>
-              <input type="text" id="edit-username" name="username" required />
-            </div>
-            <div class="formGroup">
-              <label for="edit-email">Email</label>
-              <input type="email" id="edit-email" name="email" required />
-            </div>
-            <div class="formGroup">
-              <label for="edit-first-name">First Name</label>
-              <input type="text" id="edit-first-name" name="first_name" />
-            </div>
-            <div class="formGroup">
-              <label for="edit-last-name">Last Name</label>
-              <input type="text" id="edit-last-name" name="last_name" />
-            </div>
-            <div class="formGroup">
-              <label for="edit-phone">Phone Number</label>
-              <input type="tel" id="edit-phone" name="phone_number" />
-            </div>
-            <div class="formGroup">
-              <label for="edit-company">Company</label>
-              <input
-                type="text"
-                id="edit-company"
-                name="company_name"
-                readonly
-              />
-              <small>Company cannot be changed</small>
-            </div>
-            <div class="formGroup">
-              <label for="edit-active">Status</label>
-              <select id="edit-active" name="is_active">
-                <option value="true">Active</option>
-                <option value="false">Inactive</option>
-              </select>
-            </div>
-            <div class="modalActions">
-              <button
-                type="button"
-                onclick="closeEditModal()"
-                class="btn btnSecondary"
-              >
-                Cancel
+          <div class="modalContentWrapper">
+            <div class="modalHeader">
+              <h3>Edit Agent</h3>
+              <button onclick="closeEditModal()" class="modalClose">
+                &times;
               </button>
-              <button type="submit" class="btn btnPrimary">Save Changes</button>
             </div>
-          </form>
+            <form id="edit-form">
+              <div class="formGroup">
+                <label for="edit-username">Username</label>
+                <input
+                  type="text"
+                  id="edit-username"
+                  name="username"
+                  required
+                />
+              </div>
+              <div class="formGroup">
+                <label for="edit-email">Email</label>
+                <input type="email" id="edit-email" name="email" required />
+              </div>
+              <div class="formGroup">
+                <label for="edit-first-name">First Name</label>
+                <input type="text" id="edit-first-name" name="first_name" />
+              </div>
+              <div class="formGroup">
+                <label for="edit-last-name">Last Name</label>
+                <input type="text" id="edit-last-name" name="last_name" />
+              </div>
+              <div class="formGroup">
+                <label for="edit-phone">Phone Number</label>
+                <input type="tel" id="edit-phone" name="phone_number" />
+              </div>
+              <div class="formGroup">
+                <label for="edit-company">Company</label>
+                <input
+                  type="text"
+                  id="edit-company"
+                  name="company_name"
+                  readonly
+                />
+                <small>Company cannot be changed</small>
+              </div>
+              <div class="formGroup">
+                <label for="edit-active">Status</label>
+                <select id="edit-active" name="is_active">
+                  <option value="true">Active</option>
+                  <option value="false">Inactive</option>
+                </select>
+              </div>
+              <div class="modalActions">
+                <button
+                  type="button"
+                  onclick="closeEditModal()"
+                  class="btn btnSecondary"
+                >
+                  Cancel
+                </button>
+                <button type="submit" class="btn btnPrimary">
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       </div>
 
       <!-- View Agent Modal -->
       <div id="view-modal" class="modal hidden">
-        <div class="modalContent">
-          <div class="modalHeader">
-            <h3>Agent Details</h3>
-            <button onclick="closeViewModal()" class="modalClose">
-              &times;
-            </button>
-          </div>
-          <div class="agentDetails" id="agent-details">
-            <!-- Agent details will be loaded here -->
-          </div>
-          <div class="modalActions">
-            <button onclick="closeViewModal()" class="btn btnSecondary">
-              Close
-            </button>
-            <button onclick="editFromView()" class="btn btnPrimary">
-              Edit Agent
-            </button>
+        <div class="modalContentWrapper">
+          <div class="modalContent">
+            <div class="modalHeader">
+              <h3>Agent Details</h3>
+              <button onclick="closeViewModal()" class="modalClose">
+                &times;
+              </button>
+            </div>
+            <div class="agentDetails" id="agent-details">
+              <!-- Agent details will be loaded here -->
+            </div>
+            <div class="modalActions">
+              <button onclick="closeViewModal()" class="btn btnSecondary">
+                Close
+              </button>
+              <button onclick="editFromView()" class="btn btnPrimary">
+                Edit Agent
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -411,53 +422,43 @@
           currentAgentId = agentId;
 
           const detailsHtml = `
-                    <div class="detailItem">
-                        <label>Username:</label>
-                        <span>${agent.username}</span>
-                    </div>
-                    <div class="detailItem">
-                        <label>Email:</label>
-                        <span>${agent.email}</span>
-                    </div>
-                    <div class="detailItem">
-                        <label>First Name:</label>
-                        <span>${agent.first_name || "N/A"}</span>
-                    </div>
-                    <div class="detailItem">
-                        <label>Last Name:</label>
-                        <span>${agent.last_name || "N/A"}</span>
-                    </div>
-                    <div class="detailItem">
-                        <label>Phone:</label>
-                        <span>${agent.phone_number || "N/A"}</span>
-                    </div>
-                    <div class="detailItem">
-                        <label>Company:</label>
-                        <span>${agent.company_name || "N/A"}</span>
-                    </div>
-                    <div class="detailItem">
-                        <label>Status:</label>
-                        <span class="agentStatus ${
-                          agent.is_active ? "active" : "inactive"
-                        }">
-                            ${agent.is_active ? "Active" : "Inactive"}
-                        </span>
-                    </div>
-                    <div class="detailItem">
-                        <label>Date Joined:</label>
-                        <span>${new Date(
-                          agent.date_joined
-                        ).toLocaleDateString()}</span>
-                    </div>
-                    <div class="detailItem">
-                        <label>Last Login:</label>
-                        <span>${
-                          agent.last_login
-                            ? new Date(agent.last_login).toLocaleDateString()
-                            : "Never"
-                        }</span>
-                    </div>
-                `;
+            <div class="agentProfileContainer">
+              <div class="agentProfileImage">
+                <img src="${
+                  agent.profile_picture ||
+                  "https://i.pinimg.com/1200x/a9/a8/c8/a9a8c8258957c8c7d6fcd320e9973203.jpg"
+                }" alt="${agent.username}">
+              </div>
+              <div class="agentProfileInfo">
+                <h3>${agent.first_name || ""} ${agent.last_name || ""}</h3>
+                <p class="agentUsername">@${agent.username}</p>
+                <div class="agentInfoGrid">
+                  <div><strong>Email:</strong> ${agent.email}</div>
+                  <div><strong>Phone:</strong> ${
+                    agent.phone_number || "N/A"
+                  }</div>
+                  <div><strong>Company:</strong> ${
+                    agent.company_name || "N/A"
+                  }</div>
+                  <div><strong>Status:</strong> 
+                    <span class="agentStatus ${
+                      agent.is_active ? "active" : "inactive"
+                    }">
+                      ${agent.is_active ? "Active" : "Inactive"}
+                    </span>
+                  </div>
+                  <div><strong>Date Joined:</strong> ${new Date(
+                    agent.date_joined
+                  ).toLocaleDateString()}</div>
+                  <div><strong>Last Login:</strong> ${
+                    agent.last_login
+                      ? new Date(agent.last_login).toLocaleDateString()
+                      : "Never"
+                  }</div>
+                </div>
+              </div>
+            </div>
+          `;
 
           document.getElementById("agent-details").innerHTML = detailsHtml;
           document.getElementById("view-modal").classList.remove("hidden");
@@ -469,6 +470,13 @@
 
       // Edit agent
       async function editAgent(agentId) {
+        // check
+        if (!agentId) {
+            console.error("❌ editAgent called with null/undefined ID");
+            showToast("Invalid agent ID — please refresh and try again.", "error");
+            return;
+          }
+
         try {
           const response = await fetch(`/api/v1/users/${agentId}/`, {
             method: "GET",
