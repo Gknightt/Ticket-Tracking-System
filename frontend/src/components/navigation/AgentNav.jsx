@@ -152,7 +152,11 @@ export default function AgentNav() {
         </div>
 
         {openNotifModal && (
-          <Notification closeNotifAction={() => setOpenNotifModal(false)} />
+          <Notification
+            closeNotifAction={() => setOpenNotifModal(false)}
+            // pass the parent's fetchNotifications so the nav badge can refresh
+            parentFetchNotifications={fetchNotifications}
+          />
         )}
         {openProfileModal && (
           <ProfileModal closeProfileAction={() => setOpenProfileModal(false)} />

@@ -211,3 +211,15 @@
 .nDeleteButton i:hover {
   color: #ef4444;
 }
+
+/* small blue dot to indicate unread notifications (like Facebook) */
+.nUnreadDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #2563eb; /* blue-600 */
+  margin-left: 8px;
+  flex-shrink: 0;
+  align-self: center;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
