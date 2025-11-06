@@ -10,7 +10,7 @@ router = DefaultRouter()
 # router.register(r'actions', ActionViewSet, basename='action')
 
 urlpatterns = [
-    path('api/', include(router.urls)),
-    path('api/workflows/save-graph/', SaveGraphView.as_view(), name='save-graph'),
-    path("api/graph/<uuid:workflow_id>/", WorkflowGraphView.as_view(), name="workflow-graph"),
+    path('', include(router.urls)),
+    path('workflows/save-graph/', SaveGraphView.as_view(), name='save-graph'),
+    path('graph/<uuid:workflow_id>/', WorkflowGraphView.as_view(), name='workflow-graph'),
 ]

@@ -4,61 +4,24 @@ from datetime import timedelta
 from dotenv import load_dotenv
 import dj_database_url
 
-# Base directory of the project
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Load environment variables from .env file only if not in production/containerized environment
-# This ensures docker-compose environment variables take precedence
+# Load environment variables from .env file if not in production
 if not os.getenv('DJANGO_ENV') == 'production':
-    LOCAL_ENV = BASE_DIR / '.env'
-    load_dotenv(dotenv_path=LOCAL_ENV)
+    load_dotenv(BASE_DIR / '.env')
 
-# Security settings - prioritize environment variables from docker-compose
+# SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-$6412+n(t#!#4zo%akvxla5cub-u-i8!ulxck68_+97g_z066^')
-DEBUG = os.getenv('DJANGO_DEBUG', 'False') == 'True'  # Default to False for security
-# ALLOWED_HOSTS = ['*'] if DEBUG else os.getenv('DJANGO_ALLOWED_HOSTS', '*').split(',')
+
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() == 'false'
+
 ALLOWED_HOSTS = ['*']
 
-
-# Queue names
-DJANGO_NOTIFICATION_QUEUE = os.getenv('DJANGO_NOTIFICATION_QUEUE', 'notification-queue-default')
-DJANGO_TICKET_STATUS_QUEUE = os.getenv('DJANGO_TICKET_STATUS_QUEUE', 'ticket_status-default')
-
-# Function to print environment variables check only once
-def print_env_check_once():
-    # Setting a flag to indicate the check has been run
-    if not hasattr(print_env_check_once, 'has_run'):
-        print("=============================")
-        print("Environment variables check:")
-        print(f"DJANGO_ENV: {os.getenv('DJANGO_ENV', 'Not set')} (production or development)")
-        print(f"DJANGO_DEBUG: {os.getenv('DJANGO_DEBUG', 'Not set')} (Current DEBUG setting: {DEBUG})")
-        print(f"DJANGO_SECRET_KEY: {'Set' if os.getenv('DJANGO_SECRET_KEY') else 'Not set - using default'}")
-        print(f"DATABASE_URL: {os.getenv('DATABASE_URL', 'Not set')}")
-        if 'default' in DATABASES:
-            if 'ENGINE' in DATABASES['default']:
-                print(f"Current DB Engine: {DATABASES['default']['ENGINE']}")
-            else:
-                print("Current DB Engine: Using dj_database_url config")
-        else:
-            print("Database configuration not yet available")
-        print(f"DJANGO_CELERY_BROKER_URL: {os.getenv('DJANGO_CELERY_BROKER_URL', 'Not set')}")
-        print(f"DJANGO_NOTIFICATION_QUEUE: {os.getenv('DJANGO_NOTIFICATION_QUEUE', 'Not set')} (Using: {DJANGO_NOTIFICATION_QUEUE})")
-        print(f"DJANGO_TICKET_STATUS_QUEUE: {os.getenv('DJANGO_TICKET_STATUS_QUEUE', 'Not set')} (Using: {DJANGO_TICKET_STATUS_QUEUE})")
-        print(f"DJANGO_USER_SERVICE: {os.getenv('DJANGO_USER_SERVICE', 'Not set')}")
-        print(f"DJANGO_AUTH_SERVICE: {os.getenv('DJANGO_AUTH_SERVICE', 'Not set')}")
-        print(f"DJANGO_ALLOWED_HOSTS: {os.getenv('DJANGO_ALLOWED_HOSTS', 'Not set')} (Using: {ALLOWED_HOSTS})")
-        if not os.getenv('DJANGO_ENV') == 'production' and 'LOCAL_ENV' in globals():
-            print(f".env file location: {LOCAL_ENV}")
-            print(f".env file exists: {os.path.exists(LOCAL_ENV)}")
-        else:
-            print(".env file location: Not used in production")
-            print(".env file exists: N/A")
-        print("=============================\n")
-        print_env_check_once.has_run = True
-
-# Installed apps
+# Application definition
 INSTALLED_APPS = [
-    # Django default apps
+    # Django apps
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -79,7 +42,7 @@ INSTALLED_APPS = [
     'bmscheckout',
     'workflowmanager',
 
-    # Third-party dependencies
+    # Third-party apps
     'rest_framework',
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
@@ -88,7 +51,6 @@ INSTALLED_APPS = [
     'drf_spectacular',
 ]
 
-# Middleware
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
@@ -101,10 +63,8 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-# URL configuration
 ROOT_URLCONF = 'workflow_api.urls'
 
-# Templates
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -120,11 +80,10 @@ TEMPLATES = [
     },
 ]
 
-# WSGI application
 WSGI_APPLICATION = 'workflow_api.wsgi.application'
 
 # Database
-if os.getenv('DJANGO_ENV') == 'production':
+if os.getenv('DATABASE_URL'):
     DATABASES = {
         'default': dj_database_url.config(
             default=os.environ.get('DATABASE_URL')
@@ -138,10 +97,7 @@ else:
         }
     }
 
-# Print environment variables check once after database configuration
-print_env_check_once()
-
-# Authentication and password validation
+# Password validation
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
@@ -155,26 +111,30 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
-# Static files
-STATIC_URL = 'static/'
+# Static files (CSS, JavaScript, Images)
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Media files
 MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_ROOT = BASE_DIR / 'media'
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# REST framework settings
+# Django REST Framework
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
+    'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ),
-    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
+    ],
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend'
+    ],
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
-# Simple JWT settings
+# JWT Settings
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
@@ -183,84 +143,33 @@ SIMPLE_JWT = {
     'ALGORITHM': 'HS256',
     'SIGNING_KEY': SECRET_KEY,
     'AUTH_HEADER_TYPES': ('Bearer',),
-    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
-    'USER_ID_FIELD': 'id',
-    'USER_ID_CLAIM': 'user_id',
-    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
 }
 
-# CORS settings
+# CORS Settings
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:1000",  # Frontend URL
+    "http://localhost:1000",
     "http://127.0.0.1:1000",
 ]
-CORS_ALLOW_METHODS = [
-    'DELETE',
-    'GET',
-    'OPTIONS',
-    'PATCH',
-    'POST',
-    'PUT',
-]
-CORS_ALLOW_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
-    'x-csrftoken',
-    'x-requested-with',
-]
 
-# Logging
-# LOGGING = {
-#     'version': 1,
-#     'disable_existing_loggers': False,
-#     'formatters': {
-#         'verbose': {
-#             'format': '{asctime} [{levelname}] {name} — {message}',
-#             'style': '{',
-#         },
-#     },
-#     'handlers': {
-#         'workflow_file': {
-#             'level': 'DEBUG',
-#             'class': 'logging.FileHandler',
-#             'filename': os.path.join(BASE_DIR, 'logs', 'workflow.log'),
-#             'formatter': 'verbose',
-#         },
-#     },
-#     'loggers': {
-#         'workflow': {
-#             'handlers': ['workflow_file'],
-#             'level': 'DEBUG',
-#             'propagate': False,
-#         },
-#     },
-# }
-
-# Celery settings
-CELERY_BROKER_URL = os.getenv('DJANGO_CELERY_BROKER_URL')
-
-CELERY_TASK_DEFAULT_QUEUE = DJANGO_NOTIFICATION_QUEUE
-CELERY_TASK_DEFAULT_DELIVERY_MODE = 'persistent'
-CELERY_TASK_ACKS_LATE = True
+# Celery Configuration
+CELERY_BROKER_URL = os.getenv('DJANGO_CELERY_BROKER_URL', 'redis://localhost:6379/0')
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
+CELERY_TASK_ACKS_LATE = True
 
-# External service URLs
-USER_SERVICE_URL = os.getenv('DJANGO_USER_SERVICE')
-AUTH_SERVICE_URL = os.getenv('DJANGO_AUTH_SERVICE')
-BASE_URL = os.getenv('DJANGO_USER_SERVICE')
+# Queue Configuration
+DJANGO_NOTIFICATION_QUEUE = os.getenv('DJANGO_NOTIFICATION_QUEUE', 'notification-queue-default')
+DJANGO_TICKET_STATUS_QUEUE = os.getenv('DJANGO_TICKET_STATUS_QUEUE', 'ticket_status-default')
 
+CELERY_TASK_DEFAULT_QUEUE = DJANGO_NOTIFICATION_QUEUE
 CELERY_TASK_ROUTES = {
     "notifications.tasks.create_assignment_notification": {"queue": DJANGO_NOTIFICATION_QUEUE},
     'send_ticket_status': {'queue': DJANGO_TICKET_STATUS_QUEUE},
 }
 
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# External Services
+USER_SERVICE_URL = os.getenv('DJANGO_USER_SERVICE')
+AUTH_SERVICE_URL = os.getenv('DJANGO_AUTH_SERVICE')
+BASE_URL = os.getenv('DJANGO_USER_SERVICE')
