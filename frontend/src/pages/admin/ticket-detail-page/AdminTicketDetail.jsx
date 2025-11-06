@@ -21,7 +21,7 @@ import Messaging from "../../../components/component/Messaging";
 import useFetchActionLogs from "../../../api/workflow-graph/useActionLogs";
 import ActionLogList from "../../../components/ticket/ActionLogList";
 import { useWorkflowProgress } from "../../../api/workflow-graph/useWorkflowProgress";
-import useUserTickets from "../../../api/useUserTickets";
+import useSecureStepInstance from "../../../api/useSecureStepInstance";
 import { useAuth } from "../../../api/AuthContext";
 
 // modal
@@ -32,7 +32,7 @@ export default function AdminTicketDetail() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { id } = useParams();
-  const { userTickets } = useUserTickets();
+  const { stepInstance, loading: instanceLoading, error: instanceError } = useSecureStepInstance(id);
 
   // Tabs with URL sync
   const [searchParams, setSearchParams] = useSearchParams();
@@ -111,33 +111,45 @@ export default function AdminTicketDetail() {
   }, [state.ticket?.created_at]);
 
   useEffect(() => {
-    if (!userTickets || userTickets.length === 0) return;
+    // Handle loading state
+    if (instanceLoading) {
+      setLoading(true);
+      return;
+    }
 
-    const matchedInstance = userTickets.find(
-      (instance) => instance.step_instance_id === id
-    );
-
-    if (!matchedInstance) {
-      setError("Ticket not found.");
+    // Handle error state
+    if (instanceError) {
+      setError(instanceError);
+      setLoading(false);
       dispatch({ type: "RESET" });
-    } else {
+      return;
+    }
+
+    // Handle successful data
+    if (stepInstance) {
       dispatch({
         type: "SET_TICKET",
         payload: {
           ticket: {
-            ...matchedInstance.task.ticket,
-            hasacted: matchedInstance.has_acted,
+            ...stepInstance.task.ticket,
+            hasacted: stepInstance.has_acted,
           },
-          action: matchedInstance.available_actions || [],
-          instruction: matchedInstance.step.instruction,
-          instance: matchedInstance.step_instance_id,
-          taskid: matchedInstance.task.task_id,
+          action: stepInstance.available_actions || [],
+          instruction: stepInstance.step.instruction,
+          instance: stepInstance.step_instance_id,
+          taskid: stepInstance.task.task_id,
         },
       });
       setError("");
+      setLoading(false);
+    } else if (!instanceLoading) {
+      // Only set error if not loading and no data
+      setError("Step instance not found.");
+      setLoading(false);
+      dispatch({ type: "RESET" });
     }
-    setLoading(false);
-  }, [userTickets, id]);
+  }, [stepInstance, instanceLoading, instanceError]);
+
   const { fetchActionLogs, logs } = useFetchActionLogs();
   useEffect(() => {
     if (state.taskid) {

@@ -1,7 +1,11 @@
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import ListAPIView, RetrieveAPIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.http import JsonResponse
 from .models import StepInstance
 from .serializers import StepInstanceSerializer
 from .services import EmployeeService
+from authentication import JWTCookieAuthentication, TTSSystemPermission
 
 
 class StepInstanceView(ListAPIView):
@@ -118,3 +122,88 @@ class StepInstanceView(ListAPIView):
                 print(f"list: Successfully processed {len(employee_info_map)} employee records")
         
         return response
+
+
+class SecureStepInstanceDetailView(RetrieveAPIView):
+    """
+    Secure view for retrieving a specific step instance by step_instance_id.
+    Only accessible if the authenticated user is assigned to the step instance.
+    """
+    serializer_class = StepInstanceSerializer
+    authentication_classes = [JWTCookieAuthentication]
+    permission_classes = [TTSSystemPermission]
+    lookup_field = 'step_instance_id'
+    lookup_url_kwarg = 'step_instance_id'
+
+    def get_queryset(self):
+        return StepInstance.objects.all()
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Override retrieve method to check user authorization and populate employee information.
+        """
+        try:
+            step_instance_id = kwargs.get('step_instance_id')
+            
+            # Get the step instance
+            try:
+                step_instance = StepInstance.objects.get(step_instance_id=step_instance_id)
+            except StepInstance.DoesNotExist:
+                return JsonResponse(
+                    {'error': 'Step instance not found'}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            # Check if the authenticated user is authorized to view this step instance
+            authenticated_user_id = request.user.user_id
+            step_instance_user_id = step_instance.user_id
+            
+            if str(authenticated_user_id) != str(step_instance_user_id):
+                return JsonResponse(
+                    {
+                        'error': 'No authorization to handle this ticket',
+                        'message': f'This step instance is assigned to a different user'
+                    }, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            # Serialize the step instance
+            serializer = self.get_serializer(step_instance)
+            response_data = serializer.data
+
+            # Populate employee information if needed
+            task_data = response_data.get('task')
+            if task_data and 'ticket' in task_data:
+                ticket_data = task_data['ticket']
+                
+                # Check if employee is null but employee_cookie_id exists
+                if ticket_data.get('employee') is None and ticket_data.get('employee_cookie_id'):
+                    employee_service = EmployeeService(request)
+                    employee_cookie_id = ticket_data.get('employee_cookie_id')
+                    
+                    # Fetch employee info
+                    employee_info_map = employee_service.fetch_multiple_employees_info({employee_cookie_id})
+                    employee_info = employee_info_map.get(str(employee_cookie_id))
+                    
+                    if employee_info:
+                        # Update the database record
+                        try:
+                            ticket = step_instance.task_id.ticket
+                            ticket.employee = employee_info
+                            ticket.save(update_fields=['employee'])
+                            
+                            # Update the response data
+                            ticket_data['employee'] = employee_info
+                            
+                        except Exception as e:
+                            print(f"Error updating ticket employee info: {e}")
+                            # Still update the response data even if database update fails
+                            ticket_data['employee'] = employee_info
+
+            return Response(response_data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return JsonResponse(
+                {'error': f'Internal server error: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
