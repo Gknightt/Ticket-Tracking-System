@@ -1,91 +1,13 @@
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from .models import StepInstance
-from rest_framework.generics import CreateAPIView
 from rest_framework.generics import ListAPIView
-from rest_framework.response import Response
-from rest_framework import status
-from .serializers import TriggerNextStepSerializer
-from action.serializers import ActionSerializer  # You'll need to create this
-from step.models import StepTransition
+from .models import StepInstance
+from .serializers import StepInstanceSerializer
+from .services import EmployeeService
 
 
-class AvailableActionsView(APIView):
-    def get(self, request, step_instance_id):
-        try:
-            instance = StepInstance.objects.get(step_instance_id=step_instance_id)
-        except StepInstance.DoesNotExist:
-            return Response({'detail': 'StepInstance not found'}, status=status.HTTP_404_NOT_FOUND)
-
-        current_step = instance.step_transition_id.to_step_id
-        transitions = StepTransition.objects.filter(from_step_id=current_step)
-        actions = [t.action_id for t in transitions if t.action_id]
-
-        serializer = ActionSerializer(actions, many=True)
-        return Response(serializer.data)
-
-
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from .models import StepInstance, StepTransition
-from .serializers import TriggerNextStepSerializer, StepInstanceSerializer
-from rest_framework.generics import CreateAPIView
-from rest_framework.exceptions import NotFound
-from django_filters.rest_framework import DjangoFilterBackend
-class TriggerNextStepView(CreateAPIView):
-    queryset = StepInstance.objects.all()
-    serializer_class = TriggerNextStepSerializer
-
-    def get(self, request, step_instance_id):
-        try:
-            instance = StepInstance.objects.get(step_instance_id=step_instance_id)
-        except StepInstance.DoesNotExist:
-            return Response({'detail': 'StepInstance not found'}, status=status.HTTP_404_NOT_FOUND)
-
-        # Find the current step based on the transition taken to reach this instance
-        current_step = instance.step_transition_id.to_step_id
-        if not current_step:
-            return Response({'detail': 'This step does not transition to another step.'}, status=status.HTTP_204_NO_CONTENT)
-
-        transitions = StepTransition.objects.filter(from_step_id=current_step).select_related('action_id')
-        actions = [t.action_id for t in transitions if t.action_id]
-
-        serialized_actions = ActionSerializer(actions, many=True).data
-        return Response({
-            'step_instance_id': step_instance_id,
-            'current_step_id': current_step.step_id,
-            'available_actions': serialized_actions
-        })
-
-    def get_step_instance(self):
-        try:
-            return StepInstance.objects.get(step_instance_id=self.kwargs['step_instance_id'])
-        except StepInstance.DoesNotExist:
-            raise NotFound('StepInstance not found')
-
-    def create(self, request, *args, **kwargs):
-        step_instance = self.get_step_instance()
-
-        serializer = self.get_serializer(data=request.data, context={'step_instance': step_instance})
-        serializer.is_valid(raise_exception=True)
-        result = serializer.save()
-
-        # Check if we're at the end (no new step was created)
-        if result == step_instance:
-            return Response({
-                'message': 'complete, workflow ended',
-            }, status=status.HTTP_200_OK)
-
-        # If a new step was created
-        return Response({
-            'message': 'Step instance created',
-            'step_instance_id': result.step_instance_id
-        }, status=status.HTTP_201_CREATED)
-
-    
 class StepInstanceView(ListAPIView):
+    """
+    Main view for listing step instances with employee information populated.
+    """
     serializer_class = StepInstanceSerializer
 
     def get_queryset(self):
@@ -101,6 +23,98 @@ class StepInstanceView(ListAPIView):
             queryset = queryset.filter(user_id=user_id)
 
         # Sort by latest created
-        queryset = queryset.order_by('-created_at')  # Assuming 'created_at' is the field for creation timestamp
+        queryset = queryset.order_by('-created_at')
 
         return queryset
+
+    def list(self, request, *args, **kwargs):
+        """
+        Override list method to populate employee information before returning response.
+        Optimized to batch employee info requests.
+        """
+        response = super().list(request, *args, **kwargs)
+        
+        print(f"list: Response status code: {response.status_code}")
+        
+        # Process each step instance to populate employee information
+        if response.status_code == 200:
+            # Handle both paginated and non-paginated responses
+            step_instances_data = []
+            if 'results' in response.data:
+                step_instances_data = response.data['results']
+            elif isinstance(response.data, list):
+                step_instances_data = response.data
+            else:
+                return response
+            
+            # Use the EmployeeService to handle employee info fetching
+            employee_service = EmployeeService(request)
+            
+            # Collect all employee_cookie_ids that need fetching
+            tickets_needing_employee_info = []
+            employee_cookie_ids_to_fetch = set()
+            
+            for step_instance_data in step_instances_data:
+                task_data = step_instance_data.get('task')
+                if task_data and 'ticket' in task_data:
+                    ticket_data = task_data['ticket']
+                    
+                    # Check if employee is null but employee_cookie_id exists
+                    if ticket_data.get('employee') is None and ticket_data.get('employee_cookie_id'):
+                        print(f"list: Ticket {ticket_data.get('id')} needs employee info for cookie_id: {ticket_data.get('employee_cookie_id')}")
+                        tickets_needing_employee_info.append({
+                            'step_instance_data': step_instance_data,
+                            'ticket_data': ticket_data,
+                            'employee_cookie_id': ticket_data.get('employee_cookie_id')
+                        })
+                        employee_cookie_ids_to_fetch.add(ticket_data.get('employee_cookie_id'))
+            
+            print(f"list: Found {len(tickets_needing_employee_info)} tickets needing employee info")
+            print(f"list: Unique employee_cookie_ids to fetch: {employee_cookie_ids_to_fetch}")
+            
+            # Fetch all employee info in one batch request
+            if employee_cookie_ids_to_fetch:
+                employee_info_map = employee_service.fetch_multiple_employees_info(employee_cookie_ids_to_fetch)
+                print(f"list: Received employee_info_map: {employee_info_map}")
+                
+                # Update tickets with fetched employee info
+                for ticket_info in tickets_needing_employee_info:
+                    employee_cookie_id = ticket_info['employee_cookie_id']
+                    # Convert to string to match the JSON response key format
+                    employee_info = employee_info_map.get(str(employee_cookie_id))
+                    ticket_id = ticket_info['ticket_data'].get('id')
+                    
+                    print(f"list: Processing ticket {ticket_id} with employee_cookie_id {employee_cookie_id}")
+                    print(f"list: Looking up employee info with key: '{employee_cookie_id}' (string version)")
+                    print(f"list: Employee info for cookie_id {employee_cookie_id}: {employee_info}")
+                    
+                    if employee_info:
+                        # Update the database record
+                        try:
+                            step_instance = StepInstance.objects.get(
+                                step_instance_id=ticket_info['step_instance_data']['step_instance_id']
+                            )
+                            ticket = step_instance.task_id.ticket
+                            
+                            print(f"list: Before update - ticket {ticket.id} employee field: {ticket.employee}")
+                            ticket.employee = employee_info
+                            ticket.save(update_fields=['employee'])
+                            print(f"list: After update - ticket {ticket.id} employee field: {ticket.employee}")
+                            
+                            # Update the response data
+                            print(f"list: Before response update - ticket_data employee: {ticket_info['ticket_data'].get('employee')}")
+                            ticket_info['ticket_data']['employee'] = employee_info
+                            print(f"list: After response update - ticket_data employee: {ticket_info['ticket_data'].get('employee')}")
+                            
+                        except Exception as e:
+                            print(f"list: Error updating ticket {ticket_id}: {e}")
+                            # Still update the response data even if database update fails
+                            ticket_info['ticket_data']['employee'] = employee_info
+                            print(f"list: Updated response data only for ticket {ticket_id}")
+                    else:
+                        print(f"list: No employee info found for cookie_id {employee_cookie_id}")
+                        print(f"list: Available keys in employee_info_map: {list(employee_info_map.keys())}")
+                
+                print(f"list: Successfully processed {len(employee_info_map)} employee records")
+        
+        return response

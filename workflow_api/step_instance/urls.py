@@ -1,5 +1,7 @@
 from django.urls import path
-from .views import TriggerNextStepView, AvailableActionsView, StepInstanceView
+from .views import StepInstanceView
+from .action_views import AvailableActionsView
+from .trigger_views import TriggerNextStepView
 
 urlpatterns = [
     path('<str:step_instance_id>/actions/', AvailableActionsView.as_view()),
