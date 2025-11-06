@@ -123,9 +123,9 @@ class Command(BaseCommand):
             # Comprehensive workflow definitions with department-specific metadata
             workflows_to_create = [
                 {
-                    "name": "Asset - Asset Check-in",
-                    "category": "Asset Category",
-                    "sub_category": "Asset Check-in",
+                    "name": "Asset Check In Workflow",
+                    "category": "Asset Check In",
+                    "sub_category": "Check In Process",
                     "department": "Asset Department",
                     "description": "Workflow for checking in company assets. (Triage -> Resolve -> Finalize)",
                     "steps_config": create_3_step_config(
@@ -135,9 +135,9 @@ class Command(BaseCommand):
                     )
                 },
                 {
-                    "name": "Asset - Asset Check-out",
-                    "category": "Asset Category",
-                    "sub_category": "Asset Check-out",
+                    "name": "Asset Check Out Workflow",
+                    "category": "Asset Check Out",
+                    "sub_category": "Check Out Process",
                     "department": "Asset Department",
                     "description": "Workflow for checking out company assets. (Triage -> Resolve -> Finalize)",
                     "steps_config": create_3_step_config(
@@ -147,9 +147,9 @@ class Command(BaseCommand):
                     )
                 },
                 {
-                    "name": "Budget - Project Proposal",
-                    "category": "Budget Category",
-                    "sub_category": "Project Proposal",
+                    "name": "New Budget Proposal Workflow",
+                    "category": "New Budget Proposal",
+                    "sub_category": "Budget Approval Process",
                     "department": "Budget Department",
                     "description": "Workflow for submitting and approving new project proposals. (Triage -> Resolve -> Finalize)",
                     "steps_config": create_3_step_config(
@@ -159,8 +159,8 @@ class Command(BaseCommand):
                     )
                 },
                 {
-                    "name": "IT - Access Request",
-                    "category": "IT Category",
+                    "name": "IT Support Access Request Workflow",
+                    "category": "IT Support",
                     "sub_category": "Access Request",
                     "department": "IT Department",
                     "description": "Workflow for requesting access to systems or applications. (Triage -> Resolve -> Finalize)",
@@ -171,8 +171,8 @@ class Command(BaseCommand):
                     )
                 },
                 {
-                    "name": "IT - Software Installation",
-                    "category": "IT Category",
+                    "name": "IT Support Software Installation Workflow",
+                    "category": "IT Support",
                     "sub_category": "Software Installation",
                     "department": "IT Department",
                     "description": "Workflow for requesting software installation. (Triage -> Resolve -> Finalize)",

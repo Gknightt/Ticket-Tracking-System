@@ -14,26 +14,38 @@ from django.db import transaction
 def receive_ticket(ticket_data):
     import traceback
     try:
-        # ✅ Normalize keys
-        if 'ticket_number' in ticket_data:
-            ticket_data['ticket_id'] = ticket_data.pop('ticket_number')
-        if 'sub_category' in ticket_data:
-            ticket_data['subcategory'] = ticket_data.pop('sub_category')
+        # ✅ Map incoming fields to model fields
+        field_mapping = {
+            'id': 'original_ticket_id',
+            'ticket_number': 'ticket_number',
+            'sub_category': 'sub_category',
+        }
+        
+        # Apply field mapping
+        for old_key, new_key in field_mapping.items():
+            if old_key in ticket_data:
+                ticket_data[new_key] = ticket_data.pop(old_key)
 
-        # ✅ Parse datetime and durations
-        if isinstance(ticket_data.get('opened_on'), str):
-            try:
-                ticket_data['opened_on'] = datetime.fromisoformat(ticket_data['opened_on']).date()
-            except Exception:
-                ticket_data['opened_on'] = None
+        # ✅ Parse datetime fields
+        datetime_fields = ['submit_date', 'update_date', 'fetched_at']
+        for field in datetime_fields:
+            if isinstance(ticket_data.get(field), str):
+                try:
+                    dt = parse_datetime(ticket_data[field])
+                    ticket_data[field] = make_aware(dt) if dt and dt.tzinfo is None else dt
+                except Exception:
+                    ticket_data[field] = None
 
-        if isinstance(ticket_data.get('fetched_at'), str):
-            try:
-                dt = parse_datetime(ticket_data['fetched_at'])
-                ticket_data['fetched_at'] = make_aware(dt) if dt and dt.tzinfo is None else dt
-            except Exception:
-                ticket_data['fetched_at'] = None
+        # ✅ Parse date fields
+        date_fields = ['scheduled_date', 'expected_return_date', 'performance_start_date', 'performance_end_date']
+        for field in date_fields:
+            if isinstance(ticket_data.get(field), str):
+                try:
+                    ticket_data[field] = datetime.fromisoformat(ticket_data[field]).date()
+                except Exception:
+                    ticket_data[field] = None
 
+        # ✅ Parse duration fields
         for dur_field in ['response_time', 'resolution_time']:
             if isinstance(ticket_data.get(dur_field), str):
                 try:
@@ -42,17 +54,39 @@ def receive_ticket(ticket_data):
                 except Exception:
                     ticket_data[dur_field] = None
 
-        # ✅ Filter allowed fields
+        # ✅ Handle decimal fields
+        if ticket_data.get('requested_budget'):
+            try:
+                ticket_data['requested_budget'] = float(ticket_data['requested_budget'])
+            except (ValueError, TypeError):
+                ticket_data['requested_budget'] = None
+
+        # ✅ Ensure JSON fields have proper defaults
+        if 'dynamic_data' not in ticket_data or ticket_data['dynamic_data'] is None:
+            ticket_data['dynamic_data'] = {}
+        if 'attachments' not in ticket_data or ticket_data['attachments'] is None:
+            ticket_data['attachments'] = []
+        if 'cost_items' not in ticket_data or ticket_data['cost_items'] is None:
+            ticket_data['cost_items'] = None
+
+        # ✅ Filter allowed fields for the updated model
         allowed_fields = {
-            'ticket_id', 'subject', 'employee', 'priority', 'status', 'opened_on', 'sla',
-            'description', 'department', 'position', 'fetched_at', 'category', 'subcategory',
-            'original_ticket_id', 'source_service', 'attachments', 'is_task_allocated',
-            'submit_date', 'update_date', 'response_time', 'resolution_time', 'time_closed', 'rejection_reason'
+            'ticket_id', 'original_ticket_id', 'ticket_number', 'source_service',
+            'employee', 'employee_cookie_id',
+            'subject', 'category', 'subcategory', 'sub_category', 'description', 
+            'scheduled_date', 'submit_date', 'update_date', 'assigned_to',
+            'priority', 'status', 'department',
+            'asset_name', 'serial_number', 'location', 'expected_return_date', 'issue_type', 'other_issue',
+            'performance_start_date', 'performance_end_date',
+            'approved_by', 'rejected_by', 'cost_items', 'requested_budget', 'fiscal_year', 'department_input',
+            'dynamic_data', 'attachments',
+            'response_time', 'resolution_time', 'time_closed', 'rejection_reason',
+            'is_task_allocated', 'fetched_at'
         }
         ticket_data = {k: v for k, v in ticket_data.items() if k in allowed_fields}
 
         # ✅ Validate required fields
-        required_fields = ['ticket_id', 'category', 'subcategory']
+        required_fields = ['subject']
         missing = [field for field in required_fields if not ticket_data.get(field)]
         if missing:
             return {
@@ -98,17 +132,34 @@ def receive_ticket(ticket_data):
                 print(f"❌ Error processing attachment {file_url}: {e}")
                 continue
 
+        ticket_data["attachments"] = validated_attachments
+
         # ✅ Create and save with explicit transaction
         with transaction.atomic():
-            ticket = WorkflowTicket(**ticket_data)
-            ticket.full_clean()
-            ticket.save()
+            # Use update_or_create to handle duplicates based on original_ticket_id or ticket_number
+            lookup_fields = {}
+            if ticket_data.get('original_ticket_id'):
+                lookup_fields['original_ticket_id'] = ticket_data['original_ticket_id']
+            elif ticket_data.get('ticket_number'):
+                lookup_fields['ticket_number'] = ticket_data['ticket_number']
+            
+            if lookup_fields:
+                ticket, created = WorkflowTicket.objects.update_or_create(
+                    **lookup_fields,
+                    defaults=ticket_data
+                )
+                action = "created" if created else "updated"
+            else:
+                ticket = WorkflowTicket(**ticket_data)
+                ticket.full_clean()
+                ticket.save()
+                action = "created"
             
             # Force a database query to verify the save worked
             saved_ticket = WorkflowTicket.objects.get(pk=ticket.pk)
-            print(f"✅ Verified ticket saved with ID: {saved_ticket.pk}")
+            print(f"✅ Verified ticket {action} with ID: {saved_ticket.pk}")
 
-        return {"status": "success", "ticket_id": ticket.ticket_id}
+        return {"status": "success", "ticket_id": ticket.ticket_id or ticket.original_ticket_id, "action": action}
 
     except ValidationError as ve:
         return {

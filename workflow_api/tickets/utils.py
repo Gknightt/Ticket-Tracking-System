@@ -7,22 +7,19 @@ def allocate_task_for_ticket(ticket):
     """
     Create Tasks for every Workflows entry whose:
     - department matches ticket.department (case-insensitive),
-    - category matches ticket.category (case-insensitive),
-    - sub_category matches ticket.subcategory (case-insensitive).
+    - category matches ticket.category (case-insensitive).
 
     Returns True if at least one Task was created (or already existed).
     """
     dep = (ticket.department or '').strip()
     cat = (ticket.category or '').strip()
-    sub = (ticket.subcategory or '').strip()
 
-    if not (dep and cat and sub):
+    if not (dep and cat):
         return False
 
     workflows = Workflows.objects.filter(
         department__iexact=dep,
-        category__iexact=cat,
-        sub_category__iexact=sub
+        category__iexact=cat
     )
 
     created_any = False
