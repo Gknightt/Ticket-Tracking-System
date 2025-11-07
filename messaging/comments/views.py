@@ -368,31 +368,19 @@ class CommentViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], url_path='download-document/(?P<document_id>[^/.]+)')
     def download_document(self, request, document_id=None):
         """
-        Download a document by ID
+        Download a document by ID - redirects to cached media endpoint
         """
         try:
+            # Validate document exists
             document = DocumentStorage.objects.get(id=document_id)
             
-            if not document.file_path:
-                raise Http404("File not found")
-            
-            response = HttpResponse(
-                document.file_path.read(),
-                content_type=document.content_type
-            )
-            response['Content-Disposition'] = f'attachment; filename="{document.original_filename}"'
-            response['Content-Length'] = document.file_size
-            
-            return response
+            # Redirect to the cached media view for optimized serving
+            from django.shortcuts import redirect
+            return redirect('cached-document', document_id=document_id)
             
         except DocumentStorage.DoesNotExist:
             raise Http404("Document not found")
-        except Exception as e:
-            return Response(
-                {"error": f"Error downloading file: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
+    
     @extend_schema(
         request=CommentRatingSerializer,
         examples=[
@@ -462,7 +450,7 @@ class CommentRatingViewSet(viewsets.ModelViewSet):
         queryset = CommentRating.objects.all()
         comment_id = self.request.query_params.get('comment_id', None)
         
-        if comment_id is not None:
+        if (comment_id is not None):
             try:
                 comment = Comment.objects.get(comment_id=comment_id)
                 queryset = queryset.filter(comment=comment)
