@@ -4,18 +4,45 @@ from tickets.models import Ticket
 
 class DocumentStorageSerializer(serializers.ModelSerializer):
     download_url = serializers.SerializerMethodField()
+    image_info = serializers.SerializerMethodField()
     
     class Meta:
         model = DocumentStorage
         fields = ['id', 'file_hash', 'original_filename', 'file_size', 'content_type', 
-                 'uploaded_at', 'uploaded_by_name', 'download_url']
-        read_only_fields = ['id', 'file_hash', 'uploaded_at', 'uploaded_by_name']
+                 'uploaded_at', 'uploaded_by_name', 'download_url', 'is_image', 
+                 'image_width', 'image_height', 'image_ratio', 'image_info']
+        read_only_fields = ['id', 'file_hash', 'uploaded_at', 'uploaded_by_name', 
+                           'is_image', 'image_width', 'image_height', 'image_ratio']
     
     def get_download_url(self, obj):
         request = self.context.get('request')
         if request and obj.file_path:
             return request.build_absolute_uri(obj.file_path.url)
         return None
+    
+    def get_image_info(self, obj):
+        """
+        Provide formatted image information for display purposes
+        """
+        if not obj.is_image:
+            return None
+        
+        info = {
+            'dimensions': f"{obj.image_width}x{obj.image_height}" if obj.image_width and obj.image_height else None,
+            'ratio': obj.image_ratio,
+            'orientation': None
+        }
+        
+        # Determine orientation
+        if obj.image_ratio:
+            if obj.image_ratio > 1:
+                info['orientation'] = 'landscape'
+            elif obj.image_ratio < 1:
+                info['orientation'] = 'portrait'
+            else:
+                info['orientation'] = 'square'
+        
+        return info
 
 class CommentDocumentSerializer(serializers.ModelSerializer):
     document = DocumentStorageSerializer(read_only=True)

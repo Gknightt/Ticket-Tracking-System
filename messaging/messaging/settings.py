@@ -103,7 +103,7 @@ REST_FRAMEWORK = {
         'rest_framework.parsers.FormParser',       # Enable form data
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 10,  # Reduced for better testing
+    'PAGE_SIZE': 10,  # Set default page size
     'DEFAULT_FILTER_BACKENDS': [
         'rest_framework.filters.SearchFilter',
         'rest_framework.filters.OrderingFilter',
@@ -116,7 +116,9 @@ REST_FRAMEWORK = {
 }
 
 # Custom pagination class for better control
-class CustomPageNumberPagination:
+from rest_framework.pagination import PageNumberPagination
+
+class CommentsPagination(PageNumberPagination):
     page_size = 10
     page_size_query_param = 'page_size'
     max_page_size = 100
