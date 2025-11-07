@@ -95,24 +95,48 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',  # Enable browsable API
     ],
     'DEFAULT_PARSER_CLASSES': [
         'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.MultiPartParser',  # Enable file uploads
+        'rest_framework.parsers.FormParser',       # Enable form data
     ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 10,  # Reduced for better testing
+    'DEFAULT_FILTER_BACKENDS': [
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ],
+    # Enable HTML forms for file uploads in browsable API
+    'HTML_SELECT_CUTOFF': 1000,
+    'HTML_SELECT_CUTOFF_TEXT': "More than {count} items...",
+    # Improve browsable API rendering
+    'COERCE_DECIMAL_TO_STRING': False,
 }
+
+# Custom pagination class for better control
+class CustomPageNumberPagination:
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+    page_query_param = 'page'
+
 
 # Spectacular settings for API documentation
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Messaging Service API',
-    'DESCRIPTION': 'Ticket-based messaging microservice - blindly trust requests, accommodate multiple users',
+    'DESCRIPTION': 'Ticket-based messaging microservice with document attachment support - blindly trust requests, accommodate multiple users',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
     'COMPONENT_SPLIT_REQUEST': True,
+    'SCHEMA_PATH_PREFIX': r'/api/v[0-9]',
+    'DEFAULT_GENERATOR_CLASS': 'drf_spectacular.generators.SchemaGenerator',
 }
 
 # CORS settings
 _env_origins = os.environ.get('CORS_ALLOWED_ORIGINS')
-if _env_origins:
+if (_env_origins):
     CORS_ALLOWED_ORIGINS = [origin.strip() for origin in _env_origins.split(',') if origin.strip()]
 else:
     CORS_ALLOWED_ORIGINS = [
@@ -170,6 +194,15 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+
+# Media files (uploads)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# File upload settings
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+FILE_UPLOAD_PERMISSIONS = 0o644
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
