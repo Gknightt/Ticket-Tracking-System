@@ -233,7 +233,7 @@ export default function AdminTicketDetail() {
             <div className={styles.layoutSection} style={{ flex: 2 }}>
               <div className={styles.tdpTicketNoWrapper}>
                 <h2 className={styles.tdpTicketNo}>
-                  Ticket No. {state.ticket?.ticket_id}
+                  Ticket No. {state.ticket?.ticket_number}
                 </h2>
                 <div
                   className={
@@ -298,7 +298,7 @@ export default function AdminTicketDetail() {
               </div>
 
               {/* Comments section under attachments */}
-              <TicketComments ticketId={state.ticket?.ticket_id} />
+              <TicketComments ticketId={state.ticket?.ticket_number} />
             </div>
             {/* Right */}
             <div
@@ -409,7 +409,7 @@ export default function AdminTicketDetail() {
                 {activeTab === "Messages" && (
                   <div className={styles.messageSection}>
                     <Messaging
-                      ticket_id={state.ticket?.ticket_id}
+                      ticket_id={state.ticket?.ticket_number}
                       agentName={`${state.ticket?.employee?.first_name} ${state.ticket?.employee?.last_name}`}
                       agentStatus={state.ticket?.status}
                       currentUser={user}
