@@ -10,7 +10,7 @@ export const TicketsProvider = ({ children }) => {
   const [error, setError] = useState("");
 
   const fetchTickets = async () => {
-    const cacheKey = 'instances/simple/';
+    const cacheKey = ' ';
     
     // Check cache first
     const cachedData = memoryCache.get(cacheKey);
