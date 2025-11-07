@@ -1,6 +1,56 @@
 from rest_framework import serializers
-from .models import Comment, CommentRating
+from .models import Comment, CommentRating, DocumentStorage, CommentDocument
 from tickets.models import Ticket
+
+class DocumentStorageSerializer(serializers.ModelSerializer):
+    download_url = serializers.SerializerMethodField()
+    image_info = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = DocumentStorage
+        fields = ['id', 'file_hash', 'original_filename', 'file_size', 'content_type', 
+                 'uploaded_at', 'uploaded_by_name', 'download_url', 'is_image', 
+                 'image_width', 'image_height', 'image_ratio', 'image_info']
+        read_only_fields = ['id', 'file_hash', 'uploaded_at', 'uploaded_by_name', 
+                           'is_image', 'image_width', 'image_height', 'image_ratio']
+    
+    def get_download_url(self, obj):
+        request = self.context.get('request')
+        if request and obj.file_path:
+            return request.build_absolute_uri(obj.file_path.url)
+        return None
+    
+    def get_image_info(self, obj):
+        """
+        Provide formatted image information for display purposes
+        """
+        if not obj.is_image:
+            return None
+        
+        info = {
+            'dimensions': f"{obj.image_width}x{obj.image_height}" if obj.image_width and obj.image_height else None,
+            'ratio': obj.image_ratio,
+            'orientation': None
+        }
+        
+        # Determine orientation
+        if obj.image_ratio:
+            if obj.image_ratio > 1:
+                info['orientation'] = 'landscape'
+            elif obj.image_ratio < 1:
+                info['orientation'] = 'portrait'
+            else:
+                info['orientation'] = 'square'
+        
+        return info
+
+class CommentDocumentSerializer(serializers.ModelSerializer):
+    document = DocumentStorageSerializer(read_only=True)
+    
+    class Meta:
+        model = CommentDocument
+        fields = ['id', 'document', 'attached_at', 'attached_by_name']
+        read_only_fields = ['id', 'attached_at', 'attached_by_name']
 
 class CommentRatingSerializer(serializers.ModelSerializer):
     class Meta:
@@ -19,12 +69,13 @@ class CommentRatingSerializer(serializers.ModelSerializer):
 class ReplySerializer(serializers.ModelSerializer):
     ratings_summary = serializers.SerializerMethodField()
     ticket_id = serializers.SerializerMethodField()
+    documents = CommentDocumentSerializer(many=True, read_only=True)
     
     class Meta:
         model = Comment
         fields = ['comment_id', 'ticket_id', 'user_id', 'firstname', 'lastname', 'role', 
-                 'content', 'created_at', 'thumbs_up_count', 'thumbs_down_count', 'ratings_summary']
-        read_only_fields = ['comment_id', 'created_at', 'thumbs_up_count', 'thumbs_down_count', 'ticket_id']
+                 'content', 'created_at', 'thumbs_up_count', 'thumbs_down_count', 'ratings_summary', 'documents']
+        read_only_fields = ['comment_id', 'created_at', 'thumbs_up_count', 'thumbs_down_count', 'ticket_id', 'documents']
     
     def get_ratings_summary(self, obj):
         return {
@@ -44,13 +95,21 @@ class CommentSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True
     )
+    documents = CommentDocumentSerializer(many=True, read_only=True)
+    # Replace ListField with individual FileFields for better HTML form compatibility
+    document1 = serializers.FileField(write_only=True, required=False, help_text="Upload document 1 (optional)")
+    document2 = serializers.FileField(write_only=True, required=False, help_text="Upload document 2 (optional)")
+    document3 = serializers.FileField(write_only=True, required=False, help_text="Upload document 3 (optional)")
+    document4 = serializers.FileField(write_only=True, required=False, help_text="Upload document 4 (optional)")
+    document5 = serializers.FileField(write_only=True, required=False, help_text="Upload document 5 (optional)")
     
     class Meta:
         model = Comment
         fields = ['comment_id', 'ticket_id', 'user_id', 'firstname', 'lastname', 'role', 
                  'content', 'created_at', 'parent', 'thumbs_up_count', 'thumbs_down_count', 
-                 'replies', 'ratings_summary']
-        read_only_fields = ['comment_id', 'created_at', 'thumbs_up_count', 'thumbs_down_count', 'replies']
+                 'replies', 'ratings_summary', 'documents', 
+                 'document1', 'document2', 'document3', 'document4', 'document5']
+        read_only_fields = ['comment_id', 'created_at', 'thumbs_up_count', 'thumbs_down_count', 'replies', 'documents']
     
     def get_ratings_summary(self, obj):
         return {
@@ -75,12 +134,24 @@ class CommentSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         representation['ticket_id'] = instance.ticket.ticket_id
+        # Remove document fields from output
+        for i in range(1, 6):
+            representation.pop(f'document{i}', None)
         return representation
     
     def validate_ticket_id(self, value):
         return value
     
     def create(self, validated_data):
+        # Extract document fields before creating the comment
+        document_files = []
+        for i in range(1, 6):
+            doc_field = f'document{i}'
+            if doc_field in validated_data:
+                doc_file = validated_data.pop(doc_field)
+                if doc_file:
+                    document_files.append(doc_file)
+        
         ticket_id_str = validated_data.pop('ticket_id', None)
         
         if not ticket_id_str:
@@ -95,4 +166,32 @@ class CommentSerializer(serializers.ModelSerializer):
             ticket = Ticket.objects.create(ticket_id=ticket_id_str, status='open')
         
         validated_data['ticket'] = ticket
-        return super().create(validated_data)
+        comment = super().create(validated_data)
+        
+        # Handle document uploads if any
+        if document_files:
+            user_id = validated_data.get('user_id')
+            firstname = validated_data.get('firstname')
+            lastname = validated_data.get('lastname')
+            
+            for file_obj in document_files:
+                try:
+                    # Create or get existing document with deduplication
+                    document, created = DocumentStorage.create_from_file(
+                        file_obj, user_id, firstname, lastname
+                    )
+                    
+                    # Attach document to comment (if not already attached)
+                    CommentDocument.objects.get_or_create(
+                        comment=comment,
+                        document=document,
+                        defaults={
+                            'attached_by_user_id': user_id,
+                            'attached_by_name': f"{firstname} {lastname}"
+                        }
+                    )
+                except Exception as e:
+                    # Log error but don't fail the comment creation
+                    print(f"Error attaching document {file_obj.name}: {str(e)}")
+        
+        return comment
