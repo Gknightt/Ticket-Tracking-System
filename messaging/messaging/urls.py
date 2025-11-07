@@ -15,7 +15,7 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
@@ -25,6 +25,8 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, Sp
 
 # Import viewsets for the main API router
 from comments.views import CommentViewSet, CommentRatingViewSet
+# Import cached media views
+from .media_views import cached_media_view, cached_public_media_view
 
 # Create main API router for viewset-based endpoints
 router = DefaultRouter()
@@ -88,8 +90,11 @@ urlpatterns = [
     
     # DRF Auth (for browsable API)
     path('api-auth/', include('rest_framework.urls')),
+    
+    # Cached media serving endpoints
+    path('media/document/<str:document_id>/', cached_media_view, name='cached-document'),
+    re_path(r'^media/(?P<path>.*)$', cached_public_media_view, name='cached-media'),
 ]
 
-# Serve media files during development
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# Remove the old static media serving for production-ready caching
+# The cached views handle all media serving with proper cache headers
