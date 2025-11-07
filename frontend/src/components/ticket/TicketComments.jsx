@@ -5,18 +5,214 @@ import { useAuth } from "../../api/AuthContext";
 import useComments from "../../api/useComments";
 import styles from "./ticketComments.module.css";
 
+// Document attachment component
+const DocumentAttachment = ({ document, onDownload }) => {
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const getFileIcon = (filename) => {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    switch (ext) {
+      case 'pdf': return 'fa-file-pdf';
+      case 'doc': case 'docx': return 'fa-file-word';
+      case 'xls': case 'xlsx': return 'fa-file-excel';
+      case 'ppt': case 'pptx': return 'fa-file-powerpoint';
+      case 'jpg': case 'jpeg': case 'png': case 'gif': return 'fa-file-image';
+      case 'zip': case 'rar': return 'fa-file-zipper';
+      default: return 'fa-file';
+    }
+  };
+
+  return (
+    <div className={styles.documentAttachment}>
+      <i className={`fas ${getFileIcon(document.original_filename)} ${styles.documentIcon}`}></i>
+      <div className={styles.documentInfo}>
+        <span className={styles.documentName}>{document.original_filename}</span>
+        <span className={styles.documentSize}>{formatFileSize(document.file_size)}</span>
+      </div>
+      <button
+        className={styles.downloadButton}
+        onClick={() => onDownload(document.id, document.original_filename)}
+        title="Download file"
+      >
+        <i className="fas fa-download"></i>
+      </button>
+    </div>
+  );
+};
+
+// File upload component
+const FileUpload = ({ onFilesSelected, maxFiles = 5, uniqueId = 'file-upload', clearTrigger = 0 }) => {
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const fileInputRef = React.useRef();
+
+  const handleFileSelect = (e) => {
+    const files = Array.from(e.target.files);
+    const limitedFiles = files.slice(0, maxFiles);
+    setSelectedFiles(limitedFiles);
+    onFilesSelected(limitedFiles);
+  };
+
+  const removeFile = (index) => {
+    const newFiles = selectedFiles.filter((_, i) => i !== index);
+    setSelectedFiles(newFiles);
+    onFilesSelected(newFiles);
+    
+    // Reset input if no files left
+    if (newFiles.length === 0 && fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Clear files when clearTrigger changes (after successful submissions)
+  React.useEffect(() => {
+    if (clearTrigger > 0) {
+      setSelectedFiles([]);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  }, [clearTrigger]);
+
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  return (
+    <div className={styles.fileUpload}>
+      <div className={styles.fileInputContainer}>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          onChange={handleFileSelect}
+          className={styles.fileInput}
+          id={uniqueId}
+          accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.zip,.rar,.txt"
+        />
+        <label htmlFor={uniqueId} className={styles.fileInputLabel}>
+          <i className="fas fa-paperclip"></i>
+          Attach Files ({selectedFiles.length}/{maxFiles})
+        </label>
+      </div>
+      
+      {selectedFiles.length > 0 && (
+        <div className={styles.selectedFiles}>
+          <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '8px' }}>
+            Selected Files:
+          </div>
+          {selectedFiles.map((file, index) => (
+            <div key={`${file.name}-${index}`} className={styles.selectedFile}>
+              <span className={styles.fileName}>
+                {file.name} ({formatFileSize(file.size)})
+              </span>
+              <button
+                type="button"
+                onClick={() => removeFile(index)}
+                className={styles.removeFileButton}
+                title="Remove file"
+              >
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Pagination component
+const Pagination = ({ pagination, onPageChange, loading }) => {
+  if (pagination.total_pages <= 1) return null;
+
+  const pages = [];
+  const maxPages = 5;
+  let startPage = Math.max(1, pagination.current_page - Math.floor(maxPages / 2));
+  let endPage = Math.min(pagination.total_pages, startPage + maxPages - 1);
+
+  if (endPage - startPage + 1 < maxPages) {
+    startPage = Math.max(1, endPage - maxPages + 1);
+  }
+
+  for (let i = startPage; i <= endPage; i++) {
+    pages.push(i);
+  }
+
+  return (
+    <div className={styles.pagination}>
+      <button
+        onClick={() => onPageChange(pagination.current_page - 1)}
+        disabled={!pagination.previous || loading}
+        className={styles.paginationButton}
+      >
+        <i className="fas fa-chevron-left"></i> Previous
+      </button>
+
+      <div className={styles.pageNumbers}>
+        {startPage > 1 && (
+          <>
+            <button onClick={() => onPageChange(1)} className={styles.pageButton}>1</button>
+            {startPage > 2 && <span className={styles.ellipsis}>...</span>}
+          </>
+        )}
+
+        {pages.map(page => (
+          <button
+            key={page}
+            onClick={() => onPageChange(page)}
+            className={`${styles.pageButton} ${page === pagination.current_page ? styles.activePage : ''}`}
+            disabled={loading}
+          >
+            {page}
+          </button>
+        ))}
+
+        {endPage < pagination.total_pages && (
+          <>
+            {endPage < pagination.total_pages - 1 && <span className={styles.ellipsis}>...</span>}
+            <button onClick={() => onPageChange(pagination.total_pages)} className={styles.pageButton}>
+              {pagination.total_pages}
+            </button>
+          </>
+        )}
+      </div>
+
+      <button
+        onClick={() => onPageChange(pagination.current_page + 1)}
+        disabled={!pagination.next || loading}
+        className={styles.paginationButton}
+      >
+        Next <i className="fas fa-chevron-right"></i>
+      </button>
+    </div>
+  );
+};
+
 // Comment component to render individual comments
 const Comment = ({
   comment,
   onReply,
   onReaction,
   onDelete,
+  onDownloadDocument,
   canDelete = false,
   currentUserId,
   isReply = false,
 }) => {
   const [showReplyForm, setShowReplyForm] = useState(false);
   const [replyContent, setReplyContent] = useState("");
+  const [replyFiles, setReplyFiles] = useState([]);
+  const [clearReplyFilesTrigger, setClearReplyFilesTrigger] = useState(0);
 
   console.log("Comment data:", comment);
 
@@ -52,9 +248,11 @@ const Comment = ({
   const handleReplySubmit = (e) => {
     e.preventDefault();
     if (replyContent.trim()) {
-      onReply(comment.id, replyContent);
+      onReply(comment.id, replyContent, replyFiles);
       setReplyContent("");
+      setReplyFiles([]);
       setShowReplyForm(false);
+      setClearReplyFilesTrigger((prev) => prev + 1);
     }
   };
 
@@ -130,6 +328,25 @@ const Comment = ({
             </button>
           )}
         </div>
+
+        {/* Display attached documents */}
+        {comment.documents && comment.documents.length > 0 && (
+          <div className={styles.documentsContainer}>
+            <div className={styles.documentsHeader}>
+              <i className="fas fa-paperclip"></i>
+              <span>Attachments ({comment.documents.length})</span>
+            </div>
+            <div className={styles.documentsList}>
+              {comment.documents.map((docAttachment) => (
+                <DocumentAttachment
+                  key={docAttachment.id}
+                  document={docAttachment.document}
+                  onDownload={onDownloadDocument}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className={styles.commentActions}>
@@ -183,16 +400,37 @@ const Comment = ({
 
       {showReplyForm && (
         <form className={styles.replyForm} onSubmit={handleReplySubmit}>
-          <input
-            type="text"
+          <textarea
             className={styles.replyInput}
             value={replyContent}
             onChange={(e) => setReplyContent(e.target.value)}
             placeholder="Write a reply..."
+            rows="3"
           />
-          <button type="submit" className={styles.replyButton}>
-            Reply
-          </button>
+          
+          <FileUpload
+            onFilesSelected={setReplyFiles}
+            maxFiles={3}
+            uniqueId={`reply-file-upload-${comment.id}`}
+            clearTrigger={clearReplyFilesTrigger}
+          />
+          
+          <div className={styles.replyFormActions}>
+            <button
+              type="button"
+              className={styles.cancelButton}
+              onClick={() => {
+                setShowReplyForm(false);
+                setReplyContent("");
+                setReplyFiles([]);
+              }}
+            >
+              Cancel
+            </button>
+            <button type="submit" className={styles.replyButton}>
+              Reply
+            </button>
+          </div>
         </form>
       )}
 
@@ -204,6 +442,7 @@ const Comment = ({
               comment={reply}
               onReply={onReply}
               onReaction={onReaction}
+              onDownloadDocument={onDownloadDocument}
               currentUserId={currentUserId}
               isReply={true} // Mark this as a reply so it won't show the reply button
             />
@@ -250,17 +489,22 @@ const ErrorState = ({ message, onRetry }) => (
 const TicketComments = ({ ticketId }) => {
   const { user, isAdmin } = useAuth();
   const [newComment, setNewComment] = useState("");
+  const [attachmentFiles, setAttachmentFiles] = useState([]);
+  const [clearAttachmentFilesTrigger, setClearAttachmentFilesTrigger] = useState(0);
 
   const {
     comments,
     loading,
     error,
+    pagination,
     addComment,
     addReply,
     addReaction,
     removeReaction,
     deleteComment,
+    downloadDocument,
     refreshComments,
+    fetchComments,
   } = useComments(ticketId);
 
   const handleDelete = async (commentId) => {
@@ -280,13 +524,27 @@ const TicketComments = ({ ticketId }) => {
   const handleSendComment = async (e) => {
     e.preventDefault();
     if (newComment.trim()) {
-      await addComment(newComment);
-      setNewComment("");
+      console.log('Sending comment with files:', attachmentFiles);
+      const result = await addComment(newComment, attachmentFiles);
+      if (result) {
+        setNewComment("");
+        setAttachmentFiles([]);
+        setClearAttachmentFilesTrigger((prev) => prev + 1);
+        console.log('Comment sent successfully');
+      } else {
+        console.error('Failed to send comment');
+      }
     }
   };
 
-  const handleReply = async (parentId, content) => {
-    await addReply(parentId, content);
+  const handleReply = async (parentId, content, files = []) => {
+    console.log('Sending reply with files:', files);
+    const result = await addReply(parentId, content, files);
+    if (result) {
+      console.log('Reply sent successfully');
+    } else {
+      console.error('Failed to send reply');
+    }
   };
 
   const handleReaction = async (
@@ -308,6 +566,14 @@ const TicketComments = ({ ticketId }) => {
       // Add new reaction
       await addReaction(commentId, reactionType);
     }
+  };
+
+  const handleDownloadDocument = async (documentId, filename) => {
+    await downloadDocument(documentId, filename);
+  };
+
+  const handlePageChange = (page) => {
+    fetchComments(page);
   };
 
   // Organize comments into a tree structure (root comments and their replies)
@@ -355,7 +621,14 @@ const TicketComments = ({ ticketId }) => {
 
   return (
     <div className={styles.commentsSection}>
-      <h3>Comments</h3>
+      <div className={styles.commentsHeader}>
+        <h3>Comments</h3>
+        {pagination.count > 0 && (
+          <span className={styles.commentsCount}>
+            {pagination.count} comment{pagination.count !== 1 ? 's' : ''}
+          </span>
+        )}
+      </div>
 
       <div className={styles.commentsList}>
         {loading ? (
@@ -365,26 +638,29 @@ const TicketComments = ({ ticketId }) => {
         ) : organizedComments.length === 0 ? (
           <EmptyState />
         ) : (
-          organizedComments.map((comment) => (
-            <Comment
-              key={comment.id}
-              comment={comment}
-              onReply={handleReply}
-              onReaction={handleReaction}
-              onDelete={handleDelete}
-              // canDelete={
-              //   (user?.id &&
-              //     (user?.id === comment.user_id ||
-              //       user?.id === comment.user?.id)) ||
-              //   (typeof isAdmin === "function" ? isAdmin() : false)
-              // }
-              canDelete={
-                (user?.id && String(user.id) === String(comment.user_id)) ||
-                (typeof isAdmin === "function" ? isAdmin() : false)
-              }
-              currentUserId={user?.id}
+          <>
+            {organizedComments.map((comment) => (
+              <Comment
+                key={comment.id}
+                comment={comment}
+                onReply={handleReply}
+                onReaction={handleReaction}
+                onDelete={handleDelete}
+                onDownloadDocument={handleDownloadDocument}
+                canDelete={
+                  (user?.id && String(user.id) === String(comment.user_id)) ||
+                  (typeof isAdmin === "function" ? isAdmin() : false)
+                }
+                currentUserId={user?.id}
+              />
+            ))}
+            
+            <Pagination
+              pagination={pagination}
+              onPageChange={handlePageChange}
+              loading={loading}
             />
-          ))
+          </>
         )}
       </div>
 
@@ -395,14 +671,33 @@ const TicketComments = ({ ticketId }) => {
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
           disabled={loading}
+          rows="4"
         />
-        <button
-          className={styles.commentButton}
-          type="submit"
-          disabled={loading || !newComment.trim()}
-        >
-          <i className="fa-solid fa-paper-plane"></i> Send
-        </button>
+        
+        <FileUpload
+          onFilesSelected={setAttachmentFiles}
+          maxFiles={5}
+          uniqueId="comment-file-upload"
+          clearTrigger={clearAttachmentFilesTrigger}
+        />
+        
+        <div className={styles.commentFormActions}>
+          <div className={styles.attachmentInfo}>
+            {attachmentFiles.length > 0 && (
+              <span className={styles.fileCount}>
+                <i className="fas fa-paperclip"></i>
+                {attachmentFiles.length} file{attachmentFiles.length !== 1 ? 's' : ''} selected
+              </span>
+            )}
+          </div>
+          <button
+            className={styles.commentButton}
+            type="submit"
+            disabled={loading || !newComment.trim()}
+          >
+            <i className="fa-solid fa-paper-plane"></i> Send
+          </button>
+        </div>
       </form>
     </div>
   );

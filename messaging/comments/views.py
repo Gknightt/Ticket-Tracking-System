@@ -130,25 +130,56 @@ class CommentViewSet(viewsets.ModelViewSet):
     
     def create(self, request, *args, **kwargs):
         """
-        Override create to handle document attachments via upload_documents field
+        Override create to handle document attachments
         """
-        # Handle both multipart form data and the new upload_documents field
-        data = request.data.copy()
-        
-        # If files are uploaded via the traditional 'documents' key (for backward compatibility)
+        # Extract files from request before serializing
+        uploaded_files = []
         if 'documents' in request.FILES:
-            files = request.FILES.getlist('documents')
-            if files and 'upload_documents' not in data:
-                data['upload_documents'] = files
+            uploaded_files = request.FILES.getlist('documents')
         
-        serializer = self.get_serializer(data=data)
+        # Create comment without file validation issues
+        serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
             comment = serializer.save()
+            
+            # Handle file attachments after comment is created
+            if uploaded_files:
+                self._attach_files_to_comment(comment, uploaded_files, request.data)
             
             # Return updated comment with documents
             comment_serializer = CommentSerializer(comment, context={'request': request})
             return Response(comment_serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def _attach_files_to_comment(self, comment, files, data):
+        """
+        Helper method to attach files to a comment after creation
+        """
+        user_id = data.get('user_id')
+        firstname = data.get('firstname')
+        lastname = data.get('lastname')
+        
+        for file_obj in files:
+            try:
+                # Only process files with actual content
+                if file_obj and hasattr(file_obj, 'size') and file_obj.size > 0:
+                    # Create or get existing document with deduplication
+                    document, created = DocumentStorage.create_from_file(
+                        file_obj, user_id, firstname, lastname
+                    )
+                    
+                    # Attach document to comment (if not already attached)
+                    CommentDocument.objects.get_or_create(
+                        comment=comment,
+                        document=document,
+                        defaults={
+                            'attached_by_user_id': user_id,
+                            'attached_by_name': f"{firstname} {lastname}"
+                        }
+                    )
+            except Exception as e:
+                # Log error but don't fail the comment creation
+                print(f"Error attaching document {file_obj.name}: {str(e)}")
     
     def _handle_document_attachments(self, request, comment, data):
         """

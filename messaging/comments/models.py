@@ -4,6 +4,8 @@ import uuid
 import hashlib
 import os
 from django.core.files.storage import default_storage
+from PIL import Image
+import io
 
 def comment_document_upload_path(instance, filename):
     """Generate upload path for comment documents"""
@@ -95,11 +97,41 @@ class DocumentStorage(models.Model):
     uploaded_by_user_id = models.CharField(max_length=255)
     uploaded_by_name = models.CharField(max_length=255)  # "firstname lastname"
     
+    # Image metadata fields
+    is_image = models.BooleanField(default=False)
+    image_width = models.IntegerField(null=True, blank=True)
+    image_height = models.IntegerField(null=True, blank=True)
+    image_ratio = models.FloatField(null=True, blank=True, help_text="Width/Height ratio")
+    
     class Meta:
         ordering = ['-uploaded_at']
     
     def __str__(self):
         return f"{self.original_filename} ({self.file_hash[:8]}...)"
+    
+    def calculate_image_info(self, file_content):
+        """
+        Calculate image dimensions and ratio if the file is an image
+        """
+        try:
+            # Check if content type indicates it's an image
+            if not self.content_type.startswith('image/'):
+                return
+            
+            # Try to open as image
+            image = Image.open(io.BytesIO(file_content))
+            self.is_image = True
+            self.image_width = image.width
+            self.image_height = image.height
+            
+            # Calculate ratio (width/height)
+            if image.height > 0:
+                self.image_ratio = round(image.width / image.height, 4)
+            
+        except Exception as e:
+            # Not a valid image or error processing
+            self.is_image = False
+            print(f"Error processing image {self.original_filename}: {str(e)}")
     
     @classmethod
     def create_from_file(cls, file_obj, user_id, firstname, lastname):
@@ -127,6 +159,10 @@ class DocumentStorage(models.Model):
                 uploaded_by_user_id=user_id,
                 uploaded_by_name=f"{firstname} {lastname}"
             )
+            
+            # Calculate image info before saving
+            doc.calculate_image_info(file_content)
+            
             doc.file_path.save(file_obj.name, file_obj, save=False)
             doc.save()
             return doc, True
