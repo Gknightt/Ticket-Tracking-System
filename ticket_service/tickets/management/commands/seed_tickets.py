@@ -4,224 +4,194 @@ import shutil
 import mimetypes
 from datetime import datetime, timedelta
 from urllib.parse import urljoin
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.core.management.base import BaseCommand
 from django.utils.timezone import make_aware
 from django.conf import settings
 from tickets.models import Ticket
 
-# Constants
-PRIORITIES = ['Low', 'Medium', 'High', 'Urgent']
-STATUSES = ['Open']
+# Updated Constants based on the correct structure
+CATEGORY_CHOICES = [
+    'IT Support', 'Asset Check In', 'Asset Check Out', 'New Budget Proposal', 'Others'
+]
+
+IT_SUBCATS = [
+    'Technical Assistance',
+    'Software Installation/Update',
+    'Hardware Troubleshooting',
+    'Email/Account Access Issue',
+    'Internet/Network Connectivity Issue',
+    'Printer/Scanner Setup or Issue',
+    'System Performance Issue',
+    'Virus/Malware Check',
+    'IT Consultation Request',
+    'Data Backup/Restore',
+]
+
+DEVICE_TYPES = ['Laptop', 'Printer', 'Projector', 'Monitor', 'Other']
+
+ASSET_NAMES = {
+    'Laptop': ['Dell Latitude 5420', 'HP ProBook 450 G9', 'Lenovo ThinkPad X1'],
+    'Printer': ['HP LaserJet Pro M404dn', 'Canon imageCLASS MF445dw'],
+    'Projector': ['Epson PowerLite 2247U', 'BenQ MH535A'],
+    'Mouse': ['Logitech MX Master 3', 'Microsoft Surface Mouse'],
+    'Keyboard': ['Logitech K380', 'Microsoft Ergonomic Keyboard'],
+}
+
+LOCATIONS = [
+    'Main Office - 1st Floor',
+    'Main Office - 2nd Floor',
+    'Main Office - 3rd Floor',
+    'Branch Office - North',
+    'Branch Office - South',
+    'Warehouse',
+    'Remote/Home Office',
+]
+
+BUDGET_SUBCATS = [
+    'Capital Expenses (CapEx)',
+    'Operational Expenses (OpEx)',
+    'Reimbursement Claim (Liabilities)',
+    'Charging Department (Cost Center)'
+]
+
+COST_ELEMENTS = {
+    'Capital Expenses (CapEx)': ['Equipment', 'Software', 'Furniture'],
+    'Operational Expenses (OpEx)': ['Utilities', 'Supplies', 'IT Services', 'Software Subscriptions'],
+    'Reimbursement Claim (Liabilities)': ['Payable', 'Loans'],
+    'Charging Department (Cost Center)': ['IT Operations', 'System Development', 'Infrastructure & Equipment', 'Training and Seminars'],
+}
+
+PRIORITIES = ['Critical', 'High', 'Medium', 'Low']
+STATUSES = ['New', 'Open', 'In Progress', 'On Hold', 'Pending', 'Resolved', 'Rejected', 'Withdrawn', 'Closed']
 NAMES = ['Alice Johnson', 'Bob Smith', 'Charlie Davis', 'Diana Martinez', 'Eve Wilson', 'Frank Brown', 'Grace Lee', 'Henry Taylor', 'Iris Chen', 'Jack Anderson']
 
 # Folder paths
 SAMPLE_FOLDER = os.path.join(settings.BASE_DIR, 'media/documents')
 ATTACHMENT_UPLOAD_DIR = 'uploads/tickets'
 
-# Valid workflow-aligned combinations
-VALID_WORKFLOWS = [
-    ("Asset Department", "Asset Category", "Asset Check-in"),
-    ("Asset Department", "Asset Category", "Asset Check-out"),
-    ("Budget Department", "Budget Category", "Project Proposal"),
-    ("IT Department", "IT Category", "Access Request"),
-    ("IT Department", "IT Category", "Software Installation"),
-]
-
-# Additional random categories and subcategories
-RANDOM_CATEGORIES = [
-    ("HR Department", "HR Category", ["Leave Request", "Payroll Issue", "New Hire Onboarding"]),
-    ("Facilities", "Facility Category", ["Maintenance Request", "Room Booking", "Equipment Repair"]),
-    ("Logistics", "Logistics Category", ["Delivery Request", "Inventory Check", "Shipping Issue"]),
-]
-
-# Realistic ticket templates per workflow
+# Realistic ticket templates per category/subcategory
 TICKET_TEMPLATES = {
-    "Asset Check-in": [
+    "Technical Assistance": [
         {
-            "subject": "Return MacBook Pro 16\" M2 - Asset #{asset_id}",
-            "description": "I am returning my assigned MacBook Pro as I have completed the {project} project. The device is in {condition} with all accessories included (charger, USB-C cable, carrying case). Asset tag #{asset_id} is intact and verified. The laptop has been backed up and factory reset per IT security policy. Please process check-in and update inventory."
+            "subject": "Technical Support - {device} Issue ({company_id})",
+            "description": "I am experiencing technical difficulties with my {device}. The issue is: {issue}. This is impacting my work productivity and I need assistance as soon as possible. Device location: {location}."
         },
         {
-            "subject": "Check-in Request: Dell Latitude 5420 Laptop - Serial #{serial}",
-            "description": "Submitting check-in for Dell Latitude 5420 (Serial: {serial}). Equipment used for {duration} months, returning due to {reason}. Current condition: {condition}. All original packaging included. Battery health at {battery}%. Located at {location}. Request Asset Manager verification."
-        },
-        {
-            "subject": "Equipment Return: iPhone 13 Pro Company Phone",
-            "description": "Returning company iPhone 13 Pro issued on {date}. Device in {condition}, all functions working properly. Includes original charger and case. IMEI verified against records. Phone wiped and reset to factory settings. Return reason: {reason}."
-        },
-        {
-            "subject": "Asset Handover: HP Monitor 27\" and Docking Station",
-            "description": "Checking in HP 27\" monitor and docking station from home office setup. Both items in {condition}. All cables and power adapters included. Equipment no longer needed due to {reason}. Asset tags #{asset_id} verified. Ready for reallocation."
+            "subject": "Help Needed - {device} Not Working Properly",
+            "description": "My {device} has been experiencing problems since {date}. The specific issue is {issue}. I have tried basic troubleshooting but the problem persists. Please provide technical assistance."
         },
     ],
-    "Asset Check-out": [
+    "Software Installation/Update": [
         {
-            "subject": "Laptop Request: MacBook Pro for Software Development",
-            "description": "Requesting MacBook Pro for {project} project starting {start_date}. Duration: {duration} weeks. Required specs: 16GB RAM, 512GB SSD. Will be used at {location}. Manager {manager} approved on {approval_date}. Needed for: {task}. Understand responsibility for equipment care and timely return."
+            "subject": "Software Installation Request - {software} ({company_id})",
+            "description": "Requesting installation of {software} on my workstation. This software is required for {purpose}. Manager approval: {manager}. Preferred installation time: {time}."
         },
         {
-            "subject": "Equipment Needed: Projector for Client Presentation",
-            "description": "Urgent request for presentation projector and screen for client meeting on {date}. Required from {start_date} to {end_date}. Location: {location}. Will be presenting {topic}. Manager approval obtained. Will follow all equipment handling guidelines."
-        },
-        {
-            "subject": "Request: Microsoft Surface Pro for Field Work",
-            "description": "Need Microsoft Surface Pro for field assignment at {location}. Assignment period: {duration} weeks starting {start_date}. Required for: {task}. Supervisor {manager} approved. Will maintain equipment properly and return on schedule. Business justification: {reason}."
-        },
-        {
-            "subject": "Check-out: Wireless Headset for Remote Support Role",
-            "description": "Requesting wireless headset for customer support role. Working remotely from {location}. Need professional audio equipment for client calls. Duration: permanent assignment. Manager {manager} approved request. Will use for {task}."
+            "subject": "Update Required - {software} to Latest Version",
+            "description": "Need to update {software} to the latest version for {purpose}. Current version is causing {issue}. Business justification: {justification}."
         },
     ],
-    "Project Proposal": [
+    "Hardware Troubleshooting": [
         {
-            "subject": "Budget Proposal: {project} - ${budget}",
-            "description": "Requesting ${budget} funding for {project}. \n\nObjective: {objective}\n\nBudget Breakdown:\n- Personnel: ${personnel}\n- Equipment: ${equipment}\n- Operations: ${operations}\n- Contingency: ${contingency}\n\nTimeline: {duration} months\nExpected ROI: {roi}%\nDepartment: {department}\nProject Manager: {manager}\n\nThis project will {benefit} and directly supports our goal to {goal}."
-        },
-        {
-            "subject": "Funding Request: {project} Initiative",
-            "description": "Submitting proposal for {project} requiring ${budget} budget allocation.\n\nBusiness Case: {business_case}\n\nKey Benefits:\n- {benefit1}\n- {benefit2}\n- {benefit3}\n\nProject Duration: {duration} months\nBreak-even: {breakeven} months\nRisk Level: {risk}\n\nManager: {manager}\nApproval needed by: {approval_date}"
-        },
-        {
-            "subject": "Project Proposal: {project}",
-            "description": "{project} proposal for {department} Department.\n\nBudget: ${budget}\nDuration: {duration} months\nTeam Size: {team_size} members\n\nJustification: {justification}\n\nExpected Outcomes:\n- {outcome1}\n- {outcome2}\n- {outcome3}\n\nRisks: {risk}\nMitigation: {mitigation}\n\nSponsor: {manager}"
+            "subject": "Hardware Issue - {device} Malfunction ({company_id})",
+            "description": "Reporting hardware malfunction with {device}. Problem: {issue}. First noticed on {date}. This is affecting my daily work tasks. Location: {location}."
         },
     ],
-    "Access Request": [
+    "Asset Check Out": [
         {
-            "subject": "Access Request: {system} - {role} Role",
-            "description": "Requesting {access_level} access to {system} for {role} position.\n\nBusiness Justification: {justification}\n\nRequired Permissions: {permissions}\nDuration: {duration}\nData Classification: {classification}\n\nManager Approval: {manager} ({approval_date})\nSecurity Training: Completed\n\nWill comply with all security policies and data handling procedures."
+            "subject": "Equipment Request - {asset_name} ({company_id})",
+            "description": "Requesting checkout of {asset_name} for {purpose}. Expected usage period: {duration}. Location: {location}. Manager approval: {manager}. Will follow all equipment handling guidelines."
         },
         {
-            "subject": "System Access: {system} for {purpose}",
-            "description": "Need access to {system} starting {start_date}.\n\nPurpose: {purpose}\nAccess Type: {access_level}\nRequired for: {task}\n\nCompliance: {compliance}\nSupervisor: {manager}\nExpected Usage: {usage}\n\nThis access is critical for {critical_reason} and supports {project} project."
-        },
-        {
-            "subject": "Urgent: {system} Access for Production Support",
-            "description": "Urgent access request for {system}.\n\nRole: {role}\nAccess Level: {access_level}\nStart Date: {start_date}\n\nBusiness Need: {business_need}\nImpact if denied: {impact}\n\nManager {manager} approved. Security clearance: {clearance}. MFA enabled."
+            "subject": "Asset Checkout Request - {asset_name}",
+            "description": "Need to checkout {asset_name} for project work. Usage from {start_date} to {return_date}. Business justification: {justification}. Will ensure proper care and timely return."
         },
     ],
-    "Software Installation": [
+    "Asset Check In": [
         {
-            "subject": "Software Install: {software} for {purpose}",
-            "description": "Requesting installation of {software} (Version {version}) on workstation {device}.\n\nBusiness Purpose: {purpose}\nLicense Type: {license}\nCost: ${cost}\n\nJustification: {justification}\nWill improve {improvement} by {percentage}%.\n\nDevice: {device}\nOS: {os}\nManager Approval: {manager}\nBudget Code: {budget_code}"
+            "subject": "Equipment Return - {asset_name} ({company_id})",
+            "description": "Returning {asset_name} (Serial: {serial}). Equipment condition: {condition}. All accessories included. Return reason: {reason}. Asset has been properly cleaned and reset."
         },
         {
-            "subject": "Installation Request: {software} - {version}",
-            "description": "Need {software} ({version}) installed for {purpose}.\n\nSoftware Details:\n- Publisher: {publisher}\n- License: {license}\n- Users: {users}\n\nBusiness Case: {business_case}\nProductivity Gain: {gain}\n\nSecurity Review: Approved\nCompliance: Verified\nManager: {manager}\nInstall Date: {install_date}"
-        },
-        {
-            "subject": "{software} Installation for {department}",
-            "description": "Installing {software} for {department} department use.\n\nPurpose: {purpose}\nVersion: {version}\nLicense Cost: ${cost}\n\nWill enable: {capability}\nTime Savings: {time_saved} hours/week\n\nScope: {scope}\nApprovals: Manager {manager}, IT Security, Budget approved\nTraining: {training}"
+            "subject": "Asset Return - {asset_name}",
+            "description": "Checking in {asset_name} after completion of {project}. Equipment is in {condition} with {accessories}. Serial number {serial} verified."
         },
     ],
-    "Leave Request": [
+    "Capital Expenses (CapEx)": [
         {
-            "subject": "Annual Leave: {duration} Days - {month}",
-            "description": "Requesting annual leave from {start_date} to {end_date} ({days} working days).\n\nReason: {reason}\n\nCoverage Plan: {colleague} will handle urgent matters. All current tasks will be completed or delegated.\n\nRemaining Balance: {balance} days\nManager: {manager}"
+            "subject": "CapEx Budget Request - {cost_element} ({company_id})",
+            "description": "Requesting capital expenditure approval for {cost_element}. Amount: ₱{budget:,.2f}. Business justification: {justification}. Expected ROI: {roi}%. Project duration: {duration} months."
         },
     ],
-    "Maintenance Request": [
+    "Operational Expenses (OpEx)": [
         {
-            "subject": "Maintenance: {issue} in {location}",
-            "description": "Reporting {issue} in {location}.\n\nIssue noticed: {date_noticed}\nImpact: {impact} - Affecting {affected} employees\nUrgency: {urgency}\n\nPreferred service time: {service_time}\nReported by: {reporter}"
+            "subject": "OpEx Budget Request - {cost_element} ({company_id})",
+            "description": "Requesting operational expense budget for {cost_element}. Amount: ₱{budget:,.2f}. Monthly recurring: {recurring}. Justification: {justification}."
         },
     ],
 }
 
-def generate_ticket_content(subcategory):
-    """Generate realistic subject and description based on subcategory."""
+def generate_ticket_content(category, subcategory, company_id, asset_name=None):
+    """Generate realistic subject and description based on category and subcategory."""
     
-    if subcategory not in TICKET_TEMPLATES:
-        # Generic template for non-workflow tickets
+    template_key = subcategory if subcategory in TICKET_TEMPLATES else category
+    
+    if template_key not in TICKET_TEMPLATES:
+        # Generic template
         return {
-            "subject": f"{subcategory} Request",
-            "description": f"This is a {subcategory} request requiring attention. Please review and process according to standard procedures. Additional details are provided in attachments."
+            "subject": f"{category} - {subcategory or 'General Request'} ({company_id})",
+            "description": f"This is a {category} request requiring attention. Please review and process according to standard procedures."
         }
     
-    template = random.choice(TICKET_TEMPLATES[subcategory])
+    template = random.choice(TICKET_TEMPLATES[template_key])
     
     # Generate placeholder values
     placeholders = {
-        "asset_id": f"AST{random.randint(10000, 99999)}",
-        "serial": f"{random.randint(100000, 999999)}",
-        "project": random.choice(["Digital Transformation", "Client Portal Upgrade", "Data Migration", "Infrastructure Modernization", "Marketing Campaign"]),
-        "condition": random.choice(["excellent condition", "good condition with minor wear", "fair condition", "like new"]),
-        "duration": random.choice(["3", "6", "12", "18"]),
-        "reason": random.choice(["project completion", "role change", "department transfer", "equipment upgrade", "contract ended"]),
-        "battery": random.randint(75, 98),
-        "location": random.choice(["Head Office", "Remote Location", "Client Site", "Branch Office", "Home Office"]),
-        "date": (datetime.now() - timedelta(days=random.randint(30, 180))).strftime("%B %Y"),
-        "start_date": (datetime.now() + timedelta(days=random.randint(1, 14))).strftime("%B %d, %Y"),
-        "end_date": (datetime.now() + timedelta(days=random.randint(30, 90))).strftime("%B %d, %Y"),
-        "approval_date": (datetime.now() - timedelta(days=random.randint(1, 7))).strftime("%B %d, %Y"),
+        "company_id": company_id,
+        "device": random.choice(['Laptop', 'Desktop', 'Monitor', 'Printer', 'Phone']),
+        "asset_name": asset_name or random.choice(['Dell Laptop', 'HP Printer', 'Monitor']),
+        "serial": f"SN-{random.randint(100000, 999999)}",
+        "issue": random.choice([
+            "not turning on", "running slowly", "displaying error messages", 
+            "connectivity problems", "unusual noises", "overheating"
+        ]),
+        "location": random.choice(LOCATIONS),
+        "date": (datetime.now() - timedelta(days=random.randint(1, 7))).strftime("%B %d, %Y"),
+        "software": random.choice([
+            "Microsoft Office", "Adobe Creative Suite", "AutoCAD", 
+            "Visual Studio", "Slack", "Zoom"
+        ]),
+        "purpose": random.choice([
+            "daily work tasks", "project requirements", "client presentations", 
+            "data analysis", "design work"
+        ]),
         "manager": random.choice(NAMES),
-        "task": random.choice(["software development", "data analysis", "client presentations", "field testing", "document preparation"]),
-        "topic": random.choice(["Q4 results", "product demo", "training session", "strategic planning"]),
-        "budget": f"{random.randint(20, 200) * 1000:,}",
-        "personnel": f"{random.randint(20, 80) * 1000:,}",
-        "equipment": f"{random.randint(10, 40) * 1000:,}",
-        "operations": f"{random.randint(5, 30) * 1000:,}",
-        "contingency": f"{random.randint(5, 20) * 1000:,}",
-        "roi": random.randint(15, 45),
-        "objective": random.choice(["improve efficiency", "expand capacity", "enhance customer experience", "reduce costs"]),
-        "department": random.choice(["Engineering", "Marketing", "Operations", "Sales", "Finance"]),
-        "benefit": random.choice(["increase productivity", "improve quality", "reduce operational costs", "enhance collaboration"]),
-        "goal": random.choice(["increase revenue", "improve customer satisfaction", "streamline operations", "expand market reach"]),
-        "business_case": random.choice(["market expansion opportunity", "operational efficiency improvement", "customer demand", "competitive pressure"]),
-        "benefit1": "Increased operational efficiency",
-        "benefit2": "Improved customer satisfaction",
-        "benefit3": "Reduced operational costs",
-        "breakeven": random.randint(12, 36),
-        "risk": random.choice(["Low", "Medium", "Moderate"]),
-        "team_size": random.randint(3, 12),
-        "justification": random.choice(["critical for project success", "required for compliance", "essential for daily operations", "needed for customer deliverables"]),
-        "outcome1": "Improved efficiency and productivity",
-        "outcome2": "Better resource utilization",
-        "outcome3": "Enhanced service delivery",
-        "mitigation": random.choice(["regular monitoring and reviews", "contingency planning", "phased implementation", "pilot testing"]),
-        "system": random.choice(["Salesforce CRM", "SAP ERP", "Azure Portal", "GitHub Enterprise", "Jira", "AWS Console"]),
-        "role": random.choice(["Software Developer", "Data Analyst", "Project Manager", "Sales Representative", "System Administrator"]),
-        "access_level": random.choice(["Read-Only", "Read-Write", "Admin", "Contributor"]),
-        "justification": random.choice(["required for job duties", "project requirement", "customer support", "compliance reporting"]),
-        "permissions": random.choice(["Create, Read, Update", "Read-Only", "Full Admin", "Standard User"]),
-        "classification": random.choice(["Confidential", "Internal", "Public", "Restricted"]),
-        "purpose": random.choice(["daily operations", "project work", "data analysis", "system administration"]),
-        "compliance": random.choice(["SOX", "GDPR", "HIPAA", "Standard"]),
-        "usage": random.choice(["Daily 9-5", "As needed", "24/7 on-call", "Periodic"]),
-        "critical_reason": random.choice(["meeting deadlines", "customer service", "compliance", "operational continuity"]),
-        "business_need": random.choice(["project delivery", "customer support", "data processing", "system maintenance"]),
-        "impact": random.choice(["project delays", "customer dissatisfaction", "missed deadlines", "revenue loss"]),
-        "clearance": random.choice(["Standard", "Enhanced", "Confidential"]),
-        "software": random.choice(["Adobe Creative Suite", "Microsoft Visual Studio", "AutoCAD", "Tableau Desktop", "Slack", "Docker Desktop"]),
-        "version": random.choice(["2024", "2025", "Latest", "Enterprise"]),
-        "device": f"WS-{random.randint(100, 999)}",
-        "license": random.choice(["Named User", "Concurrent", "Enterprise", "Site License"]),
-        "cost": random.randint(100, 2000),
-        "improvement": random.choice(["productivity", "quality", "efficiency", "collaboration"]),
-        "percentage": random.randint(15, 40),
-        "os": random.choice(["Windows 11 Pro", "macOS Sonoma", "Ubuntu 22.04"]),
-        "budget_code": f"DEPT-{random.randint(1000, 9999)}",
-        "publisher": random.choice(["Microsoft", "Adobe", "Autodesk", "Oracle", "Atlassian"]),
-        "users": random.randint(1, 25),
-        "business_case": random.choice(["efficiency improvement", "capability enablement", "system replacement", "compliance requirement"]),
-        "gain": random.choice(["20%", "35%", "50%"]),
-        "install_date": (datetime.now() + timedelta(days=random.randint(3, 14))).strftime("%B %d, %Y"),
-        "capability": random.choice(["automated workflows", "real-time collaboration", "advanced analytics", "integrated reporting"]),
-        "time_saved": random.randint(5, 20),
-        "scope": random.choice(["Single workstation", "Department-wide", "Team rollout"]),
-        "training": random.choice(["Self-paced", "Instructor-led", "Documentation provided", "Not required"]),
-        "month": (datetime.now() + timedelta(days=random.randint(14, 90))).strftime("%B %Y"),
-        "days": random.randint(5, 15),
-        "colleague": random.choice(NAMES),
-        "balance": random.randint(5, 20),
-        "issue": random.choice(["Air conditioning not working", "Leaking faucet", "Flickering lights", "Door lock malfunction", "Water cooler broken"]),
-        "date_noticed": (datetime.now() - timedelta(days=random.randint(1, 3))).strftime("%B %d"),
-        "impact": random.choice(["High", "Medium", "Low"]),
-        "affected": random.randint(5, 50),
-        "urgency": random.choice(["Urgent", "High Priority", "Standard"]),
-        "service_time": random.choice(["Business hours", "After 5 PM", "Weekend", "Anytime"]),
-        "reporter": random.choice(NAMES),
+        "time": random.choice(["during lunch break", "after hours", "morning", "anytime"]),
+        "justification": random.choice([
+            "required for project completion", "improves work efficiency", 
+            "client requirement", "compliance necessity"
+        ]),
+        "duration": random.choice(["2 weeks", "1 month", "3 months", "6 months"]),
+        "start_date": (datetime.now() + timedelta(days=1)).strftime("%B %d"),
+        "return_date": (datetime.now() + timedelta(days=random.randint(7, 30))).strftime("%B %d"),
+        "condition": random.choice(["excellent condition", "good condition", "fair condition"]),
+        "reason": random.choice([
+            "project completion", "department transfer", "equipment upgrade", "role change"
+        ]),
+        "project": random.choice([
+            "client presentation project", "data migration", "system upgrade", "training program"
+        ]),
+        "accessories": random.choice([
+            "all original accessories", "charger and cables", "carrying case included"
+        ]),
+        "cost_element": random.choice([
+            "Equipment", "Software", "Furniture", "Utilities", "IT Services"
+        ]),
+        "budget": random.uniform(10000, 500000),
+        "roi": random.randint(15, 35),
+        "recurring": random.choice(["Yes", "No"]),
     }
     
     # Format template with placeholders
@@ -231,44 +201,161 @@ def generate_ticket_content(subcategory):
     return {"subject": subject, "description": description}
 
 class Command(BaseCommand):
-    help = "Seed tickets with comprehensive, realistic content based on workflow types."
+    help = "Seed tickets with comprehensive, realistic content based on correct category structure."
 
-    def handle(self, *args, **kwargs):
-        self.stdout.write("📥 Seeding Tickets with realistic content...")
+    def add_arguments(self, parser):
+        parser.add_argument('--count', type=int, default=30, help='Number of tickets to create')
 
+    def handle(self, *args, **options):
+        count = options['count']
+        self.stdout.write(f"📥 Seeding {count} Tickets with realistic content...")
+
+        # Handle attachments
         if not os.path.isdir(SAMPLE_FOLDER):
             self.stdout.write(self.style.WARNING(f"⚠️ Attachment folder not found: {SAMPLE_FOLDER}"))
             sample_files = []
         else:
-            # Ensure destination folder exists
             dest_dir = os.path.join(settings.MEDIA_ROOT, ATTACHMENT_UPLOAD_DIR)
             os.makedirs(dest_dir, exist_ok=True)
-
-            # Gather sample files
             sample_files = [
                 os.path.join(SAMPLE_FOLDER, f)
                 for f in os.listdir(SAMPLE_FOLDER)
                 if os.path.isfile(os.path.join(SAMPLE_FOLDER, f))
             ]
 
-        # Generate 30 tickets total
-        for i in range(30):
-            # Mix of workflow and random tickets
-            if i < len(VALID_WORKFLOWS) * 3:  # 15 workflow tickets (3 per workflow)
-                department, category, subcategory = VALID_WORKFLOWS[i % len(VALID_WORKFLOWS)]
-            else:  # 15 random category tickets
-                dept, cat, subs = random.choice(RANDOM_CATEGORIES)
-                department, category = dept, cat
-                subcategory = random.choice(subs)
+        created = 0
+        for i in range(count):
+            category = random.choice(CATEGORY_CHOICES)
+            
+            # Generate employee info
+            name_parts = random.choice(NAMES).split()
+            first_name = name_parts[0]
+            last_name = name_parts[1] if len(name_parts) > 1 else "Doe"
+            email = f"{first_name.lower()}.{last_name.lower()}@example.com"
+            company_id = f"EMP{random.randint(1000, 9999)}"
+            image_url = urljoin(settings.BASE_URL, "/media/employee_images/resized-placeholder.jpeg")
 
-            # Generate dates
+            ticket_kwargs = {}
+            
+            # Set employee info
+            employee = {
+                "first_name": first_name,
+                "last_name": last_name,
+                "email": email,
+                "company_id": company_id,
+                "image": image_url,
+            }
+            ticket_kwargs['employee'] = employee
+            
+            # Configure based on category
+            if category == 'IT Support':
+                subcategory = random.choice(IT_SUBCATS)
+                device_type = random.choice(DEVICE_TYPES)
+                
+                ticket_kwargs['category'] = 'IT Support'
+                ticket_kwargs['subcategory'] = subcategory
+                ticket_kwargs['department'] = 'IT Department'
+                ticket_kwargs['dynamic_data'] = {'device_type': device_type}
+                
+                if device_type in ASSET_NAMES:
+                    asset = random.choice(ASSET_NAMES[device_type])
+                    ticket_kwargs['asset_name'] = asset
+                    ticket_kwargs['serial_number'] = f"SN-{abs(hash(asset)) % 1000000:06d}"
+                
+                ticket_kwargs['location'] = random.choice(LOCATIONS)
+                content = generate_ticket_content(category, subcategory, company_id, ticket_kwargs.get('asset_name'))
+                
+            elif category in ('Asset Check In', 'Asset Check Out'):
+                product = random.choice(list(ASSET_NAMES.keys()))
+                asset_name = random.choice(ASSET_NAMES.get(product, [product]))
+                
+                ticket_kwargs['category'] = category
+                ticket_kwargs['subcategory'] = product
+                ticket_kwargs['asset_name'] = asset_name
+                ticket_kwargs['serial_number'] = f"SN-{random.randint(100000,999999)}"
+                ticket_kwargs['department'] = 'Asset Department'
+                
+                if category == 'Asset Check Out':
+                    days = random.randint(7, 60)
+                    exp = datetime.now() + timedelta(days=days)
+                    ticket_kwargs['expected_return_date'] = exp.date()
+                
+                content = generate_ticket_content(category, category, company_id, asset_name)
+                
+            elif category == 'New Budget Proposal':
+                subcategory = random.choice(BUDGET_SUBCATS)
+                
+                ticket_kwargs['category'] = 'New Budget Proposal'
+                ticket_kwargs['subcategory'] = subcategory
+                ticket_kwargs['department'] = 'Budget Department'
+                
+                # Add cost elements and budget
+                if random.random() < 0.8:
+                    cost_element = random.choice(COST_ELEMENTS.get(subcategory, []))
+                    ticket_kwargs['cost_items'] = {'cost_element': cost_element}
+                    budget_val = Decimal(str(round(random.uniform(10000, 500000), 2))).quantize(
+                        Decimal('0.01'), rounding=ROUND_HALF_UP
+                    )
+                    ticket_kwargs['requested_budget'] = budget_val
+                
+                # Performance dates
+                start = datetime.now().date()
+                end = start + timedelta(days=random.randint(30, 365))
+                ticket_kwargs['performance_start_date'] = start
+                ticket_kwargs['performance_end_date'] = end
+                
+                content = generate_ticket_content(category, subcategory, company_id)
+                
+            else:  # Others
+                ticket_kwargs['category'] = 'Others'
+                ticket_kwargs['subcategory'] = None
+                content = generate_ticket_content('Others', 'General Inquiry', company_id)
+            
+            # Set subject and description
+            ticket_kwargs['subject'] = content["subject"]
+            ticket_kwargs['description'] = content["description"]
+            
+            # Set status and related fields - all tickets will be "Open"
+            status = 'Open'
+            ticket_kwargs['status'] = status
+            
+            # Since all tickets are "Open" (not "New"), ensure they have priority and proper department
+            ticket_kwargs['priority'] = random.choice(PRIORITIES)
+            if not ticket_kwargs.get('department'):
+                if category == 'IT Support':
+                    ticket_kwargs['department'] = 'IT Department'
+                elif category in ('Asset Check In', 'Asset Check Out'):
+                    ticket_kwargs['department'] = 'Asset Department'
+                elif category == 'New Budget Proposal':
+                    ticket_kwargs['department'] = 'Budget Department'
+                else:
+                    ticket_kwargs['department'] = random.choice(['IT Department', 'Asset Department', 'Budget Department'])
+            
+            # Set dates
             submit_date = make_aware(datetime.now() - timedelta(days=random.randint(1, 30)))
             update_date = submit_date + timedelta(days=random.randint(0, 5))
-
+            
+            ticket_kwargs['submit_date'] = submit_date
+            ticket_kwargs['update_date'] = update_date
+            ticket_kwargs['fetched_at'] = update_date
+            
+            # Optional scheduled date
+            if random.random() < 0.3:
+                ticket_kwargs['scheduled_date'] = (submit_date + timedelta(days=random.randint(1, 14))).date()
+            
+            # Set other fields
+            ticket_kwargs['original_ticket_id'] = f"SRC-{random.randint(1000, 9999)}"
+            ticket_kwargs['assigned_to'] = random.choice(NAMES)
+            ticket_kwargs['response_time'] = timedelta(hours=random.randint(1, 48))
+            ticket_kwargs['resolution_time'] = timedelta(days=random.randint(1, 7))
+            
+            if status in ['Resolved', 'Closed'] and random.random() > 0.3:
+                ticket_kwargs['time_closed'] = update_date + timedelta(days=random.randint(1, 3))
+            
             # Handle attachments
             attached_paths = []
-            if sample_files:
-                selected_files = random.sample(sample_files, k=random.randint(0, min(2, len(sample_files))))
+            if sample_files and random.random() < 0.4:  # 40% chance of attachments
+                selected_files = random.sample(sample_files, k=random.randint(1, min(2, len(sample_files))))
                 dest_dir = os.path.join(settings.MEDIA_ROOT, ATTACHMENT_UPLOAD_DIR)
                 
                 for file_path in selected_files:
@@ -289,57 +376,22 @@ class Command(BaseCommand):
                         "upload_date": datetime.now().isoformat(),
                     }
                     attached_paths.append(attachment_data)
+            
+            ticket_kwargs['attachments'] = attached_paths
 
-            # Employee info
-            name_parts = random.choice(NAMES).split()
-            first_name = name_parts[0]
-            last_name = name_parts[1] if len(name_parts) > 1 else "Doe"
-            email = f"{first_name.lower()}.{last_name.lower()}@example.com"
-            company_id = f"EMP{random.randint(1000, 9999)}"
-            image_url = urljoin(settings.BASE_URL, "/media/employee_images/resized-placeholder.jpeg")
+            # Create the ticket
+            try:
+                ticket = Ticket.objects.create(**ticket_kwargs)
+                created += 1
+                
+                self.stdout.write(self.style.SUCCESS(
+                    f"✅ Created: {ticket.ticket_id} - {ticket.subject[:50]}... ({ticket.category})"
+                ))
+                
+                if created % 10 == 0:
+                    self.stdout.write(self.style.SUCCESS(f'Created {created} tickets'))
+                    
+            except Exception as e:
+                self.stderr.write(f'Failed to create ticket #{i+1}: {e}')
 
-            employee = {
-                "first_name": first_name,
-                "last_name": last_name,
-                "email": email,
-                "company_id": company_id,
-                "department": department,
-                "image": image_url,
-            }
-
-            # Generate content
-            content = generate_ticket_content(subcategory)
-
-            # Create ticket (ticket_id will be auto-generated in format TXYYYYMMDD######)
-            ticket = Ticket.objects.create(
-                original_ticket_id=f"SRC-{random.randint(1000, 9999)}",
-                employee=employee,
-                subject=content["subject"],
-                category=category,
-                subcategory=subcategory,
-                description=content["description"],
-                scheduled_date=(submit_date + timedelta(days=random.randint(1, 7))).date(),
-                submit_date=submit_date,
-                update_date=update_date,
-                assigned_to=random.choice(NAMES),
-                priority=random.choice(PRIORITIES),
-                status=random.choice(STATUSES),
-                department=department,
-                response_time=timedelta(hours=random.randint(1, 24)),
-                resolution_time=timedelta(days=random.randint(1, 5)),
-                time_closed=update_date + timedelta(days=random.randint(1, 3)) if random.random() > 0.7 else None,
-                rejection_reason=None if random.random() > 0.15 else random.choice([
-                    "Insufficient justification",
-                    "Budget not available",
-                    "Does not meet requirements",
-                    "Alternative solution exists",
-                ]),
-                attachments=attached_paths,
-                fetched_at=update_date,
-            )
-
-            self.stdout.write(self.style.SUCCESS(
-                f"✅ Created: {ticket.ticket_id} - {ticket.subject[:50]}... ({subcategory})"
-            ))
-
-        self.stdout.write(self.style.SUCCESS(f"🎉 Successfully seeded 30 tickets with realistic content!"))
+        self.stdout.write(self.style.SUCCESS(f"🎉 Successfully seeded {created} tickets with realistic content!"))
