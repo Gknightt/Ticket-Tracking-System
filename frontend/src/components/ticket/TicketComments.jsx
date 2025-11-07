@@ -1,266 +1,32 @@
 // src/components/ticket/TicketComments.jsx
 import React, { useState } from "react";
-import { format } from "date-fns";
 import { useAuth } from "../../api/AuthContext";
 import useComments from "../../api/useComments";
+import Comment from "./Comment";
+import FileUpload from "./FileUpload";
+import Pagination from "./Pagination";
+import { LoadingSpinner, EmptyState, ErrorState } from "./CommentUtilities";
 import styles from "./ticketComments.module.css";
-
-// Comment component to render individual comments
-const Comment = ({
-  comment,
-  onReply,
-  onReaction,
-  onDelete,
-  canDelete = false,
-  currentUserId,
-  isReply = false,
-}) => {
-  const [showReplyForm, setShowReplyForm] = useState(false);
-  const [replyContent, setReplyContent] = useState("");
-
-  console.log("Comment data:", comment);
-
-  // === track if content is expanded
-  const [isContentExpanded, setIsContentExpanded] = useState(false); // Track content expansion
-  const MAX_CONTENT_LENGTH = 200;
-
-  // Truncate comment content if it's too long
-  const truncatedContent =
-    comment.content.length > MAX_CONTENT_LENGTH
-      ? comment.content.slice(0, MAX_CONTENT_LENGTH) + "..."
-      : comment.content;
-
-  const handleToggleContent = () => {
-    setIsContentExpanded(!isContentExpanded);
-  };
-  // ===
-
-  const formatDate = (dateString) => {
-    try {
-      const date = new Date(dateString);
-      return format(date, "h:mm a | MMM d, yyyy");
-    } catch (e) {
-      return "Invalid date";
-    }
-  };
-
-  // Check if the current user has already reacted
-  const userReaction = comment.reactions?.find(
-    (reaction) => reaction.user_id === currentUserId
-  );
-
-  const handleReplySubmit = (e) => {
-    e.preventDefault();
-    if (replyContent.trim()) {
-      onReply(comment.id, replyContent);
-      setReplyContent("");
-      setShowReplyForm(false);
-    }
-  };
-
-  const handleLikeClick = () => {
-    if (userReaction && userReaction.reaction_type === "like") {
-      onReaction(comment.id, userReaction.id, null); // Remove reaction
-    } else {
-      onReaction(comment.id, userReaction?.id, "like"); // Add/change to like
-    }
-  };
-
-  const handleDislikeClick = () => {
-    if (userReaction && userReaction.reaction_type === "dislike") {
-      onReaction(comment.id, userReaction.id, null); // Remove reaction
-    } else {
-      onReaction(comment.id, userReaction?.id, "dislike"); // Add/change to dislike
-    }
-  };
-
-  const getLikeCount = () => {
-    // Use the thumbs_up_count directly from the API response if available
-    if (comment.thumbs_up_count !== undefined) {
-      return comment.thumbs_up_count;
-    }
-    // Fallback to the original calculation method
-    return (
-      comment.reactions?.filter((r) => r.reaction_type === "like").length || 0
-    );
-  };
-
-  const getDislikeCount = () => {
-    // Use the thumbs_down_count directly from the API response if available
-    if (comment.thumbs_down_count !== undefined) {
-      return comment.thumbs_down_count;
-    }
-    // Fallback to the original calculation method
-    return (
-      comment.reactions?.filter((r) => r.reaction_type === "dislike").length ||
-      0
-    );
-  };
-
-  return (
-    <div className={styles.commentCard}>
-      <div className={styles.commentBody}>
-        <div className={styles.commentHeader}>
-          <div className={styles.userInfo}>
-            <span className={styles.commentAuthor}>
-              {comment.firstname || comment.user?.first_name}{" "}
-              {comment.lastname || comment.user?.last_name}
-            </span>
-            {(comment.role || comment.user?.role) && (
-              <span className={styles.userRole}>
-                {comment.role || comment.user?.role}
-              </span>
-            )}
-          </div>
-          <span className={styles.commentTime}>
-            {formatDate(comment.created_at)}
-          </span>
-        </div>
-        {/* <div className={styles.commentContent}>{comment.content}</div> */}
-        <div className={styles.commentContent}>
-          {isContentExpanded || comment.content.length <= MAX_CONTENT_LENGTH
-            ? comment.content
-            : truncatedContent}
-          {comment.content.length > MAX_CONTENT_LENGTH && (
-            <button
-              className={styles.seeMoreButton}
-              onClick={handleToggleContent}
-            >
-              {isContentExpanded ? "See Less" : "See More"}
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className={styles.commentActions}>
-        <button
-          className={`${styles.actionButton} ${
-            userReaction?.reaction_type === "like"
-              ? styles.actionButtonActive
-              : ""
-          }`}
-          onClick={handleLikeClick}
-        >
-          <i className="fa-solid fa-thumbs-up"></i> {getLikeCount()}
-        </button>
-
-        <button
-          className={`${styles.actionButton} ${
-            userReaction?.reaction_type === "dislike"
-              ? styles.actionButtonActive
-              : ""
-          }`}
-          onClick={handleDislikeClick}
-        >
-          <i className="fa-solid fa-thumbs-down"></i> {getDislikeCount()}
-        </button>
-
-        {/* Only show reply button if this is not already a reply */}
-        {!isReply && (
-          <button
-            className={styles.actionButton}
-            onClick={() => setShowReplyForm(!showReplyForm)}
-          >
-            <i className="fa-solid fa-reply"></i> Reply
-          </button>
-        )}
-
-        {/* Delete button shown only when user can delete */}
-        {canDelete && (
-          <button
-            className={styles.actionButton}
-            onClick={() => {
-              if (onDelete) {
-                const confirmed = window.confirm("Delete this comment?");
-                if (confirmed) onDelete(comment.id);
-              }
-            }}
-          >
-            <i className="fa-solid fa-trash"></i> Delete
-          </button>
-        )}
-      </div>
-
-      {showReplyForm && (
-        <form className={styles.replyForm} onSubmit={handleReplySubmit}>
-          <input
-            type="text"
-            className={styles.replyInput}
-            value={replyContent}
-            onChange={(e) => setReplyContent(e.target.value)}
-            placeholder="Write a reply..."
-          />
-          <button type="submit" className={styles.replyButton}>
-            Reply
-          </button>
-        </form>
-      )}
-
-      {comment.replies && comment.replies.length > 0 && (
-        <div className={styles.repliesContainer}>
-          {comment.replies.map((reply) => (
-            <Comment
-              key={reply.id}
-              comment={reply}
-              onReply={onReply}
-              onReaction={onReaction}
-              currentUserId={currentUserId}
-              isReply={true} // Mark this as a reply so it won't show the reply button
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Loading spinner component
-const LoadingSpinner = () => (
-  <div className={styles.loadingSpinner}>
-    <div className={styles.loadingDots}>
-      <div className={styles.loadingDot}></div>
-      <div className={styles.loadingDot}></div>
-      <div className={styles.loadingDot}></div>
-    </div>
-  </div>
-);
-
-// Empty state component
-const EmptyState = () => (
-  <div className={styles.emptyStateContainer}>
-    <i className="fa-regular fa-comments styles.emptyStateIcon"></i>
-    <p className={styles.emptyStateText}>
-      No comments yet. Be the first to start a conversation!
-    </p>
-  </div>
-);
-
-// Error state component
-const ErrorState = ({ message, onRetry }) => (
-  <div className={styles.errorMessage}>
-    <p>{message}</p>
-    {onRetry && (
-      <button onClick={onRetry} className={styles.actionButton}>
-        <i className="fa-solid fa-rotate"></i> Retry
-      </button>
-    )}
-  </div>
-);
 
 const TicketComments = ({ ticketId }) => {
   const { user, isAdmin } = useAuth();
   const [newComment, setNewComment] = useState("");
+  const [attachmentFiles, setAttachmentFiles] = useState([]);
+  const [clearAttachmentFilesTrigger, setClearAttachmentFilesTrigger] = useState(0);
 
   const {
     comments,
     loading,
     error,
+    pagination,
     addComment,
     addReply,
     addReaction,
     removeReaction,
     deleteComment,
+    downloadDocument,
     refreshComments,
+    fetchComments,
   } = useComments(ticketId);
 
   const handleDelete = async (commentId) => {
@@ -272,7 +38,6 @@ const TicketComments = ({ ticketId }) => {
 
     const success = await deleteComment(commentId);
     if (!success) {
-      // Optionally: show a user-facing notification here
       console.error("Failed to delete comment", commentId);
     }
   };
@@ -280,13 +45,27 @@ const TicketComments = ({ ticketId }) => {
   const handleSendComment = async (e) => {
     e.preventDefault();
     if (newComment.trim()) {
-      await addComment(newComment);
-      setNewComment("");
+      console.log('Sending comment with files:', attachmentFiles);
+      const result = await addComment(newComment, attachmentFiles);
+      if (result) {
+        setNewComment("");
+        setAttachmentFiles([]);
+        setClearAttachmentFilesTrigger((prev) => prev + 1);
+        console.log('Comment sent successfully');
+      } else {
+        console.error('Failed to send comment');
+      }
     }
   };
 
-  const handleReply = async (parentId, content) => {
-    await addReply(parentId, content);
+  const handleReply = async (parentId, content, files = []) => {
+    console.log('Sending reply with files:', files);
+    const result = await addReply(parentId, content, files);
+    if (result) {
+      console.log('Reply sent successfully');
+    } else {
+      console.error('Failed to send reply');
+    }
   };
 
   const handleReaction = async (
@@ -310,11 +89,17 @@ const TicketComments = ({ ticketId }) => {
     }
   };
 
+  const handleDownloadDocument = async (documentId, filename) => {
+    await downloadDocument(documentId, filename);
+  };
+
+  const handlePageChange = (page) => {
+    fetchComments(page);
+  };
+
   // Organize comments into a tree structure (root comments and their replies)
   const organizedComments = React.useMemo(() => {
     if (!comments) return [];
-
-    // console.log("Raw comments data:", comments);
 
     // Map the comments to include the 'id' field expected by the component
     // Use the already nested 'replies' structure from the API
@@ -355,7 +140,14 @@ const TicketComments = ({ ticketId }) => {
 
   return (
     <div className={styles.commentsSection}>
-      <h3>Comments</h3>
+      <div className={styles.commentsHeader}>
+        <h3>Comments</h3>
+        {pagination.count > 0 && (
+          <span className={styles.commentsCount}>
+            {pagination.count} comment{pagination.count !== 1 ? 's' : ''}
+          </span>
+        )}
+      </div>
 
       <div className={styles.commentsList}>
         {loading ? (
@@ -365,26 +157,29 @@ const TicketComments = ({ ticketId }) => {
         ) : organizedComments.length === 0 ? (
           <EmptyState />
         ) : (
-          organizedComments.map((comment) => (
-            <Comment
-              key={comment.id}
-              comment={comment}
-              onReply={handleReply}
-              onReaction={handleReaction}
-              onDelete={handleDelete}
-              // canDelete={
-              //   (user?.id &&
-              //     (user?.id === comment.user_id ||
-              //       user?.id === comment.user?.id)) ||
-              //   (typeof isAdmin === "function" ? isAdmin() : false)
-              // }
-              canDelete={
-                (user?.id && String(user.id) === String(comment.user_id)) ||
-                (typeof isAdmin === "function" ? isAdmin() : false)
-              }
-              currentUserId={user?.id}
+          <>
+            {organizedComments.map((comment) => (
+              <Comment
+                key={comment.id}
+                comment={comment}
+                onReply={handleReply}
+                onReaction={handleReaction}
+                onDelete={handleDelete}
+                onDownloadDocument={handleDownloadDocument}
+                canDelete={
+                  (user?.id && String(user.id) === String(comment.user_id)) ||
+                  (typeof isAdmin === "function" ? isAdmin() : false)
+                }
+                currentUserId={user?.id}
+              />
+            ))}
+            
+            <Pagination
+              pagination={pagination}
+              onPageChange={handlePageChange}
+              loading={loading}
             />
-          ))
+          </>
         )}
       </div>
 
@@ -395,14 +190,33 @@ const TicketComments = ({ ticketId }) => {
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
           disabled={loading}
+          rows="4"
         />
-        <button
-          className={styles.commentButton}
-          type="submit"
-          disabled={loading || !newComment.trim()}
-        >
-          <i className="fa-solid fa-paper-plane"></i> Send
-        </button>
+        
+        <FileUpload
+          onFilesSelected={setAttachmentFiles}
+          maxFiles={5}
+          uniqueId="comment-file-upload"
+          clearTrigger={clearAttachmentFilesTrigger}
+        />
+        
+        <div className={styles.commentFormActions}>
+          <div className={styles.attachmentInfo}>
+            {attachmentFiles.length > 0 && (
+              <span className={styles.fileCount}>
+                <i className="fas fa-paperclip"></i>
+                {attachmentFiles.length} file{attachmentFiles.length !== 1 ? 's' : ''} selected
+              </span>
+            )}
+          </div>
+          <button
+            className={styles.commentButton}
+            type="submit"
+            disabled={loading || !newComment.trim()}
+          >
+            <i className="fa-solid fa-paper-plane"></i> Send
+          </button>
+        </div>
       </form>
     </div>
   );
