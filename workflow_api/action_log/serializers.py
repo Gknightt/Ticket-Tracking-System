@@ -39,7 +39,14 @@ class WorkflowProgressSerializer(serializers.Serializer):
         # Build a map of transition_id -> StepInstance
         instance_map = {s.step_transition_id.transition_id: s for s in step_instances}
 
-        # Step 3: Determine step status
+        # Step 3: Get the task to extract employee_cookie_id from ticket
+        try:
+            task = Task.objects.get(task_id=task_id)
+            employee_cookie_id = task.ticket_id.employee_cookie_id if task.ticket_id else None
+        except Task.DoesNotExist:
+            employee_cookie_id = None
+
+        # Step 4: Determine step status
         def get_step_status(step):
             incoming = transitions.filter(to_step_id=step.step_id)
             has_instance = False
@@ -53,7 +60,7 @@ class WorkflowProgressSerializer(serializers.Serializer):
                         return "active"
             return "pending" if has_instance else "pending"
 
-        # Step 4: Build graph data
+        # Step 5: Build graph data
         nodes = []
         for step in steps:
             nodes.append({
@@ -76,6 +83,7 @@ class WorkflowProgressSerializer(serializers.Serializer):
         return {
             "task_id": task_id,
             "workflow_id": str(workflow.workflow_id),
+            "employee_cookie_id": employee_cookie_id,
             "nodes": nodes,
             "edges": edges
         }

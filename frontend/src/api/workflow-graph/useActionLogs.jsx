@@ -14,7 +14,7 @@ const useFetchActionLogs = () => {
     setError(null);
 
     try {
-      const response = await api.get('/action_log/action-logs/', {
+      const response = await api.get('/action-logs/action-logs/', {
         params: { task_id: taskId },
       });
       setLogs(response.data);

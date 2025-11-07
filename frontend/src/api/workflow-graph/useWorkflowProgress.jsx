@@ -13,7 +13,7 @@ export function useWorkflowProgress(taskId) {
     setLoading(true);
 
     api
-      .get(`/action_log/progress/?task_id=${taskId}`)
+      .get(`/action-logs/progress/?task_id=${taskId}`)
       .then((res) => {
         console.log("✅ API response:", res.data);
         setData(res.data); // <-- fix this line!
