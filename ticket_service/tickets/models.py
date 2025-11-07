@@ -7,24 +7,27 @@ import random
 
 class Ticket(models.Model):
     PRIORITY_CHOICES = [
-        ('Low', 'Low'),
-        ('Medium', 'Medium'),
+        ('Critical', 'Critical'),
         ('High', 'High'),
-        ('Urgent', 'Urgent'),
+        ('Medium', 'Medium'),
+        ('Low', 'Low'),
     ]
 
     STATUS_CHOICES = [
         ('New', 'New'),
         ('Open', 'Open'),
         ('In Progress', 'In Progress'),
-        ('Resolved', 'Resolved'),
-        ('Closed', 'Closed'),
         ('On Hold', 'On Hold'),
+        ('Pending', 'Pending'),
+        ('Resolved', 'Resolved'),
+        ('Rejected', 'Rejected'),
+        ('Withdrawn', 'Withdrawn'),
+        ('Closed', 'Closed'),
     ]
 
     # Ticket identity fields
     ticket_id = models.CharField(max_length=20, unique=True, db_index=True, blank=True, null=True)
-    original_ticket_id = models.CharField(max_length=20, db_index=True,  blank=True, null=True)  # ID from source service
+    original_ticket_id = models.CharField(max_length=20, db_index=True, blank=True, null=True)  # ID from source service
     source_service = models.CharField(max_length=50, default='ticket_service', db_index=True)
 
     # Customer info
@@ -41,9 +44,24 @@ class Ticket(models.Model):
     assigned_to = models.CharField(max_length=255, blank=True, null=True)
 
     # Status tracking
-    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='Low', db_index=True,  blank=True, null=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='New', db_index=True,  blank=True, null=True)
-    department = models.CharField(max_length=100, db_index=True,  blank=True, null=True)
+    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='Low', db_index=True, blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='New', db_index=True, blank=True, null=True)
+    department = models.CharField(max_length=100, db_index=True, blank=True, null=True)
+
+    # Asset-related fields
+    asset_name = models.CharField(max_length=255, blank=True, null=True)
+    serial_number = models.CharField(max_length=100, blank=True, null=True)
+    location = models.CharField(max_length=255, blank=True, null=True)
+    expected_return_date = models.DateField(blank=True, null=True)
+
+    # Dynamic data for category-specific fields
+    dynamic_data = models.JSONField(default=dict, blank=True)
+
+    # Budget-related fields
+    cost_items = models.JSONField(default=dict, blank=True)
+    requested_budget = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+    performance_start_date = models.DateField(blank=True, null=True)
+    performance_end_date = models.DateField(blank=True, null=True)
 
     # Timing info
     response_time = models.DurationField(blank=True, null=True)
@@ -69,6 +87,9 @@ class Ticket(models.Model):
             models.Index(fields=['priority']),
             models.Index(fields=['employee']),
             models.Index(fields=['department']),
+            models.Index(fields=['category']),
+            models.Index(fields=['asset_name']),
+            models.Index(fields=['serial_number']),
         ]
 
     def save(self, *args, **kwargs):
