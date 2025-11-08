@@ -59,83 +59,200 @@ class CommentViewSet(viewsets.ModelViewSet):
             'multipart/form-data': {
                 'type': 'object',
                 'properties': {
-                    'user_id': {'type': 'string'},
-                    'firstname': {'type': 'string'},
-                    'lastname': {'type': 'string'},
-                    'role': {'type': 'string'},
                     'content': {'type': 'string', 'description': 'Content of the reply'},
                     'documents': {'type': 'array', 'items': {'type': 'string', 'format': 'binary'}},
                 },
-                'required': ['user_id', 'firstname', 'lastname', 'role', 'content']
+                'required': ['content']
             }
         }
     )
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['get', 'post'])
     def reply(self, request, comment_id=None):
-        """Add a reply to an existing comment with optional document attachments"""
+        """Get reply info or add a reply to an existing comment with optional document attachments"""
         parent_comment = self.get_object()
         
-        data = request.data.copy()
-        data['ticket_id'] = parent_comment.ticket.ticket_id
-        data['parent'] = parent_comment.id
+        if request.method == 'GET':
+            # Return information about the parent comment for reply form
+            return Response({
+                'parent_comment': {
+                    'comment_id': parent_comment.comment_id,
+                    'content': parent_comment.content,
+                    'author': f"{parent_comment.firstname} {parent_comment.lastname}",
+                    'created_at': parent_comment.created_at
+                },
+                'ticket_id': parent_comment.ticket.ticket_id,
+                'reply_endpoint': request.build_absolute_uri(),
+                'required_fields': ['content']  # Only content is required now
+            })
         
-        # Validate required fields
-        required_fields = ['user_id', 'firstname', 'lastname', 'role']
-        missing_fields = [field for field in required_fields if field not in data]
-        
-        if missing_fields:
-            return Response(
-                {field: "This field is required" for field in missing_fields},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        serializer = CommentSerializer(data=data)
-        if serializer.is_valid():
-            reply = serializer.save()
+        elif request.method == 'POST':
+            print(f"DEBUG: Reply endpoint called with data: {request.data}")
+            print(f"DEBUG: Request user: {request.user}")
+            print(f"DEBUG: User authenticated: {hasattr(request, 'user') and request.user.is_authenticated}")
             
-            # Handle document attachments
-            DocumentAttachmentService.handle_document_attachments(request, reply, data)
+            # Extract user information from JWT authentication
+            if not hasattr(request, 'user') or not request.user.is_authenticated:
+                print("DEBUG: Authentication failed")
+                return Response(
+                    {"error": "Authentication required"}, 
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
             
-            # Send notification
-            self.notification_service.send_notification(reply, action='reply')
+            # Parse full_name to get firstname and lastname
+            full_name = getattr(request.user, 'full_name', '') or ''
+            name_parts = full_name.strip().split(' ', 1)
+            firstname = name_parts[0] if name_parts else ''
+            lastname = name_parts[1] if len(name_parts) > 1 else ''
             
-            reply_serializer = CommentSerializer(reply, context={'request': request})
-            return Response(reply_serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            # If full_name is empty, try to use username or email
+            if not firstname:
+                firstname = getattr(request.user, 'username', '') or getattr(request.user, 'email', '').split('@')[0]
+            
+            # Extract user role - get the first TTS role or fallback to first role
+            user_roles = getattr(request.user, 'tts_roles', []) or getattr(request.user, 'roles', [])
+            role = 'User'  # Default role
+            
+            if user_roles:
+                first_role = user_roles[0]
+                if isinstance(first_role, dict):
+                    role = first_role.get('role', 'User')
+                elif isinstance(first_role, str) and ':' in first_role:
+                    role = first_role.split(':', 1)[1]
+                elif isinstance(first_role, str):
+                    role = first_role
+            
+            print(f"DEBUG: Extracted user info - ID: {request.user.user_id}, Name: {firstname} {lastname}, Role: {role}")
+            
+            # Create a new reply with authenticated user data
+            data = request.data.copy()
+            data['ticket_id'] = parent_comment.ticket.ticket_id
+            data['parent'] = parent_comment.comment_id  # Use comment_id instead of database id
+            data['user_id'] = str(request.user.user_id)
+            data['firstname'] = firstname
+            data['lastname'] = lastname
+            data['role'] = role
+            
+            print(f"DEBUG: Final data for serializer: {data}")
+            
+            # Validate that content is provided
+            if 'content' not in data or not data['content'].strip():
+                print("DEBUG: Content validation failed")
+                return Response(
+                    {"content": "This field is required"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            serializer = CommentSerializer(data=data)
+            if serializer.is_valid():
+                print("DEBUG: Serializer is valid, saving reply")
+                reply = serializer.save()
+                
+                # Handle document attachments
+                DocumentAttachmentService.handle_document_attachments(request, reply, data)
+                
+                # Send specific reply notification
+                self.notification_service.send_comment_reply(reply)
+                
+                reply_serializer = CommentSerializer(reply, context={'request': request})
+                return Response(reply_serializer.data, status=status.HTTP_201_CREATED)
+            else:
+                print(f"DEBUG: Serializer errors: {serializer.errors}")
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     def create(self, request, *args, **kwargs):
-        """Override create to handle document attachments"""
+        """Override create to handle document attachments and extract user from JWT"""
+        # Extract user information from JWT authentication
+        if not hasattr(request, 'user') or not request.user.is_authenticated:
+            return Response(
+                {"error": "Authentication required"}, 
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        # Parse full_name to get firstname and lastname
+        full_name = getattr(request.user, 'full_name', '') or ''
+        name_parts = full_name.strip().split(' ', 1)
+        firstname = name_parts[0] if name_parts else ''
+        lastname = name_parts[1] if len(name_parts) > 1 else ''
+        
+        # If full_name is empty, try to use username or email
+        if not firstname:
+            firstname = getattr(request.user, 'username', '') or getattr(request.user, 'email', '').split('@')[0]
+        
+        # Extract user role - get the first TTS role or fallback to first role
+        user_roles = getattr(request.user, 'tts_roles', []) or getattr(request.user, 'roles', [])
+        role = 'User'  # Default role
+        
+        if user_roles:
+            first_role = user_roles[0]
+            if isinstance(first_role, dict):
+                role = first_role.get('role', 'User')
+            elif isinstance(first_role, str) and ':' in first_role:
+                role = first_role.split(':', 1)[1]
+            elif isinstance(first_role, str):
+                role = first_role
+        
+        # Add user information to request data
+        data = request.data.copy()
+        data['user_id'] = str(request.user.user_id)
+        data['firstname'] = firstname
+        data['lastname'] = lastname
+        data['role'] = role
+        
         uploaded_files = request.FILES.getlist('documents') if 'documents' in request.FILES else []
         
-        serializer = self.get_serializer(data=request.data)
+        serializer = self.get_serializer(data=data)
         if serializer.is_valid():
             comment = serializer.save()
             
             # Handle file attachments
             if uploaded_files:
                 DocumentAttachmentService.attach_files_to_comment(
-                    comment, uploaded_files, request.data
+                    comment, uploaded_files, data
                 )
             
-            # Send notification
-            self.notification_service.send_notification(comment, action='create')
+            # Send specific create notification
+            self.notification_service.send_comment_create(comment)
             
             comment_serializer = CommentSerializer(comment, context={'request': request})
             return Response(comment_serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def update(self, request, *args, **kwargs):
+        """Override update to send proper notifications"""
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        
+        if serializer.is_valid():
+            comment = serializer.save()
+            
+            # Send specific update notification
+            self.notification_service.send_comment_update(comment)
+            
+            if getattr(instance, '_prefetched_objects_cache', None):
+                instance._prefetched_objects_cache = {}
+            
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def destroy(self, request, *args, **kwargs):
+        """Override destroy to send proper notifications"""
+        instance = self.get_object()
+        
+        # Send delete notification before deletion
+        self.notification_service.send_comment_delete(instance)
+        
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
     
     @extend_schema(
         request={
             'multipart/form-data': {
                 'type': 'object',
                 'properties': {
-                    'user_id': {'type': 'string'},
-                    'firstname': {'type': 'string'},
-                    'lastname': {'type': 'string'},
-                    'role': {'type': 'string'},
                     'documents': {'type': 'array', 'items': {'type': 'string', 'format': 'binary'}},
                 },
-                'required': ['user_id', 'firstname', 'lastname', 'role', 'documents']
+                'required': ['documents']
             }
         }
     )
@@ -144,15 +261,22 @@ class CommentViewSet(viewsets.ModelViewSet):
         """Attach documents to an existing comment"""
         comment = self.get_object()
         
-        # Validate required fields
-        required_fields = ['user_id', 'firstname', 'lastname', 'role']
-        missing_fields = [field for field in required_fields if field not in request.data]
-        
-        if missing_fields:
+        # Extract user information from JWT authentication
+        if not hasattr(request, 'user') or not request.user.is_authenticated:
             return Response(
-                {field: "This field is required" for field in missing_fields},
-                status=status.HTTP_400_BAD_REQUEST
+                {"error": "Authentication required"}, 
+                status=status.HTTP_401_UNAUTHORIZED
             )
+        
+        # Parse full_name to get firstname and lastname
+        full_name = getattr(request.user, 'full_name', '') or ''
+        name_parts = full_name.strip().split(' ', 1)
+        firstname = name_parts[0] if name_parts else ''
+        lastname = name_parts[1] if len(name_parts) > 1 else ''
+        
+        # If full_name is empty, try to use username or email
+        if not firstname:
+            firstname = getattr(request.user, 'username', '') or getattr(request.user, 'email', '').split('@')[0]
         
         files = request.FILES.getlist('documents')
         if not files:
@@ -162,17 +286,20 @@ class CommentViewSet(viewsets.ModelViewSet):
             )
         
         user_data = {
-            'user_id': request.data.get('user_id'),
-            'firstname': request.data.get('firstname'),
-            'lastname': request.data.get('lastname')
+            'user_id': str(request.user.user_id),
+            'firstname': firstname,
+            'lastname': lastname
         }
         
         attached_documents, errors = DocumentAttachmentService.attach_files_to_comment(
             comment, files, user_data
         )
         
-        # Send notification
-        self.notification_service.send_notification(comment, action='attach_document')
+        # Send specific document attachment notification
+        self.notification_service.send_document_attach(comment, document_info={
+            'attached': attached_documents,
+            'errors': errors
+        })
         
         # Return updated comment
         comment_serializer = CommentSerializer(comment, context={'request': request})
@@ -206,8 +333,11 @@ class CommentViewSet(viewsets.ModelViewSet):
             document_name = comment_doc.document.original_filename
             comment_doc.delete()
             
-            # Send notification
-            self.notification_service.send_notification(comment, action='detach_document')
+            # Send specific document detachment notification
+            self.notification_service.send_document_detach(comment, document_info={
+                'detached_document': document_name,
+                'document_id': document_id
+            })
             
             return Response({
                 "message": f"Document '{document_name}' detached successfully"
@@ -238,27 +368,66 @@ class CommentViewSet(viewsets.ModelViewSet):
             raise Http404("Document not found")
     
     @extend_schema(
-        request=CommentRatingSerializer,
-        examples=[
-            OpenApiExample(
-                'Rate Comment',
-                value={
-                    'user_id': '123',
-                    'firstname': 'John',
-                    'lastname': 'Doe',
-                    'role': 'Customer',
-                    'rating': True
-                }
-            )
-        ]
+        request={
+            'application/json': {
+                'type': 'object',
+                'properties': {
+                    'rating': {'type': 'boolean', 'description': 'True for thumbs up, False for thumbs down'}
+                },
+                'required': ['rating']
+            }
+        }
     )
     @action(detail=True, methods=['post'])
     def rate(self, request, comment_id=None):
         """Rate a comment (thumbs up/down)"""
         comment = self.get_object()
         
-        rating_data = request.data.copy()
-        rating_data['comment'] = comment.id
+        # Extract user information from JWT authentication
+        if not hasattr(request, 'user') or not request.user.is_authenticated:
+            return Response(
+                {"error": "Authentication required"}, 
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        # Parse full_name to get firstname and lastname
+        full_name = getattr(request.user, 'full_name', '') or ''
+        name_parts = full_name.strip().split(' ', 1)
+        firstname = name_parts[0] if name_parts else ''
+        lastname = name_parts[1] if len(name_parts) > 1 else ''
+        
+        # If full_name is empty, try to use username or email
+        if not firstname:
+            firstname = getattr(request.user, 'username', '') or getattr(request.user, 'email', '').split('@')[0]
+        
+        # Extract user role - get the first TTS role or fallback to first role
+        user_roles = getattr(request.user, 'tts_roles', []) or getattr(request.user, 'roles', [])
+        role = 'User'  # Default role
+        
+        if user_roles:
+            first_role = user_roles[0]
+            if isinstance(first_role, dict):
+                role = first_role.get('role', 'User')
+            elif isinstance(first_role, str) and ':' in first_role:
+                role = first_role.split(':', 1)[1]
+            elif isinstance(first_role, str):
+                role = first_role
+        
+        rating_data = {
+            'comment': comment.id,
+            'user_id': str(request.user.user_id),
+            'firstname': firstname,
+            'lastname': lastname,
+            'role': role,
+            'rating': request.data.get('rating')
+        }
+        
+        # Validate rating field
+        if 'rating' not in request.data:
+            return Response(
+                {"rating": "This field is required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
         # Check for existing rating
         try:
@@ -267,14 +436,21 @@ class CommentViewSet(viewsets.ModelViewSet):
                 user_id=rating_data.get('user_id')
             )
             serializer = CommentRatingSerializer(existing_rating, data=rating_data, partial=True)
+            rating_action = 'updated'
         except CommentRating.DoesNotExist:
             serializer = CommentRatingSerializer(data=rating_data)
+            rating_action = 'created'
         
         if serializer.is_valid():
-            serializer.save()
+            rating = serializer.save()
             
-            # Send notification
-            self.notification_service.send_notification(comment, action='rate')
+            # Send specific rating notification with rating data
+            self.notification_service.send_comment_rate(comment, rating_data={
+                'rating_id': rating.id,
+                'user_id': rating.user_id,
+                'rating': rating.rating,
+                'action': rating_action
+            })
             
             comment_serializer = CommentSerializer(comment, context={'request': request})
             return Response({

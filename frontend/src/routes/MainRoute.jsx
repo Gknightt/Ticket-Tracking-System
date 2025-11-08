@@ -37,6 +37,9 @@ import AdminTicketDetail from "../pages/admin/ticket-detail-page/AdminTicketDeta
 import AdminArchiveDetail from "../pages/admin/archive-page/AdminArchiveDetail";
 import ResetPassword from "../pages/auth/PasswordReset";
 
+// WebSocket test
+import WebSocketTest from "../components/WebSocketTest";
+
 export default function MainRoute() {
   return (
     <Routes>
@@ -51,6 +54,10 @@ export default function MainRoute() {
       
       {/* PUBLIC REPORT - May need to be protected depending on requirements */}
       <Route path="/report" element={<Report />} />
+
+      {/* WEBSOCKET TEST ROUTES - Available for testing WebSocket functionality */}
+      <Route path="/websocket-test" element={<WebSocketTest />} />
+      <Route path="/websocket-test/:ticketId" element={<WebSocketTest />} />
 
       {/* PROTECTED AGENT ROUTES - Available to any user with TTS role */}
       <Route element={<ProtectedRoute requireAgent={true} />}>

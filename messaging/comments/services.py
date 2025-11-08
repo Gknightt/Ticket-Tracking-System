@@ -1,5 +1,6 @@
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+from datetime import datetime
 from .models import Comment, CommentDocument, DocumentStorage
 from .serializers import CommentSerializer
 import logging
@@ -15,22 +16,107 @@ class CommentNotificationService:
     def __init__(self):
         self.channel_layer = get_channel_layer()
     
-    def send_notification(self, comment, action='create'):
+    def send_notification(self, comment, action='create', **kwargs):
         """Send WebSocket notification for comment updates"""
-        if self.channel_layer:
+        if not self.channel_layer:
+            logger.warning("Channel layer not available for WebSocket notifications")
+            return
+        
+        try:
             ticket_id = comment.ticket.ticket_id
             room_group_name = f'comments_{ticket_id}'
             
-            serializer = CommentSerializer(comment)
+            # Prepare the message data based on action type
+            message_data = self._prepare_message_data(comment, action, **kwargs)
             
+            # Send the message to the WebSocket group
             async_to_sync(self.channel_layer.group_send)(
                 room_group_name,
-                {
-                    'type': 'comment_message',
-                    'message': serializer.data,
-                    'action': action
-                }
+                message_data
             )
+            
+            logger.info(f"WebSocket notification sent for {action} on comment {comment.id}")
+            
+        except Exception as e:
+            logger.error(f"Failed to send WebSocket notification for {action}: {str(e)}")
+    
+    def _prepare_message_data(self, comment, action, **kwargs):
+        """Prepare message data based on the action type"""
+        base_data = {
+            'type': f'comment_{action}',
+            'timestamp': datetime.now().isoformat(),
+        }
+        
+        # Handle different action types
+        if action == 'delete':
+            # For delete, we only need the comment ID since the object might be deleted
+            base_data.update({
+                'message': {
+                    'id': comment.id,
+                    'comment_id': getattr(comment, 'comment_id', comment.id),
+                    'ticket_id': comment.ticket.ticket_id
+                },
+                'action': action,
+                'deleted_comment_id': comment.id
+            })
+        
+        elif action == 'rate':
+            # For rating, include the updated comment with rating info
+            serializer = CommentSerializer(comment)
+            rating_data = kwargs.get('rating_data', {})
+            base_data.update({
+                'message': serializer.data,
+                'action': action,
+                'rating_data': rating_data
+            })
+        
+        elif action in ['attach_document', 'detach_document']:
+            # For document operations, include document info
+            serializer = CommentSerializer(comment)
+            document_info = kwargs.get('document_info', {})
+            base_data.update({
+                'message': serializer.data,
+                'action': action,
+                'document_info': document_info
+            })
+        
+        else:
+            # For create, update, reply - include full comment data
+            serializer = CommentSerializer(comment)
+            base_data.update({
+                'message': serializer.data,
+                'action': action
+            })
+        
+        return base_data
+    
+    def send_comment_create(self, comment):
+        """Send notification for comment creation"""
+        self.send_notification(comment, 'create')
+    
+    def send_comment_update(self, comment):
+        """Send notification for comment update"""
+        self.send_notification(comment, 'update')
+    
+    def send_comment_delete(self, comment):
+        """Send notification for comment deletion"""
+        self.send_notification(comment, 'delete')
+    
+    def send_comment_reply(self, reply_comment):
+        """Send notification for comment reply"""
+        self.send_notification(reply_comment, 'reply')
+    
+    def send_comment_rate(self, comment, rating_data=None):
+        """Send notification for comment rating"""
+        self.send_notification(comment, 'rate', rating_data=rating_data)
+    
+    def send_document_attach(self, comment, document_info=None):
+        """Send notification for document attachment"""
+        self.send_notification(comment, 'attach_document', document_info=document_info)
+    
+    def send_document_detach(self, comment, document_info=None):
+        """Send notification for document detachment"""
+        self.send_notification(comment, 'detach_document', document_info=document_info)
 
 
 class DocumentAttachmentService:
