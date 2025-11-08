@@ -174,6 +174,21 @@ CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', 'False').lower
 # but ensure CORS_ALLOW_ALL_ORIGINS is False when this is enabled.
 CORS_ALLOW_CREDENTIALS = os.environ.get('CORS_ALLOW_CREDENTIALS', 'True').lower() in ('1', 'true', 'yes')
 
+# Allow cache-busting headers that trigger preflight requests
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'cache-control',
+    'pragma',
+    'expires',
+]
 
 # Channels configuration (using in-memory backend for development)
 CHANNEL_LAYERS = {
