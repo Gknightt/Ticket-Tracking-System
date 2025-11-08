@@ -95,6 +95,17 @@
   color: #0084ff;
 }
 
+.actionButtonLoading {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.actionButtonLoading:hover {
+  background-color: var(--action-button-bg, #f8f9fa);
+  color: var(--action-button-color, #6c757d);
+}
+
 .replyForm {
   margin-top: 10px;
   display: flex;

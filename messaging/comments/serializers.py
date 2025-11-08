@@ -54,33 +54,61 @@ class CommentRatingSerializer(serializers.ModelSerializer):
 
 class ReplySerializer(serializers.ModelSerializer):
     ratings_summary = serializers.SerializerMethodField()
-    ticket_id = serializers.SerializerMethodField()
+    ticket_id = serializers.CharField(required=False)  # Add this to handle ticket_id input
     documents = CommentDocumentSerializer(many=True, read_only=True)
+    # Add fields for reply creation - parent should be CharField, not FK
+    parent = serializers.CharField(max_length=50, required=False, allow_null=True, help_text="Parent comment_id for replies")
     
     class Meta:
         model = Comment
         fields = ['comment_id', 'ticket_id', 'user_id', 'firstname', 'lastname', 'role', 
-                 'content', 'created_at', 'thumbs_up_count', 'thumbs_down_count', 'ratings_summary', 'documents']
-        read_only_fields = ['comment_id', 'created_at', 'thumbs_up_count', 'thumbs_down_count', 'ticket_id', 'documents']
+                 'content', 'created_at', 'parent', 'thumbs_up_count', 'thumbs_down_count', 'ratings_summary', 'documents']
+        read_only_fields = ['comment_id', 'created_at', 'thumbs_up_count', 'thumbs_down_count', 'documents']
     
     def get_ratings_summary(self, obj):
         return {
             'thumbs_up': obj.thumbs_up_count,
             'thumbs_down': obj.thumbs_down_count
         }
+    
+    def validate(self, data):
+        # Only validate required fields if they're not already set
+        if not data.get('content', '').strip():
+            raise serializers.ValidationError({'content': 'This field is required'})
+        return data
+    
+    def validate_parent(self, value):
+        """Validate that parent comment_id exists and is not a reply itself"""
+        if value:
+            try:
+                parent_comment = Comment.objects.get(comment_id=value)
+                if parent_comment.parent:
+                    raise serializers.ValidationError("Cannot reply to a reply. Parent comment must be a top-level comment.")
+            except Comment.DoesNotExist:
+                raise serializers.ValidationError(f"Parent comment with comment_id '{value}' does not exist.")
+        return value
+    
+    def create(self, validated_data):
+        """Create a reply comment"""
+        ticket_id_str = validated_data.pop('ticket_id', None)
         
-    def get_ticket_id(self, obj):
-        return obj.ticket.ticket_id if obj.ticket else None
+        if not ticket_id_str:
+            raise serializers.ValidationError({"ticket_id": "This field is required"})
+        
+        # Get the ticket
+        try:
+            ticket = Ticket.objects.get(ticket_id=ticket_id_str)
+        except Ticket.DoesNotExist:
+            raise serializers.ValidationError({"ticket_id": f"Ticket with ID {ticket_id_str} not found"})
+        
+        validated_data['ticket'] = ticket
+        return super().create(validated_data)
 
 class CommentSerializer(serializers.ModelSerializer):
     replies = ReplySerializer(many=True, read_only=True)
     ratings_summary = serializers.SerializerMethodField()
     ticket_id = serializers.CharField(required=False)
-    parent = serializers.PrimaryKeyRelatedField(
-        queryset=Comment.objects.all(),
-        required=False,
-        allow_null=True
-    )
+    parent = serializers.CharField(max_length=50, required=False, allow_null=True, help_text="Parent comment_id for replies")
     documents = CommentDocumentSerializer(many=True, read_only=True)
     # Replace ListField with individual FileFields for better HTML form compatibility
     document1 = serializers.FileField(write_only=True, required=False, help_text="Upload document 1 (optional)")
@@ -104,17 +132,34 @@ class CommentSerializer(serializers.ModelSerializer):
         }
     
     def validate(self, data):
-        # Ensure all required user fields are present
-        required_fields = ['user_id', 'firstname', 'lastname', 'role']
-        for field in required_fields:
-            if field not in data:
-                raise serializers.ValidationError({field: "This field is required"})
+        # More flexible validation - only check for required fields if they're missing
+        # The viewset will inject user data, so we shouldn't always require them
+        if not data.get('content', '').strip():
+            raise serializers.ValidationError({'content': 'This field is required'})
+        
+        # Only validate user fields if they're provided but empty
+        user_fields = ['user_id', 'firstname', 'lastname', 'role']
+        missing_fields = []
+        
+        for field in user_fields:
+            if field in data and not data[field]:
+                missing_fields.append(field)
+        
+        if missing_fields:
+            errors = {field: "This field cannot be empty" for field in missing_fields}
+            raise serializers.ValidationError(errors)
+            
         return data
     
     def validate_parent(self, value):
-        if value is not None:
-            if value.parent is not None:
-                raise serializers.ValidationError("Cannot reply to a reply")
+        """Validate that parent comment_id exists and is not a reply itself"""
+        if value:
+            try:
+                parent_comment = Comment.objects.get(comment_id=value)
+                if parent_comment.parent:
+                    raise serializers.ValidationError("Cannot reply to a reply. Parent comment must be a top-level comment.")
+            except Comment.DoesNotExist:
+                raise serializers.ValidationError(f"Parent comment with comment_id '{value}' does not exist.")
         return value
     
     def to_representation(self, instance):

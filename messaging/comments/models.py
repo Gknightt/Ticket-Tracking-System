@@ -19,7 +19,7 @@ class Comment(models.Model):
     Comment model for ticket discussion with support for replies and ratings.
     Includes detailed user information.
     """
-    comment_id = models.CharField(max_length=20, unique=True, db_index=True)
+    comment_id = models.CharField(max_length=50, unique=True, db_index=True)  # Increased from 20
     ticket = models.ForeignKey(Ticket, on_delete=models.CASCADE, related_name='comments')
     user_id = models.CharField(max_length=255)  # Store user ID as provided
     
@@ -31,7 +31,7 @@ class Comment(models.Model):
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='replies')
+    parent = models.CharField(max_length=50, null=True, blank=True, help_text="Parent comment_id for replies")  # Increased from 20
     
     # Track ratings
     thumbs_up_count = models.IntegerField(default=0)
@@ -46,6 +46,11 @@ class Comment(models.Model):
             unique_part = str(uuid.uuid4().int)[:8]
             self.comment_id = f"C{self.ticket.ticket_id[1:]}-{unique_part}"
         super().save(*args, **kwargs)
+    
+    @property
+    def replies(self):
+        """Get all replies to this comment"""
+        return Comment.objects.filter(parent=self.comment_id).order_by('created_at')
     
     def __str__(self):
         return f"{self.comment_id} - {self.firstname} {self.lastname} ({self.role}): {self.content[:50]}"

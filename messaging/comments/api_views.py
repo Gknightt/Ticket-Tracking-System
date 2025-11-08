@@ -11,7 +11,7 @@ from drf_spectacular.types import OpenApiTypes
 from .models import Comment, DocumentStorage
 from .serializers import CommentSerializer
 from .permissions import CommentPermission, CommentOwnerOrAdminPermission
-from .services import CommentService
+from .services import CommentService, CommentNotificationService
 
 
 @extend_schema(
@@ -43,6 +43,8 @@ def add_comment(request):
     if not permission.has_permission(request, None):
         return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
     
+    notification_service = CommentNotificationService()
+    
     with transaction.atomic():
         # Handle both form data and JSON
         if request.content_type and request.content_type.startswith('multipart'):
@@ -62,6 +64,9 @@ def add_comment(request):
             comment = CommentService.create_comment_with_attachments(
                 serializer.validated_data, files, user_data
             )
+            
+            # Send specific create notification
+            notification_service.send_comment_create(comment)
             
             return Response(
                 CommentSerializer(comment, context={'request': request}).data,
@@ -175,9 +180,14 @@ def update_comment(request, comment_id):
     if not owner_permission.has_object_permission(request, None, comment):
         return Response({'error': 'Can only update your own comments'}, status=status.HTTP_403_FORBIDDEN)
     
+    notification_service = CommentNotificationService()
+    
     if 'text' in request.data:
         comment.text = request.data['text']
         comment.save()
+        
+        # Send specific update notification
+        notification_service.send_comment_update(comment)
     
     return Response(CommentSerializer(comment, context={'request': request}).data)
 
@@ -215,6 +225,11 @@ def delete_comment(request, comment_id):
     if not owner_permission.has_object_permission(request, None, comment):
         return Response({'error': 'Can only delete your own comments or need admin privileges'}, 
                        status=status.HTTP_403_FORBIDDEN)
+    
+    notification_service = CommentNotificationService()
+    
+    # Send delete notification before deletion
+    notification_service.send_comment_delete(comment)
     
     comment.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)

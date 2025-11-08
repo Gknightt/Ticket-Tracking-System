@@ -24,6 +24,7 @@ const Comment = ({
   const [isContentExpanded, setIsContentExpanded] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [isRatingLoading, setIsRatingLoading] = useState(false); // Prevent double clicks
   
   const MAX_CONTENT_LENGTH = 200;
 
@@ -88,19 +89,49 @@ const Comment = ({
     }
   };
 
-  const handleLikeClick = () => {
-    if (userReaction && userReaction.reaction_type === "like") {
-      onReaction(comment.id, userReaction.id, null); // Remove reaction
-    } else {
-      onReaction(comment.id, userReaction?.id, "like"); // Add/change to like
+  const handleLikeClick = async () => {
+    if (isRatingLoading) return; // Prevent double clicks
+    
+    setIsRatingLoading(true);
+    
+    try {
+      if (userReaction && userReaction.reaction_type === "like") {
+        // User already liked, so remove the like
+        await onReaction(comment.id, userReaction.id, null);
+      } else {
+        // User hasn't liked or has disliked, so add/change to like
+        await onReaction(comment.id, userReaction?.id, "like");
+      }
+    } catch (error) {
+      console.error('Error handling like:', error);
+    } finally {
+      // Add a small delay to prevent rapid clicking
+      setTimeout(() => {
+        setIsRatingLoading(false);
+      }, 500);
     }
   };
 
-  const handleDislikeClick = () => {
-    if (userReaction && userReaction.reaction_type === "dislike") {
-      onReaction(comment.id, userReaction.id, null); // Remove reaction
-    } else {
-      onReaction(comment.id, userReaction?.id, "dislike"); // Add/change to dislike
+  const handleDislikeClick = async () => {
+    if (isRatingLoading) return; // Prevent double clicks
+    
+    setIsRatingLoading(true);
+    
+    try {
+      if (userReaction && userReaction.reaction_type === "dislike") {
+        // User already disliked, so remove the dislike
+        await onReaction(comment.id, userReaction.id, null);
+      } else {
+        // User hasn't disliked or has liked, so add/change to dislike
+        await onReaction(comment.id, userReaction?.id, "dislike");
+      }
+    } catch (error) {
+      console.error('Error handling dislike:', error);
+    } finally {
+      // Add a small delay to prevent rapid clicking
+      setTimeout(() => {
+        setIsRatingLoading(false);
+      }, 500);
     }
   };
 
@@ -194,8 +225,9 @@ const Comment = ({
               userReaction?.reaction_type === "like"
                 ? styles.actionButtonActive
                 : ""
-            }`}
+            } ${isRatingLoading ? styles.actionButtonLoading : ""}`}
             onClick={handleLikeClick}
+            disabled={isRatingLoading}
           >
             <i className="fa-solid fa-thumbs-up"></i> {getLikeCount()}
           </button>
@@ -205,8 +237,9 @@ const Comment = ({
               userReaction?.reaction_type === "dislike"
                 ? styles.actionButtonActive
                 : ""
-            }`}
+            } ${isRatingLoading ? styles.actionButtonLoading : ""}`}
             onClick={handleDislikeClick}
+            disabled={isRatingLoading}
           >
             <i className="fa-solid fa-thumbs-down"></i> {getDislikeCount()}
           </button>
