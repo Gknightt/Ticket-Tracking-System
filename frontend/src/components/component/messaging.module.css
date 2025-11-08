@@ -364,3 +364,394 @@
   font-size: 16px;
   text-align: center;
 }
+
+/* Connection Status */
+.connectionStatus {
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 8px;
+}
+
+.connected {
+  color: #28a745;
+}
+
+.disconnected {
+  color: #dc3545;
+}
+
+.error {
+  color: #dc3545;
+  font-size: 12px;
+  padding: 4px 8px;
+  background-color: #f8d7da;
+  border-radius: 4px;
+}
+
+/* Attachments */
+.attachmentsPreview {
+  padding: 8px 12px;
+  background-color: #f8f9fa;
+  border-top: 1px solid #e9ecef;
+}
+
+.attachmentPreview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  background-color: white;
+  border-radius: 4px;
+  margin-bottom: 4px;
+  border: 1px solid #dee2e6;
+}
+
+.removeAttachment {
+  background: none;
+  border: none;
+  color: #dc3545;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.attachments {
+  margin: 8px 0;
+}
+
+.attachment {
+  margin: 4px 0;
+}
+
+.attachmentButton {
+  background: #e9ecef;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #495057;
+  text-decoration: none;
+}
+
+.attachmentButton:hover {
+  background: #dee2e6;
+}
+
+.attachButton {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 8px;
+  color: #6c757d;
+}
+
+.attachButton:hover {
+  color: #495057;
+}
+
+.attachButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Reactions - Updated for Facebook-style modal */
+.reactions {
+  margin: 8px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.existingReactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.reactionCount {
+  background: #f0f2f5;
+  border: 1px solid #d0d7de;
+  border-radius: 12px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s ease;
+  color: #65676b;
+  font-weight: 500;
+}
+
+.reactionCount:hover {
+  background: #e4e6ea;
+  transform: scale(1.05);
+}
+
+.reactionCount.userReacted {
+  background: #e7f3ff;
+  color: #1877f2;
+  border-color: #1877f2;
+}
+
+.addReactionContainer {
+  position: relative;
+}
+
+.addReactionButton {
+  background: transparent;
+  border: 1px solid #d0d7de;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  opacity: 0.7;
+}
+
+.addReactionButton:hover {
+  opacity: 1;
+  background: #f0f2f5;
+  transform: scale(1.1);
+}
+
+.reactionModal {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 8px;
+  z-index: 1000;
+}
+
+.reactionModalContent {
+  background: white;
+  border: 1px solid #d0d7de;
+  border-radius: 25px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  padding: 8px 12px;
+  display: flex;
+  gap: 4px;
+  animation: reactionModalAppear 0.2s ease-out;
+}
+
+.reactionModalContent::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: white;
+}
+
+.reactionModalContent::before {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 7px solid transparent;
+  border-top-color: #d0d7de;
+  z-index: -1;
+}
+
+.reactionModalOption {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.reactionModalOption:hover {
+  background: #f0f2f5;
+  transform: scale(1.2);
+}
+
+@keyframes reactionModalAppear {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Show reaction modal only on message hover or when active */
+.messageGroup:not(:hover) .addReactionButton:not(:focus) {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.messageGroup:hover .addReactionButton,
+.addReactionButton:focus {
+  opacity: 0.7;
+  pointer-events: auto;
+}
+
+/* Remove old reaction styles that are no longer needed */
+.reaction {
+  /* Remove this old style block since we're using reactionCount now */
+}
+
+.reactionPicker {
+  /* Remove this old style block since we're using the modal now */
+}
+
+.reactionOption {
+  /* Remove this old style block since we're using reactionModalOption now */
+}
+
+/* Message Editing */
+.editForm {
+  margin: 8px 0;
+  padding: 8px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+}
+
+.editTextarea {
+  width: 100%;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  padding: 8px;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 60px;
+}
+
+.editActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.saveButton {
+  background: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.cancelButton {
+  background: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.editedIndicator {
+  font-style: italic;
+  color: #6c757d;
+  font-size: 11px;
+}
+
+/* Message Actions */
+.messageActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.messageGroup:hover .messageActions {
+  opacity: 1;
+}
+
+.actionButton {
+  background: none;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  padding: 2px 6px;
+  cursor: pointer;
+  font-size: 11px;
+  color: #6c757d;
+}
+
+.actionButton:hover {
+  background: #f8f9fa;
+  color: #495057;
+}
+
+/* Typing Indicators */
+.typingIndicators {
+  padding: 8px 12px;
+  font-style: italic;
+  color: #6c757d;
+  font-size: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin: 8px 0;
+}
+
+/* Loading */
+.loadingText {
+  text-align: center;
+  color: #6c757d;
+  padding: 20px;
+  font-style: italic;
+}
+
+/* Message header styling */
+.messageHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.senderName {
+  color: #374151;
+  font-weight: 600;
+}
+
+.senderRole {
+  color: #6b7280;
+  font-size: 11px;
+  font-weight: 400;
+  font-style: italic;
+}
+
+/* Message bubble styles */
+.messageBubbleBlue .messageHeader .senderName {
+  color: #ffffff;
+}
+
+.messageBubbleBlue .messageHeader .senderRole {
+  color: #e5e7eb;
+}
+
+.messageBubbleGray .messageHeader .senderName {
+  color: #374151;
+}
+
+.messageBubbleGray .messageHeader .senderRole {
+  color: #6b7280;
+}

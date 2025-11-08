@@ -2,15 +2,19 @@ from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponse, Http404
 from rest_framework import viewsets, status
 from rest_framework.response import Response
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, OpenApiResponse
 from drf_spectacular.types import OpenApiTypes
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from .models import Comment, CommentRating, DocumentStorage, CommentDocument
 from .serializers import CommentSerializer, CommentRatingSerializer, DocumentStorageSerializer, CommentDocumentSerializer
 from tickets.models import Ticket
+from authentication import SystemRolePermission
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class CommentViewSet(viewsets.ModelViewSet):
@@ -485,3 +489,307 @@ class CommentRatingViewSet(viewsets.ModelViewSet):
                 {"error": f"Comment with ID {comment_id} not found"}, 
                 status=status.HTTP_404_NOT_FOUND
             )
+
+
+@extend_schema(
+    summary="Add a comment",
+    description="Add a comment to a ticket. User information is extracted from JWT token automatically.",
+    request={
+        'multipart/form-data': {
+            'type': 'object',
+            'properties': {
+                'ticket_id': {'type': 'integer', 'example': 12345},
+                'text': {'type': 'string', 'example': 'This is a comment'},
+                'attachments': {'type': 'array', 'items': {'type': 'string', 'format': 'binary'}}
+            },
+            'required': ['ticket_id', 'text']
+        }
+    },
+    responses={
+        201: OpenApiResponse(response=CommentSerializer),
+        400: OpenApiResponse(description='Invalid request data')
+    },
+    tags=['Comments']
+)
+@api_view(['POST'])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
+def add_comment(request):
+    """Add a comment to a ticket - user info extracted from JWT"""
+    # Check permissions
+    permission = SystemRolePermission()
+    if not permission.has_permission(request, None):
+        return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+    
+    # Define system and role requirements for comments
+    required_system_roles = {
+        'tts': ['Admin', 'Agent'],
+        'hdts': ['Employee', 'Ticket Coordinator', 'Admin']
+    }
+    
+    # Check if user has required system roles
+    user_has_access = False
+    for system, roles in required_system_roles.items():
+        for role in roles:
+            if request.user.has_system_role(system, role):
+                user_has_access = True
+                break
+        if user_has_access:
+            break
+    
+    if not user_has_access:
+        return Response({'error': 'Insufficient permissions'}, status=status.HTTP_403_FORBIDDEN)
+    
+    with transaction.atomic():
+        # Handle both form data and JSON
+        if request.content_type and request.content_type.startswith('multipart'):
+            data = request.data.copy()
+            files = request.FILES.getlist('attachments')
+        else:
+            data = request.data
+            files = []
+        
+        # Extract user info from JWT token instead of request data
+        user = request.user
+        data['user_id'] = user.user_id
+        data['firstname'] = user.full_name.split(' ')[0] if user.full_name else user.username
+        data['lastname'] = user.full_name.split(' ', 1)[1] if user.full_name and ' ' in user.full_name else ''
+        data['role'] = user.get_systems()[0] if user.get_systems() else 'User'  # Use first system as role
+        
+        serializer = CommentSerializer(data=data)
+        if serializer.is_valid():
+            # Create comment with JWT user data
+            comment = Comment.objects.create(
+                ticket_id=serializer.validated_data['ticket_id'],
+                user_id=user.user_id,
+                firstname=data['firstname'],
+                lastname=data['lastname'],
+                role=data['role'],
+                text=serializer.validated_data['text']
+            )
+            
+            # Handle attachments using the correct models
+            for file in files:
+                # Create or get existing document with deduplication
+                document, created = DocumentStorage.create_from_file(
+                    file, user.user_id, data['firstname'], data['lastname']
+                )
+                
+                # Attach document to comment
+                CommentDocument.objects.create(
+                    comment=comment,
+                    document=document,
+                    attached_by_user_id=user.user_id,
+                    attached_by_name=f"{data['firstname']} {data['lastname']}"
+                )
+            
+            return Response(
+                CommentSerializer(comment, context={'request': request}).data,
+                status=status.HTTP_201_CREATED
+            )
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@extend_schema(
+    summary="Get comments for a ticket",
+    description="Retrieve all comments for a specific ticket ID",
+    parameters=[
+        OpenApiParameter(
+            name='ticket_id',
+            type=OpenApiTypes.INT,
+            location=OpenApiParameter.PATH,
+            description='Ticket ID to get comments for',
+            examples=[OpenApiExample('Example ticket ID', value=12345)]
+        ),
+        OpenApiParameter(
+            name='page',
+            type=OpenApiTypes.INT,
+            location=OpenApiParameter.QUERY,
+            description='Page number for pagination'
+        ),
+        OpenApiParameter(
+            name='page_size',
+            type=OpenApiTypes.INT,
+            location=OpenApiParameter.QUERY,
+            description='Number of comments per page (max 100)'
+        )
+    ],
+    responses={
+        200: OpenApiResponse(response=CommentSerializer(many=True)),
+        404: OpenApiResponse(description='Ticket not found')
+    },
+    tags=['Comments']
+)
+@api_view(['GET'])  
+def get_comments(request, ticket_id):
+    """Get all comments for a ticket with pagination"""
+    # Check permissions
+    permission = SystemRolePermission()
+    if not permission.has_permission(request, None):
+        return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+    
+    # Define system and role requirements for viewing comments
+    required_system_roles = {
+        'tts': ['Admin', 'Agent'],
+        'hdts': ['Employee', 'Ticket Coordinator', 'Admin']
+    }
+    
+    # Check if user has required system roles
+    user_has_access = False
+    for system, roles in required_system_roles.items():
+        for role in roles:
+            if request.user.has_system_role(system, role):
+                user_has_access = True
+                break
+        if user_has_access:
+            break
+    
+    if not user_has_access:
+        return Response({'error': 'Insufficient permissions'}, status=status.HTTP_403_FORBIDDEN)
+    
+    # Get comments for the ticket
+    comments = Comment.objects.filter(ticket_id=ticket_id).order_by('-created_at')
+    
+    # Simple pagination
+    page = int(request.GET.get('page', 1))
+    page_size = min(int(request.GET.get('page_size', 10)), 100)  # Max 100 per page
+    
+    start = (page - 1) * page_size
+    end = start + page_size
+    paginated_comments = comments[start:end]
+    
+    serializer = CommentSerializer(paginated_comments, many=True, context={'request': request})
+    
+    return Response({
+        'comments': serializer.data,
+        'page': page,
+        'page_size': page_size,
+        'total_count': comments.count(),
+        'has_next': end < comments.count()
+    })
+
+
+@extend_schema(
+    summary="Update a comment",
+    description="Update an existing comment. User must be the original author.",
+    parameters=[
+        OpenApiParameter(
+            name='comment_id',
+            type=OpenApiTypes.INT,
+            location=OpenApiParameter.PATH,
+            description='Comment ID to update'
+        )
+    ],
+    request={
+        'application/json': {
+            'type': 'object',
+            'properties': {
+                'text': {'type': 'string', 'example': 'Updated comment text'}
+            },
+            'required': ['text']
+        }
+    },
+    responses={
+        200: OpenApiResponse(response=CommentSerializer),
+        403: OpenApiResponse(description='Permission denied'),
+        404: OpenApiResponse(description='Comment not found')
+    },
+    tags=['Comments']
+)
+@api_view(['PUT'])
+def update_comment(request, comment_id):
+    """Update a comment - only the original author can update"""
+    # Check permissions
+    permission = SystemRolePermission()
+    if not permission.has_permission(request, None):
+        return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+    
+    comment = get_object_or_404(Comment, id=comment_id)
+    
+    # Check if user is the original author
+    if comment.user_id != request.user.user_id:
+        return Response({'error': 'Can only update your own comments'}, status=status.HTTP_403_FORBIDDEN)
+    
+    if 'text' in request.data:
+        comment.text = request.data['text']
+        comment.save()
+    
+    return Response(CommentSerializer(comment, context={'request': request}).data)
+
+
+@extend_schema(
+    summary="Delete a comment", 
+    description="Delete a comment. User must be the original author or have admin privileges.",
+    parameters=[
+        OpenApiParameter(
+            name='comment_id',
+            type=OpenApiTypes.INT,
+            location=OpenApiParameter.PATH,
+            description='Comment ID to delete'
+        )
+    ],
+    responses={
+        204: OpenApiResponse(description='Comment deleted successfully'),
+        403: OpenApiResponse(description='Permission denied'),
+        404: OpenApiResponse(description='Comment not found')
+    },
+    tags=['Comments']
+)
+@api_view(['DELETE'])
+def delete_comment(request, comment_id):
+    """Delete a comment - author or admin only"""
+    # Check permissions
+    permission = SystemRolePermission()
+    if not permission.has_permission(request, None):
+        return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+    
+    comment = get_object_or_404(Comment, id=comment_id)
+    
+    # Check if user is the original author or has admin role
+    is_author = comment.user_id == request.user.user_id
+    is_admin = (request.user.has_system_role('tts', 'Admin') or 
+                request.user.has_system_role('hdts', 'Admin'))
+    
+    if not (is_author or is_admin):
+        return Response({'error': 'Can only delete your own comments or need admin privileges'}, 
+                       status=status.HTTP_403_FORBIDDEN)
+    
+    comment.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@extend_schema(
+    summary="Download comment attachment",
+    description="Download a file attachment from a comment",
+    parameters=[
+        OpenApiParameter(
+            name='attachment_id',
+            type=OpenApiTypes.INT,
+            location=OpenApiParameter.PATH,
+            description='Attachment ID to download'
+        )
+    ],
+    responses={
+        200: OpenApiResponse(description='File download'),
+        404: OpenApiResponse(description='Attachment not found')
+    },
+    tags=['Comments']
+)
+@api_view(['GET'])
+def download_comment_attachment(request, attachment_id):
+    """Download a comment attachment"""
+    # Check permissions
+    permission = SystemRolePermission()
+    if not permission.has_permission(request, None):
+        return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+    
+    document = get_object_or_404(DocumentStorage, id=attachment_id)
+    
+    from django.http import FileResponse
+    response = FileResponse(
+        document.file_path.open('rb'),
+        as_attachment=True,
+        filename=document.original_filename
+    )
+    response['Content-Type'] = document.content_type
+    return response
