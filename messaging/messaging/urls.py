@@ -25,13 +25,19 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, Sp
 
 # Import viewsets for the main API router
 from comments.views import CommentViewSet, CommentRatingViewSet
+from tickets.views import MessageViewSet, ReactionViewSet, AttachmentViewSet
 # Import cached media views
 from .media_views import cached_media_view, cached_public_media_view
 
-# Create main API router for viewset-based endpoints
+# Create main API router for all viewset-based endpoints
 router = DefaultRouter()
+# Comments app
 router.register(r'comments', CommentViewSet)
 router.register(r'ratings', CommentRatingViewSet)
+# Tickets app
+router.register(r'messages', MessageViewSet, basename='message')
+router.register(r'reactions', ReactionViewSet, basename='reaction')
+router.register(r'attachments', AttachmentViewSet, basename='attachment')
 
 @api_view(['GET'])
 def api_root(request):
@@ -41,31 +47,38 @@ def api_root(request):
     This messaging service provides endpoints for:
     - Comments: Create, read, update comments with document attachments
     - Ratings: Rate comments (thumbs up/down)
-    - Tickets: Manage ticket information
-    - Document Management: Upload, download, and manage file attachments
+    - Messages: Send messages to tickets (auto-creates tickets if needed)
+    - Reactions: Add emoji reactions to messages
+    - Attachments: File attachments for messages
     
     Key Features:
+    - Automatic ticket creation when sending messages
     - Document deduplication based on file hash
     - Nested comment replies
     - User ownership tracking
     - File attachment support
+    - Real-time WebSocket notifications
     """
     return Response({
         'message': 'Welcome to the Messaging Service API',
-        'version': '1.0.0',
+        'version': '2.0.0',
         'endpoints': {
-            'comments': request.build_absolute_uri('/api/comments/'),
-            'ratings': request.build_absolute_uri('/api/ratings/'),
-            'tickets': request.build_absolute_uri('/api/tickets/'),
+            'comments': request.build_absolute_uri('/comments/'),
+            'ratings': request.build_absolute_uri('/ratings/'),
+            'messages': request.build_absolute_uri('/messages/'),
+            'reactions': request.build_absolute_uri('/reactions/'),
+            'attachments': request.build_absolute_uri('/attachments/'),
             'documentation': request.build_absolute_uri('/api/docs/'),
             'schema': request.build_absolute_uri('/api/schema/'),
         },
         'features': [
+            'Automatic ticket creation via messages',
             'Document attachment with deduplication',
+            'Message reactions and file attachments',
             'Nested comment replies',
             'Comment rating system',
             'User ownership tracking',
-            'File download and management'
+            'Real-time WebSocket support'
         ]
     })
 
@@ -73,17 +86,16 @@ urlpatterns = [
     # Admin interface
     path('admin/', admin.site.urls),
     
-    # API Root
-    path('api/', api_root, name='api-root'),
+    # Main API routes (DRF ViewSets) - serves as root
+    path('', include(router.urls)),
     
-    # Main API routes (DRF ViewSets)
-    path('api/', include(router.urls)),
-    
-    # Individual app routes
-    path('api/tickets/', include('tickets.urls')),
-    path('api/comments/', include('comments.urls')),
+    # Custom action routes that aren't handled by the router
+    path('messages/by-ticket/', MessageViewSet.as_view({'get': 'by_ticket'}), name='messages-by-ticket'),
+    path('reactions/add/', ReactionViewSet.as_view({'post': 'add'}), name='add-reaction'),
+    path('reactions/remove/', ReactionViewSet.as_view({'post': 'remove'}), name='remove-reaction'),
     
     # API Documentation
+    path('api/', api_root, name='api-root'),
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),

@@ -21,7 +21,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-f8^@gg0nyn!ajpm&mpw^ea9^_7+rr)#f*fgv#9aix^a()t0x*s'
+SECRET_KEY = 'your-auth-service-secret-key-here'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -96,8 +96,11 @@ DATABASES = {
 # Django REST Framework settings
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'authentication.JWTCookieAuthentication',
+    ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
+        'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
@@ -119,6 +122,12 @@ REST_FRAMEWORK = {
     'HTML_SELECT_CUTOFF_TEXT': "More than {count} items...",
     # Improve browsable API rendering
     'COERCE_DECIMAL_TO_STRING': False,
+}
+
+# JWT Settings
+SIMPLE_JWT = {
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
 }
 
 # Custom pagination class for better control
