@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.generics import CreateAPIView
 import logging
+from django.utils import timezone
 
 from task.models import Task
 from task.serializers import TaskSerializer
@@ -26,43 +27,6 @@ class TaskTransitionView(CreateAPIView):
     {
         "task_id": 1,
         "transition_id": 1
-    }
-    
-    Example Response (200 OK):
-    {
-        "status": "success",
-        "message": "Task transitioned to next step successfully",
-        "task_id": 1,
-        "previous_step": {
-            "step_id": 2,
-            "name": "Request Submission",
-            "order": 1,
-            "role": "User"
-        },
-        "current_step": {
-            "step_id": 3,
-            "name": "Approval",
-            "order": 2,
-            "description": "Manager approval required",
-            "instruction": "Review and approve the request",
-            "role": "Manager"
-        },
-        "assigned_users": [
-            {
-                "userID": 7,
-                "username": "",
-                "email": "",
-                "status": "assigned",
-                "assigned_on": "2025-11-10T10:30:00.000000+00:00",
-                "role": "Manager"
-            }
-        ],
-        "task_details": {
-            "task_id": 1,
-            "ticket_id": 1,
-            "status": "pending",
-            ...
-        }
     }
     """
     
@@ -88,6 +52,16 @@ class TaskTransitionView(CreateAPIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        # Extract current user_id from authenticated request
+        if not hasattr(request, 'user') or not hasattr(request.user, 'user_id'):
+            return Response(
+                {'error': 'Current user information not found in request'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        current_user_id = request.user.user_id
+        logger.info(f"👤 User {current_user_id} attempting transition")
+        
         # Get task
         try:
             task = Task.objects.select_related(
@@ -100,6 +74,35 @@ class TaskTransitionView(CreateAPIView):
                 {'error': f'Task {task_id} not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
+        
+        # Validate user is assigned to this task with "assigned" status
+        # Check if user has ANY "assigned" record (they may have multiple with different roles)
+        user_assignment = None
+        user_assignment_index = None
+        for index, user in enumerate(task.users):
+            if user.get('userID') == current_user_id and user.get('status') == 'assigned':
+                user_assignment = user
+                user_assignment_index = index
+                break
+        
+        if not user_assignment:
+            # User has no "assigned" records - either not assigned or already acted on all assignments
+            # Provide helpful error with their assignment history
+            user_records = [u for u in task.users if u.get('userID') == current_user_id]
+            return Response(
+                {
+                    'error': f'User {current_user_id} has no active "assigned" status for task {task_id}',
+                    'task_id': task_id,
+                    'current_user_id': current_user_id,
+                    'user_records': user_records,
+                    'message': 'User may have already acted on all their assignments or is not assigned to this task'
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        logger.info(
+            f"✅ User {current_user_id} validated with status 'assigned' for role '{user_assignment.get('role')}' at index {user_assignment_index}"
+        )
         
         # Get transition
         try:
@@ -114,16 +117,44 @@ class TaskTransitionView(CreateAPIView):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        # Validate transition has a to_step (destination must always exist)
+        # Handle terminal transitions (to_step_id is NULL)
         if not transition.to_step_id:
-            return Response(
-                {
-                    'error': f'Transition {transition_id} is terminal (to_step_id is NULL). '
-                             f'Cannot transition to a null/end step',
-                    'transition_id': transition_id
-                },
-                status=status.HTTP_400_BAD_REQUEST
+            logger.info(
+                f"🏁 Terminal transition {transition_id} detected (to_step_id is NULL). "
+                f"Completing task {task_id}"
             )
+            
+            # Mark the SPECIFIC validated user assignment as "acted"
+            if user_assignment_index is not None:
+                task.users[user_assignment_index]['status'] = 'acted'
+                task.users[user_assignment_index]['acted_on'] = timezone.now().isoformat()
+                logger.info(
+                    f"📝 Updated user {current_user_id} record at index {user_assignment_index} to 'acted'"
+                )
+            
+            # Mark task as completed
+            task.status = 'completed'
+            task.save()
+            
+            logger.info(
+                f"✅ Task {task_id} completed successfully. "
+                f"User {current_user_id} status updated to 'acted'"
+            )
+            
+            # Return completion response
+            serializer = TaskSerializer(task)
+            
+            return Response({
+                'status': 'success',
+                'message': 'Task completed successfully (terminal transition reached)',
+                'task_id': task_id,
+                'workflow_status': 'completed',
+                'current_user_id': current_user_id,
+                'user_status': 'acted',
+                'transition_id': transition_id,
+                'is_terminal': True,
+                'task_details': serializer.data,
+            }, status=status.HTTP_200_OK)
         
         # Core validation: Check if task's current_step matches the transition's from_step_id
         # This ensures the task is in the correct state to use this transition
@@ -219,15 +250,25 @@ class TaskTransitionView(CreateAPIView):
                 status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
         
+        # Mark the SPECIFIC validated user assignment as "acted" before moving to next step
+        if user_assignment_index is not None:
+            task.users[user_assignment_index]['status'] = 'acted'
+            task.users[user_assignment_index]['acted_on'] = timezone.now().isoformat()
+            logger.info(
+                f"📝 Updated user {current_user_id} record at index {user_assignment_index} to 'acted'"
+            )
+        
         # Update task
         task.current_step = next_step
-        task.users = assigned_users
+        # Append assigned users instead of overwriting
+        task.users.extend(assigned_users)
         task.status = 'pending'
         task.save()
         
         logger.info(
             f"✅ Task {task.task_id} transitioned successfully. "
-            f"New users: {[u.get('userID') for u in assigned_users]}"
+            f"User {current_user_id} status changed to 'acted'. "
+            f"New assigned users: {[u.get('userID') for u in assigned_users]}"
         )
         
         # Return detailed response
@@ -237,6 +278,8 @@ class TaskTransitionView(CreateAPIView):
             'status': 'success',
             'message': 'Task transitioned to next step successfully',
             'task_id': task.task_id,
+            'current_user_id': current_user_id,
+            'user_action_status': 'acted',
             'previous_step': {
                 'step_id': previous_step.step_id,
                 'name': previous_step.name,
