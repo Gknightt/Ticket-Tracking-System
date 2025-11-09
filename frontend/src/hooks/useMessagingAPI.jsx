@@ -2,9 +2,8 @@ import { useState, useCallback } from 'react';
 
 const MESSAGING_API_BASE = import.meta.env.VITE_MESSAGING_API || 'http://localhost:8005/api';
 
-export const useMessagingAPI = (ticketId) => {
+export const useMessagingAPI = (ticketId, setMessages) => {
   const [ticket, setTicket] = useState(null);
-  const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -123,7 +122,6 @@ export const useMessagingAPI = (ticketId) => {
 
   return {
     ticket,
-    messages,
     isLoading,
     error,
     fetchMessages,
