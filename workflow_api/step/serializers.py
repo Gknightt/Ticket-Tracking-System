@@ -1,7 +1,6 @@
 from rest_framework import serializers
 from .models import Steps, StepTransition
 from role.models import Roles
-from action.models import Actions
 
 
 class StepSerializer(serializers.ModelSerializer):
@@ -22,55 +21,8 @@ class StepSerializer(serializers.ModelSerializer):
     def get_is_initialized(self, obj):
         return StepTransition.objects.filter(to_step_id=obj).exists()
 
-# class StepTransitionSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = StepTransition
-#         fields = [
-#             'id',
-#             'from_step',
-#             'to_step',
-#             'action_id',
-#         ]
-#         read_only_fields = ['id']
-
-#         # validation: from_step != to_step
-#         # from_step workflow must be equal to to_step workflow
-
-class ActionSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Actions
-        fields = ['action_id', 'name', 'description']
-        read_only_fields = ['action_id']
-
-
-
-from rest_framework import serializers
-from .models import StepTransition
-from action.models import Actions
-from step.models import Steps
-from action.serializers import ActionSerializer  # Make sure this exists
-
-class ActionInlineSerializer(serializers.Serializer):
-    name = serializers.CharField()
-    description = serializers.CharField(allow_blank=True, required=False)
-
-from rest_framework import serializers
-from step.models import StepTransition, Steps
-from action.models import Actions
-
-class ActionInlineSerializer(serializers.Serializer):
-    name = serializers.CharField()
-    description = serializers.CharField(allow_blank=True, required=False)
-
-from rest_framework import serializers
-from .models import Steps, StepTransition, Actions
 
 class StepTransitionSerializer(serializers.ModelSerializer):
-    action = ActionInlineSerializer(write_only=True)
-    action_id = serializers.SerializerMethodField(read_only=True)
-    action_name = serializers.SerializerMethodField(read_only=True)
-    action_description = serializers.SerializerMethodField(read_only=True)
-
     from_step_id = serializers.SlugRelatedField(
         queryset=Steps.objects.all(),
         allow_null=True,
@@ -87,20 +39,11 @@ class StepTransitionSerializer(serializers.ModelSerializer):
         model = StepTransition
         fields = [
             'transition_id',
-            'id', 'workflow_id',
-            'from_step_id', 'to_step_id',
-            'action', 'action_id', 'action_name', 'action_description'
+            'workflow_id',
+            'from_step_id', 
+            'to_step_id',
         ]
-        read_only_fields = ['id', 'action_id', 'action_name', 'action_description', 'transition_id']
-
-    def get_action_id(self, obj):
-        return obj.action_id.action_id if obj.action_id else None
-
-    def get_action_name(self, obj):
-        return obj.action_id.name if obj.action_id else None
-
-    def get_action_description(self, obj):
-        return obj.action_id.description if obj.action_id else None
+        read_only_fields = ['transition_id']
 
     def validate(self, attrs):
         frm = attrs.get('from_step_id') or getattr(self.instance, 'from_step_id', None)
@@ -126,23 +69,7 @@ class StepTransitionSerializer(serializers.ModelSerializer):
 
         return attrs
 
-    def create(self, validated_data):
-        action_data = validated_data.pop('action')
-        action, _ = Actions.objects.get_or_create(
-            name=action_data['name'],
-            defaults={'description': action_data.get('description', '')}
-        )
-        return StepTransition.objects.create(action_id=action, **validated_data)
-
     def update(self, instance, validated_data):
-        action_data = validated_data.pop('action', None)
-        if action_data:
-            action, _ = Actions.objects.get_or_create(
-                name=action_data['name'],
-                defaults={'description': action_data.get('description', '')}
-            )
-            instance.action_id = action
-
         # Constraint 2: Disallow updating from_step if it's null
         new_from_step = validated_data.get('from_step_id')
         if instance.from_step_id is None and new_from_step is not None:

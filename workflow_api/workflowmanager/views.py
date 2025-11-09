@@ -21,11 +21,6 @@ class StepTransitionViewSet(viewsets.ModelViewSet):
     serializer_class = StepTransitionSerializer
     lookup_field = 'transition_id'
 
-class ActionViewSet(viewsets.ModelViewSet):
-    queryset = Actions.objects.all()
-    serializer_class = ActionSerializer
-    lookup_field = 'action_id'
-
 class SaveGraphView(APIView):
     def post(self, request):
         workflow_id = request.data.get("workflow_id")
@@ -70,7 +65,6 @@ class WorkflowGraphView(APIView):
                 "position": tr.transition_id,
                 "from": tr.from_step_id.step_id if tr.from_step_id else None,
                 "to": tr.to_step_id.step_id if tr.to_step_id else None,
-                "action": tr.action_id.name if tr.action_id else ""
             }
             for tr in transitions
         ]

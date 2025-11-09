@@ -4,7 +4,6 @@ from django.db import models
 from .models import Workflows, Category
 from step.models import Steps, StepTransition
 from role.models import Roles
-from action.models import Actions
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -40,7 +39,7 @@ class WorkflowSerializer(serializers.ModelSerializer):
             "medium_sla",
             "high_sla",
             "urgent_sla",
-            "department",  # New field for department
+            "department",
         )
         read_only_fields = ("workflow_id",)
 
@@ -84,13 +83,7 @@ class StepSerializer(serializers.ModelSerializer):
 class StepTransitionSerializer(serializers.ModelSerializer):
     class Meta:
         model = StepTransition
-        fields = ['transition_id', 'from_step_id', 'to_step_id', 'action_id']
-
-
-class ActionSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Actions
-        fields = ['action_id', 'name', 'description']
+        fields = ['transition_id', 'from_step_id', 'to_step_id']
 
 
 class WorkflowAggregatedSerializer(serializers.ModelSerializer):
@@ -113,7 +106,6 @@ class FullWorkflowSerializer(serializers.Serializer):
         transitions = StepTransition.objects.filter(
             models.Q(from_step_id__in=step_ids) | models.Q(to_step_id__in=step_ids)
         )
-        action_ids = transitions.values_list('action_id', flat=True)
         role_ids = steps.values_list('role_id', flat=True).distinct()
 
         base = WorkflowAggregatedSerializer(obj).data
@@ -122,5 +114,4 @@ class FullWorkflowSerializer(serializers.Serializer):
             "roles": RoleSerializer(Roles.objects.filter(role_id__in=role_ids), many=True).data if role_ids else [],
             "steps": StepSerializer(steps, many=True).data,
             "transitions": StepTransitionSerializer(transitions, many=True).data,
-            "actions": ActionSerializer(Actions.objects.filter(action_id__in=action_ids), many=True).data,
         }

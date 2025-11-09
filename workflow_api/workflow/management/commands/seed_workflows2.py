@@ -2,7 +2,6 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction, IntegrityError
 from django.core.exceptions import ValidationError
 from role.models import Roles
-from action.models import Actions
 from workflow.models import Workflows
 from step.models import Steps, StepTransition
 import random
@@ -57,7 +56,7 @@ class Command(BaseCommand):
       2. Resolve Ticket (Department-specific: Asset Manager, Budget Manager)
       3. Finalize Ticket (Admin)
     - Department-specific instructions for the 'Resolve' step
-    - Clean actions and transitions (e.g., 'reject' from Resolve returns to Triage)
+    - Clean transitions (e.g., 'reject' from Resolve returns to Triage)
     
     Usage: python manage.py seed_workflows2
     
@@ -88,7 +87,7 @@ class Command(BaseCommand):
                     'Requester': Roles.objects.get(name='Admin'),
                     'Asset_Reviewer': Roles.objects.get(name='Asset Manager'),
                     'Budget_Reviewer': Roles.objects.get(name='Budget Manager'),
-                    'IT_Reviewer': Roles.objects.get(name='Asset Manager'), # Using Asset Manager for IT reviews as per original script
+                    'IT_Reviewer': Roles.objects.get(name='Asset Manager'),
                 }
                 self.stdout.write(self.style.SUCCESS('✓ All required roles found'))
             except Roles.DoesNotExist as e:
@@ -100,21 +99,18 @@ class Command(BaseCommand):
                     {
                         'label': 'Triage Ticket',
                         'role': 'Requester',
-                        'actions': ['start', 'submit'],
                         'description': 'Initial triage to verify ticket completeness, assign category, and route to the correct resolver.',
                         'instruction_type': 'triage_generic'
                     },
                     {
                         'label': 'Resolve Ticket',
                         'role': resolver_role,
-                        'actions': ['approve', 'reject'],
                         'description': resolve_desc,
                         'instruction_type': resolver_instruction
                     },
                     {
                         'label': 'Finalize Ticket',
                         'role': 'Requester',
-                        'actions': ['complete'],
                         'description': 'Final verification that all records are updated, tasks are completed, and the requester is notified.',
                         'instruction_type': 'finalize_generic'
                     },
@@ -193,7 +189,6 @@ class Command(BaseCommand):
             
             total_workflows = 0
             total_steps = 0
-            total_actions = 0
             total_transitions = 0
 
             for wf_data in workflows_to_create:
@@ -231,7 +226,7 @@ class Command(BaseCommand):
                 # Create steps with role-specific and workflow-specific details
                 step_objs = []
                 for idx, step_cfg in enumerate(steps_cfg):
-                    # Step names are now namespaced by workflow but use the clean labels
+                    # Step names are namespaced by workflow but use the clean labels
                     step_name = f"{wf.name} - {step_cfg['label']}"
                     instruction = random.choice(instructions_pool[step_cfg['instruction_type']])
                     
@@ -250,71 +245,40 @@ class Command(BaseCommand):
                         total_steps += 1
                         self.stdout.write(f'  	✓ Created step: {step_cfg["label"]} (Role: {role_map[step_cfg["role"]].name})')
 
-                # Create actions and transitions with workflow context
+                # Create transitions without actions
                 for idx, step_cfg in enumerate(steps_cfg):
                     step = step_objs[idx]
                     
-                    for event in step_cfg['actions']:
-                        # Create clean, unique action names.
-                        act_name = f"{wf_data['sub_category']} - {step_cfg['label']} - {event}"
-                        
-                        # ================================================================
-                        # START: REVISED LOGIC
-                        # ================================================================
-                        
-                        # Dynamically build description and transitions
-                        description = f'{event} action on {step.name}' # Default
-                        frm, to = None, None # Default
-
-                        if event == 'start':
-                            description = f'Initiates the {wf_data["sub_category"]} workflow at the Triage step'
-                            frm, to = None, step # Start -> Triage
-                        
-                        elif event == 'submit':
-                            # 'submit' only happens at Triage (idx=0), moves to Resolve (idx=1)
-                            next_step_role = role_map[steps_cfg[idx+1]["role"]].name 
-                            description = f'Submits the {wf_data["sub_category"]} request from Triage to {next_step_role} for resolution'
-                            frm, to = step, step_objs[idx + 1] # Triage -> Resolve
-                        
-                        elif event == 'approve':
-                            # 'approve' only happens at Resolve (idx=1), moves to Finalize (idx=2)
-                            next_step_label = steps_cfg[idx+1]["label"]
-                            description = f'Resolves the {wf_data["sub_category"]} request and advances to {next_step_label}'
-                            frm, to = step, step_objs[idx + 1] # Resolve -> Finalize
-
-                        elif event == 'reject':
-                            # 'reject' only happens at Resolve (idx=1), moves back to Triage (idx=0)
-                            prev_step_label = steps_cfg[idx-1]["label"]
-                            description = f'Rejects the {wf_data["sub_category"]} request and returns to {prev_step_label} for corrections'
-                            frm, to = step, step_objs[idx - 1] # Resolve -> Triage
-                        
-                        elif event == 'complete':
-                            description = f'Completes and closes the {wf_data["sub_category"]} workflow and triggers {end_logic} end logic'
-                            frm, to = step, None # Finalize -> End
-
-                        # ================================================================
-                        # END: REVISED LOGIC
-                        # ================================================================
-
-                        action, action_created = Actions.objects.get_or_create(
-                            name=act_name,
-                            defaults={'description': description}
-                        )
-                        
-                        if action_created:
-                            total_actions += 1
-
+                    # Determine transitions based on step position
+                    transitions = []
+                    
+                    if idx == 0:  # Triage step
+                        transitions = [
+                            (None, step),  # start
+                            (step, step_objs[idx + 1])  # submit -> Resolve
+                        ]
+                    elif idx == 1:  # Resolve step
+                        transitions = [
+                            (step, step_objs[idx + 1]),  # approve -> Finalize
+                            (step, step_objs[idx - 1])   # reject -> Triage
+                        ]
+                    elif idx == 2:  # Finalize step
+                        transitions = [
+                            (step, None)  # complete -> End
+                        ]
+                    
+                    for frm, to in transitions:
                         try:
-                            transition, trans_created = StepTransition.objects.get_or_create(
+                            trans, trans_created = StepTransition.objects.get_or_create(
                                 from_step_id=frm,
                                 to_step_id=to,
-                                action_id=action
+                                workflow_id=wf
                             )
                             if trans_created:
                                 total_transitions += 1
                         except (ValidationError, IntegrityError) as e:
                             self.stdout.write(self.style.WARNING(
-                                f'  	⚠ Skipped transition {event}: {str(e)}'
+                                f'  	⚠ Skipped transition: {str(e)}'
                             ))
                             continue
 
@@ -324,7 +288,6 @@ class Command(BaseCommand):
             self.stdout.write('='*70)
             self.stdout.write(f'{self.style.MIGRATE_LABEL("Total Workflows Created:")} {total_workflows}')
             self.stdout.write(f'{self.style.MIGRATE_LABEL("Total Steps Created:")} {total_steps} ({total_workflows} workflows * 3 steps each)')
-            self.stdout.write(f'{self.style.MIGRATE_LABEL("Total Actions Created:")} {total_actions}')
             self.stdout.write(f'{self.style.MIGRATE_LABEL("Total Transitions Created:")} {total_transitions}')
             
             self.stdout.write('\n' + self.style.MIGRATE_HEADING('Standardized 3-Step Workflow Summary:'))

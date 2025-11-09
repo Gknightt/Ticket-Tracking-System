@@ -1,7 +1,6 @@
 from django.core.management.base import BaseCommand
 from django.db import transaction, IntegrityError
 from role.models import Roles
-from action.models import Actions
 from workflow.models import Workflows, Category
 from step.models import Steps, StepTransition
 from django.core.exceptions import ValidationError
@@ -9,7 +8,7 @@ import random
 
 
 class Command(BaseCommand):
-    help = 'Seed workflows with step-specific actions, robust transitions, and end logic.'
+    help = 'Seed workflows with step transitions and end logic.'
 
     def handle(self, *args, **options):
         with transaction.atomic():
@@ -65,16 +64,10 @@ class Command(BaseCommand):
                         )
                         step_objs.append(step)
 
-                    # Create actions and transitions
+                    # Create transitions without actions
                     for idx, (label, _, events) in enumerate(steps_cfg):
                         step = step_objs[idx]
                         for event in events:
-                            act_name = f"{step.name} - {event}"
-                            action, _ = Actions.objects.get_or_create(
-                                name=act_name,
-                                defaults={'description': f'{event} action on {step.name}'}
-                            )
-
                             # Determine transition logic
                             if event == 'start':
                                 frm, to = None, step
@@ -90,12 +83,11 @@ class Command(BaseCommand):
                             try:
                                 StepTransition.objects.get_or_create(
                                     from_step_id=frm,
-                                    to_step_id=to,
-                                    action_id=action
+                                    to_step_id=to
                                 )
                             except (ValidationError, IntegrityError):
                                 continue
 
             self.stdout.write(self.style.SUCCESS(
-                'Seeding complete: workflows, steps, actions, transitions, end_logic.'
+                'Seeding complete: workflows, steps, transitions, end_logic.'
             ))

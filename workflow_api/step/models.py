@@ -1,6 +1,5 @@
 from django.db import models
 from role.models import Roles
-from action.models import Actions
 from django.core.exceptions import ValidationError
 
 class Steps(models.Model):
@@ -13,7 +12,7 @@ class Steps(models.Model):
     # steps details
     name = models.CharField(max_length=64, unique=True)
     description = models.CharField(max_length=256, null=True)
-    instruction = models.TextField(null=True, blank=True)  # ✅ Added instruction field
+    instruction = models.TextField(null=True, blank=True)
     order = models.PositiveIntegerField(default=0)
 
     # flags
@@ -48,7 +47,7 @@ class StepTransition(models.Model):
         on_delete=models.CASCADE,
         null=True,
         blank=True,
-        to_field='step_id'  # Reference the integer field
+        to_field='step_id'
     )
     to_step_id = models.ForeignKey(
         Steps,
@@ -56,24 +55,11 @@ class StepTransition(models.Model):
         on_delete=models.CASCADE,
         null=True,
         blank=True,
-        to_field='step_id'  # Reference the integer field
-    )
-    action_id = models.ForeignKey(
-        Actions,
-        on_delete=models.CASCADE,
-        null=True,
-        unique=True,  # enforce one-to-one between Action and StepTransition
-        to_field='action_id'  # Reference the integer field
+        to_field='step_id'
     )
 
     class Meta:
-        constraints = [
-            # this is redundant if you use unique=True above, but shown here
-            models.UniqueConstraint(
-                fields=['action_id'],
-                name='unique_action_per_step_transition'
-            )
-        ]
+        pass
 
     def clean(self):
         super().clean()
@@ -81,7 +67,7 @@ class StepTransition(models.Model):
         # 1) No self-loop
         if self.from_step_id and self.to_step_id and self.from_step_id == self.to_step_id:
             raise ValidationError("from_step and to_step must be different")
-        # 2) Same-workflow guard - Fixed attribute names
+        # 2) Same-workflow guard
         if self.from_step_id and self.to_step_id and (
             self.from_step_id.workflow_id != self.to_step_id.workflow_id
         ):

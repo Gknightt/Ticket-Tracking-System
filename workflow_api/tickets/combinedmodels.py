@@ -32,21 +32,19 @@ class Workflows(models.Model):
         Category,
         on_delete=models.PROTECT,
         related_name='main_workflows',
-        limit_choices_to={'parent__isnull': True},   # <-- only root cats
+        limit_choices_to={'parent__isnull': True},
     )
     sub_category = models.ForeignKey(
         Category,
         on_delete=models.PROTECT,
         related_name='sub_workflows',
-        limit_choices_to={'parent__isnull': False},  # <-- only subcats
+        limit_choices_to={'parent__isnull': False},
     )
 
     # timestamp fields
     status        = models.CharField(max_length=16, choices=STATUS_CHOICES, default="draft")
     createdAt     = models.DateTimeField(auto_now_add=True)
     updatedAt     = models.DateTimeField(auto_now=True)
-
-    # is_initialized = models.BooleanField(default=False)
 
     class Meta:
         constraints = [
@@ -75,19 +73,16 @@ class Workflows(models.Model):
 
 class Task(models.Model):
     ticket_id = models.ForeignKey(
-        'tickets.WorkflowTicket',  # Assuming Ticket model is in tickets app
+        'tickets.WorkflowTicket',
         on_delete=models.CASCADE,
     )
     workflow_id = models.ForeignKey('workflow.Workflows', on_delete=models.CASCADE)
 
     def get_workflow(self):
-        # Optional: only if you need to reference it somewhere dynamically
         from workflow.models import Workflows
         return Workflows.objects.first()
     
-    
     def get_ticket(self):
-        # Optional: only if you need to reference it somewhere dynamically
         from tickets.models import WorkflowTicket
         return WorkflowTicket.objects.first()
 
@@ -98,7 +93,6 @@ class Task(models.Model):
 
 from django.db import models
 from role.models import Roles
-from action.models import Actions
 from django.core.exceptions import ValidationError
 
 class Steps(models.Model):
@@ -145,7 +139,7 @@ class StepTransition(models.Model):
         blank=True
     )
     action_id = models.ForeignKey(
-        Actions,
+        'action.Actions',
         on_delete=models.CASCADE,
         null=True,
         unique=True,  # enforce one-to-one between Action and StepTransition
@@ -176,29 +170,3 @@ class StepTransition(models.Model):
         # ensure clean() runs on every save
         self.full_clean()
         super().save(*args, **kwargs)
-
-from django.db import models
-
-class Roles(models.Model):
-    # used to who creates the model
-    user_id = models.IntegerField(null=False)
-    # Must be unique
-    name = models.CharField(max_length=64, unique=True)
-    description = models.CharField(max_length=256, null=True)
-
-    # timestamps
-    createdAt = models.DateTimeField(auto_now_add=True)
-    updatedAt = models.DateTimeField(auto_now=True)
-
-from django.db import models
-
-class Actions(models.Model):
-    
-    # revise not to be unique, as actions with similar name can be reused across workflows
-    name = models.CharField(max_length=64, unique=True)
-    description = models.CharField(max_length=256, null=True)
-    
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-# Create your models here.
