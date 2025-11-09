@@ -30,10 +30,7 @@ class APIRootSerializer(serializers.Serializer):
     tickets = serializers.URLField()
     tasks = serializers.URLField()
     roles = serializers.URLField()
-    actions = serializers.URLField()
     steps = serializers.URLField()
-    instances = serializers.URLField()
-    action_logs = serializers.URLField()
     ams_checkout = serializers.URLField()
     bms_checkout = serializers.URLField()
     workflow_manager = serializers.URLField()
@@ -57,10 +54,7 @@ def api_root(request, format=None):
         'tickets': request.build_absolute_uri('tickets/'),
         'tasks': request.build_absolute_uri('tasks/'),
         'roles': request.build_absolute_uri('roles/'),
-        'actions': request.build_absolute_uri('actions/'),
         'steps': request.build_absolute_uri('steps/'),
-        'instances': request.build_absolute_uri('instances/'),
-        'action-logs': request.build_absolute_uri('action-logs/'),
         'ams-checkout': request.build_absolute_uri('ams-checkout/'),
         'bms-checkout': request.build_absolute_uri('bms-checkout/'),
         'workflow-manager': request.build_absolute_uri('workflow-manager/'),
@@ -81,10 +75,7 @@ urlpatterns = [
     path('tickets/', include('tickets.urls')),
     path('tasks/', include('task.urls')),
     path('roles/', include('role.urls')),
-    path('actions/', include('action.urls')),
     path('steps/', include('step.urls')),
-    path('instances/', include('step_instance.urls')),
-    path('action-logs/', include('action_log.urls')),
     path('ams-checkout/', include('amscheckout.urls')),
     path('bms-checkout/', include('bmscheckout.urls')),
     path('workflow-manager/', include('workflowmanager.urls')),

@@ -19,10 +19,3 @@ class StepTransitionSerializer(serializers.ModelSerializer):
     class Meta:
         model = StepTransition
         fields = '__all__'
-
-from action.models import Actions
-
-class ActionSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Actions
-        fields = '__all__'
