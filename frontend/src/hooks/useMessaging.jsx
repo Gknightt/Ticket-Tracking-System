@@ -1,10 +1,12 @@
+import { useState } from 'react';
 import { useMessagingAPI } from './useMessagingAPI';
 import { useWebSocketMessaging } from './useWebSocketMessaging';
 
 export const useMessaging = (ticketId, userId = 'anonymous') => {
+  const [messages, setMessages] = useState([]);
+
   const {
     ticket,
-    messages,
     isLoading,
     error: apiError,
     fetchMessages,
@@ -14,7 +16,7 @@ export const useMessaging = (ticketId, userId = 'anonymous') => {
     addReaction,
     removeReaction,
     downloadAttachment,
-  } = useMessagingAPI(ticketId);
+  } = useMessagingAPI(ticketId, setMessages);
 
   const {
     isConnected,
@@ -23,7 +25,7 @@ export const useMessaging = (ticketId, userId = 'anonymous') => {
     startTyping,
     stopTyping,
     reconnect,
-  } = useWebSocketMessaging(ticketId, userId);
+  } = useWebSocketMessaging(ticketId, userId, setMessages);
 
   return {
     ticket,

@@ -2,11 +2,10 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 
 const WEBSOCKET_BASE = import.meta.env.VITE_MESSAGING_WS || 'ws://localhost:8005';
 
-export const useWebSocketMessaging = (ticketId, userId = 'anonymous') => {
+export const useWebSocketMessaging = (ticketId, userId = 'anonymous', setMessages) => {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState(null);
   const [typingUsers, setTypingUsers] = useState(new Set());
-  const [messages, setMessages] = useState([]);
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -150,6 +149,5 @@ export const useWebSocketMessaging = (ticketId, userId = 'anonymous') => {
     startTyping,
     stopTyping,
     reconnect: connectWebSocket,
-    messages,
   };
 };
