@@ -169,12 +169,13 @@ class Task(models.Model):
             
             users_for_role = fetch_users_for_role(next_step.role_id.role_id)
             if users_for_role:
-                self.users = apply_round_robin_assignment(
+                # Append new users instead of overwriting
+                new_assignments = apply_round_robin_assignment(
                     users_for_role, 
                     next_step.role_id.name
                 )
-            else:
-                self.users = []
+                self.users.extend(new_assignments)
+            # If no users, keep existing assignments (don't clear)
         
         self.status = 'pending'
         self.save()
