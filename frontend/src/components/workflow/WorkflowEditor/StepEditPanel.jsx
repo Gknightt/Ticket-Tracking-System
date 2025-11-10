@@ -8,6 +8,8 @@ export default function StepEditPanel({ step, roles, onClose, onSave, onDelete, 
     description: '',
     instruction: '',
     role: '',
+    is_start: false,
+    is_end: false,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -22,6 +24,8 @@ export default function StepEditPanel({ step, roles, onClose, onSave, onDelete, 
         description: step.description || '',
         instruction: step.instruction || '',
         role: step.role || '',
+        is_start: step.is_start || false,
+        is_end: step.is_end || false,
       });
     }
   }, [step]);
@@ -34,15 +38,17 @@ export default function StepEditPanel({ step, roles, onClose, onSave, onDelete, 
         role: formData.role,
         description: formData.description,
         instruction: formData.instruction,
+        is_start: formData.is_start,
+        is_end: formData.is_end,
       });
     }
   }, [formData, onChange, step?.id]);
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: type === 'checkbox' ? checked : value,
     }));
   };
 
@@ -58,6 +64,8 @@ export default function StepEditPanel({ step, roles, onClose, onSave, onDelete, 
         role: formData.role,
         description: formData.description,
         instruction: formData.instruction,
+        is_start: formData.is_start,
+        is_end: formData.is_end,
       });
       return;
     }
@@ -68,6 +76,8 @@ export default function StepEditPanel({ step, roles, onClose, onSave, onDelete, 
         description: formData.description,
         instruction: formData.instruction,
         role: formData.role,
+        is_start: formData.is_start,
+        is_end: formData.is_end,
       };
 
       await updateStepDetails(step.id, updateData);
@@ -174,6 +184,30 @@ export default function StepEditPanel({ step, roles, onClose, onSave, onDelete, 
               placeholder="Enter step instruction"
               rows="3"
             />
+          </div>
+
+          <div className={styles.formGroup}>
+            <label>
+              <input
+                type="checkbox"
+                name="is_start"
+                checked={formData.is_start}
+                onChange={handleChange}
+              />
+              Is Start
+            </label>
+          </div>
+
+          <div className={styles.formGroup}>
+            <label>
+              <input
+                type="checkbox"
+                name="is_end"
+                checked={formData.is_end}
+                onChange={handleChange}
+              />
+              Is End
+            </label>
           </div>
 
           <div className={styles.formActions}>

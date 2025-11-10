@@ -131,6 +131,8 @@ const WorkflowEditorContent = forwardRef(({ workflowId, onStepClick, onEdgeClick
             role: node.role,
             description: node.description,
             instruction: node.instruction,
+            is_start: node.is_start || false,
+            is_end: node.is_end || false,
             id: node.id,
             onStepClick: () => onStepClick(node),
           },
@@ -278,6 +280,8 @@ const WorkflowEditorContent = forwardRef(({ workflowId, onStepClick, onEdgeClick
           instruction: n.data.instruction || '',
           design: { x: n.position.x, y: n.position.y },
           to_delete: n.data.to_delete || false,
+          is_start: n.data.is_start || false,
+          is_end: n.data.is_end || false,
         })),
         edges: edges.map((e) => {
           // Helper function to convert ID to appropriate format
@@ -451,6 +455,8 @@ export default function WorkflowEditorLayout({ workflowId }) {
                     role: updated.role,
                     description: updated.description,
                     instruction: updated.instruction,
+                    is_start: updated.is_start,
+                    is_end: updated.is_end,
                   });
                 }
                 setEditingStep(null);
@@ -464,6 +470,8 @@ export default function WorkflowEditorLayout({ workflowId }) {
                 role: updated.role,
                 description: updated.description,
                 instruction: updated.instruction,
+                is_start: updated.is_start,
+                is_end: updated.is_end,
               }) : undefined}
             />
           )}

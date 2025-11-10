@@ -238,6 +238,8 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                 'design': node.design or {},
                 'created_at': created_at,
                 'updated_at': updated_at,
+                'is_start': node.is_start,
+                'is_end': node.is_end,
             })
         
         # Use utility function to calculate and apply handles to edges
@@ -469,7 +471,9 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                 'role': node.role_id.name if node.role_id else '',
                 'description': node.description or '',
                 'instruction': node.instruction or '',
-                'design': node.design or {}
+                'design': node.design or {},
+                'is_start': node.is_start,
+                'is_end': node.is_end,
             })
         
         # Use utility function to calculate and apply handles to edges
@@ -536,6 +540,8 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                 'design': node.design or {},
                 'created_at': created_at,
                 'updated_at': updated_at,
+                'is_start': node.is_start,
+                'is_end': node.is_end,
             })
         
         # Use utility function to calculate and apply handles to edges

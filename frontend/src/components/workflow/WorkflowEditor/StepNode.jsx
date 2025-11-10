@@ -13,13 +13,17 @@ export default function StepNode({ data, isConnecting }) {
   }, [data, getNode]);
 
   return (
-    <div className={styles.node} onClick={handleNodeClick}>
+    <div className={`${styles.node} ${data.is_start ? styles.startNode : ''} ${data.is_end ? styles.endNode : ''}`} onClick={handleNodeClick}>
       <Handle type="target" position={Position.Top} id="top" />
       <Handle type="target" position={Position.Bottom} id="bottom" />
       <Handle type="target" position={Position.Left} id="left" />
       <Handle type="target" position={Position.Right} id="right" />
       
       <div className={styles.nodeContent}>
+        <div className={styles.nodeBadges}>
+          {data.is_start && <span className={styles.startBadge}>START</span>}
+          {data.is_end && <span className={styles.endBadge}>END</span>}
+        </div>
         <div className={styles.nodeTitle}>{data.label}</div>
         <div className={styles.nodeRole}>{data.role}</div>
         <div className={styles.nodeDescription}>
