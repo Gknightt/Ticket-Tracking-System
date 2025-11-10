@@ -148,8 +148,8 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                         for edge in edges_data:
                             edge_id = edge.get('id')
                             if not edge.get('to_delete', False):
-                                from_id = edge.get('from_node')
-                                to_id = edge.get('to_node')
+                                from_id = edge.get('from')
+                                to_id = edge.get('to')
                                 
                                 # Resolve temp IDs to actual IDs
                                 if str(from_id) in temp_id_mapping:
@@ -277,8 +277,8 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                 {"id": 5, "to_delete": true}
             ],
             "edges": [
-                {"id": 1, "from_node": 1, "to_node": 2, "name": "Edge Name"},
-                {"id": "temp-e1", "from_node": 1, "to_node": "temp-1"},
+                {"id": 1, "from": 1, "to": 2, "name": "Edge Name"},
+                {"id": "temp-e1", "from": 1, "to": "temp-1"},
                 {"id": 10, "to_delete": true}
             ]
         }
@@ -370,8 +370,8 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                 # ===== PROCESS EDGES =====
                 for edge in edges_data:
                     edge_id = edge.get('id')
-                    from_id = edge.get('from_node')
-                    to_id = edge.get('to_node')
+                    from_id = edge.get('from')
+                    to_id = edge.get('to')
                     to_delete = edge.get('to_delete', False)
                     
                     # Resolve temp IDs to actual IDs
@@ -427,7 +427,7 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                                 
                                 if 'name' in edge:
                                     transition.name = edge['name']
-                                if 'from_node' in edge:
+                                if 'from' in edge:
                                     try:
                                         from_step = Steps.objects.get(step_id=int(from_id), workflow_id=workflow_id)
                                         transition.from_step_id = from_step
@@ -436,7 +436,7 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                                             {'error': f'From step {from_id} not found'},
                                             status=status.HTTP_400_BAD_REQUEST
                                         )
-                                if 'to_node' in edge:
+                                if 'to' in edge:
                                     try:
                                         to_step = Steps.objects.get(step_id=int(to_id), workflow_id=workflow_id)
                                         transition.to_step_id = to_step
@@ -481,8 +481,8 @@ class WorkflowViewSet(viewsets.ModelViewSet):
         for edge in edges:
             edges_data.append({
                 'id': edge.transition_id,
-                'from_node': edge.from_step_id.step_id if edge.from_step_id else None,
-                'to_node': edge.to_step_id.step_id if edge.to_step_id else None,
+                'from': edge.from_step_id.step_id if edge.from_step_id else None,
+                'to': edge.to_step_id.step_id if edge.to_step_id else None,
                 'name': edge.name or ''
             })
         

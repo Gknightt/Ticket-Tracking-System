@@ -40,8 +40,8 @@ class GraphNodeSerializer(serializers.Serializer):
 class GraphEdgeSerializer(serializers.Serializer):
     """Serializer for graph edges with support for temporary IDs"""
     id = serializers.CharField()  # Can be integer or temp-id string
-    from_node = serializers.CharField()  # Can be integer or temp-id string
-    to_node = serializers.CharField()  # Can be integer or temp-id string
+    from_field = serializers.CharField(source='from')  # Can be integer or temp-id string
+    to_field = serializers.CharField(source='to')  # Can be integer or temp-id string
     name = serializers.CharField(max_length=64, required=False, allow_blank=True)
     to_delete = serializers.BooleanField(default=False, required=False)
     
@@ -55,6 +55,23 @@ class GraphEdgeSerializer(serializers.Serializer):
                     "Edge id must be an integer or start with 'temp-'"
                 )
         return value
+    
+    def to_representation(self, instance):
+        """Override to return 'from' and 'to' in response"""
+        ret = super().to_representation(instance)
+        if 'from_field' in ret:
+            ret['from'] = ret.pop('from_field')
+        if 'to_field' in ret:
+            ret['to'] = ret.pop('to_field')
+        return ret
+    
+    def to_internal_value(self, data):
+        """Override to accept 'from' and 'to' in request"""
+        if 'from' in data:
+            data['from_field'] = data.pop('from')
+        if 'to' in data:
+            data['to_field'] = data.pop('to')
+        return super().to_internal_value(data)
 
 
 class UpdateWorkflowGraphSerializer(serializers.Serializer):
@@ -321,16 +338,16 @@ class CreateWorkflowWithGraphSerializer(serializers.Serializer):
         node_ids = {str(node.get('id')) for node in nodes}
         
         for edge in edges:
-            from_id = str(edge.get('from_node', ''))
-            to_id = str(edge.get('to_node', ''))
+            from_id = str(edge.get('from', ''))
+            to_id = str(edge.get('to', ''))
             
             if from_id and from_id not in node_ids:
                 raise serializers.ValidationError(
-                    f"Edge references non-existent from_node: {from_id}"
+                    f"Edge references non-existent from node: {from_id}"
                 )
             if to_id and to_id not in node_ids:
                 raise serializers.ValidationError(
-                    f"Edge references non-existent to_node: {to_id}"
+                    f"Edge references non-existent to node: {to_id}"
                 )
         
         # Validate all node roles exist
