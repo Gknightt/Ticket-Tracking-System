@@ -274,7 +274,7 @@ CORS_ALLOWED_ORIGINS = config(
 )
 
 # For development only - allows all origins (less secure)
-CORS_ALLOW_ALL_ORIGINS = = config(
+CORS_ALLOW_ALL_ORIGINS = config(
     'CORS_ALLOWED_ORIGINS',
     default='http://localhost:3000',
     cast=lambda v: [s.strip() for s in v.split(',')]
