@@ -8,7 +8,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
 import logging
 
-from .models import Task
+from .models import Task, TaskItem
 from .serializers import TaskSerializer, UserTaskListSerializer, TaskCreateSerializer
 from .utils.assignment import assign_users_for_step
 from authentication import JWTCookieAuthentication, MultiSystemPermission
@@ -38,41 +38,24 @@ class UserTaskListView(ListAPIView):
         """
         user_id = self.request.user.user_id
         
-        # Get all tasks that have this user in their users array
-        queryset = Task.objects.all()
-        filtered_tasks = []
-        
-        for task in queryset:
-            if task.users and any(user.get('userID') == user_id for user in task.users):
-                filtered_tasks.append(task.pk)
-        
-        queryset = Task.objects.filter(pk__in=filtered_tasks)
+        # Get all tasks that have this user assigned via TaskItem
+        queryset = Task.objects.filter(
+            taskitem__user_id=user_id
+        ).distinct()
         
         # Apply additional filters from query parameters
         role = self.request.query_params.get('role')
         assignment_status = self.request.query_params.get('assignment_status')
         
         if role:
-            # Filter by role - check users array for matching role
-            filtered_by_role = []
-            for task in queryset:
-                for user in task.users:
-                    if user.get('userID') == user_id and user.get('role') == role:
-                        filtered_by_role.append(task.pk)
-                        break
-            queryset = queryset.filter(pk__in=filtered_by_role)
+            # Filter by role - check TaskItems for matching role
+            queryset = queryset.filter(taskitem__user_id=user_id, taskitem__role=role)
         
         if assignment_status:
-            # Filter by assignment status - check users array for matching status
-            filtered_by_status = []
-            for task in queryset:
-                for user in task.users:
-                    if user.get('userID') == user_id and user.get('status') == assignment_status:
-                        filtered_by_status.append(task.pk)
-                        break
-            queryset = queryset.filter(pk__in=filtered_by_status)
+            # Filter by assignment status - check TaskItems for matching status
+            queryset = queryset.filter(taskitem__user_id=user_id, taskitem__status=assignment_status)
         
-        return queryset.select_related('ticket_id', 'workflow_id', 'current_step')
+        return queryset.select_related('ticket_id', 'workflow_id', 'current_step').distinct()
     
     def get_serializer_context(self):
         """Add user_id to serializer context for extracting user-specific assignment data"""
@@ -118,11 +101,10 @@ class TaskViewSet(viewsets.ModelViewSet):
         """
         user_id = request.user.user_id
         
-        # Filter tasks by user ID
-        filtered_tasks = []
-        for task in self.queryset:
-            if task.users and any(user.get('userID') == user_id for user in task.users):
-                filtered_tasks.append(task)
+        # Filter tasks by user ID via TaskItems
+        filtered_tasks = Task.objects.filter(
+            taskitem__user_id=user_id
+        ).select_related('ticket_id', 'workflow_id', 'current_step').distinct()
         
         # Apply pagination if needed
         page = self.paginate_queryset(filtered_tasks)
@@ -164,28 +146,23 @@ class TaskViewSet(viewsets.ModelViewSet):
             )
         
         # Validate status
-        valid_statuses = ['assigned', 'in_progress', 'completed', 'on_hold']
+        valid_statuses = ['assigned', 'in_progress', 'completed', 'on_hold', 'acted']
         if new_status not in valid_statuses:
             return Response(
                 {'error': f'status must be one of: {valid_statuses}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Check if user is assigned to this task
-        user_found = False
-        for user in task.users:
-            if user.get('userID') == user_id:
-                user_found = True
-                user['status'] = new_status
-                break
-        
-        if not user_found:
+        # Get or create TaskItem for this user
+        try:
+            task_item = TaskItem.objects.get(task=task, user_id=user_id)
+            task_item.status = new_status
+            task_item.save()
+        except TaskItem.DoesNotExist:
             return Response(
                 {'error': f'User {user_id} is not assigned to this task'},
                 status=status.HTTP_403_FORBIDDEN
             )
-        
-        task.save()
         
         serializer = UserTaskListSerializer(
             task,

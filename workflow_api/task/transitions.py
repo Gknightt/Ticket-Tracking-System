@@ -5,7 +5,7 @@ from rest_framework.generics import CreateAPIView
 import logging
 from django.utils import timezone
 
-from task.models import Task
+from task.models import Task, TaskItem
 from task.serializers import TaskSerializer
 from task.utils.assignment import assign_users_for_step
 from authentication import JWTCookieAuthentication
@@ -76,32 +76,29 @@ class TaskTransitionView(CreateAPIView):
             )
         
         # Validate user is assigned to this task with "assigned" status
-        # Check if user has ANY "assigned" record (they may have multiple with different roles)
         user_assignment = None
-        user_assignment_index = None
-        for index, user in enumerate(task.users):
-            if user.get('userID') == current_user_id and user.get('status') == 'assigned':
-                user_assignment = user
-                user_assignment_index = index
-                break
-        
-        if not user_assignment:
+        try:
+            user_assignment = TaskItem.objects.get(
+                task=task,
+                user_id=current_user_id,
+                status='assigned'
+            )
+        except TaskItem.DoesNotExist:
             # User has no "assigned" records - either not assigned or already acted on all assignments
-            # Provide helpful error with their assignment history
-            user_records = [u for u in task.users if u.get('userID') == current_user_id]
+            user_records = TaskItem.objects.filter(task=task, user_id=current_user_id)
             return Response(
                 {
                     'error': f'User {current_user_id} has no active "assigned" status for task {task_id}',
                     'task_id': task_id,
                     'current_user_id': current_user_id,
-                    'user_records': user_records,
+                    'user_records': [item.to_dict() for item in user_records],
                     'message': 'User may have already acted on all their assignments or is not assigned to this task'
                 },
                 status=status.HTTP_403_FORBIDDEN
             )
         
         logger.info(
-            f"✅ User {current_user_id} validated with status 'assigned' for role '{user_assignment.get('role')}' at index {user_assignment_index}"
+            f"✅ User {current_user_id} validated with status 'assigned' for role '{user_assignment.role}'"
         )
         
         # Get transition
@@ -124,13 +121,13 @@ class TaskTransitionView(CreateAPIView):
                 f"Completing task {task_id}"
             )
             
-            # Mark the SPECIFIC validated user assignment as "acted"
-            if user_assignment_index is not None:
-                task.users[user_assignment_index]['status'] = 'acted'
-                task.users[user_assignment_index]['acted_on'] = timezone.now().isoformat()
-                logger.info(
-                    f"📝 Updated user {current_user_id} record at index {user_assignment_index} to 'acted'"
-                )
+            # Mark the user assignment as "acted"
+            user_assignment.status = 'acted'
+            user_assignment.acted_on = timezone.now()
+            user_assignment.save()
+            logger.info(
+                f"📝 Updated user {current_user_id} TaskItem to 'acted'"
+            )
             
             # Mark task as completed
             task.status = 'completed'
@@ -238,9 +235,9 @@ class TaskTransitionView(CreateAPIView):
         )
         
         # Assign users for the next step using round-robin
-        assigned_users = assign_users_for_step(next_step, next_step.role_id.name)
+        assigned_items = assign_users_for_step(task, next_step, next_step.role_id.name)
         
-        if not assigned_users:
+        if not assigned_items:
             return Response(
                 {
                     'error': f'No users available for role {next_step.role_id.name}',
@@ -250,25 +247,23 @@ class TaskTransitionView(CreateAPIView):
                 status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
         
-        # Mark the SPECIFIC validated user assignment as "acted" before moving to next step
-        if user_assignment_index is not None:
-            task.users[user_assignment_index]['status'] = 'acted'
-            task.users[user_assignment_index]['acted_on'] = timezone.now().isoformat()
-            logger.info(
-                f"📝 Updated user {current_user_id} record at index {user_assignment_index} to 'acted'"
-            )
+        # Mark the user assignment as "acted" before moving to next step
+        user_assignment.status = 'acted'
+        user_assignment.acted_on = timezone.now()
+        user_assignment.save()
+        logger.info(
+            f"📝 Updated user {current_user_id} TaskItem to 'acted'"
+        )
         
         # Update task
         task.current_step = next_step
-        # Append assigned users instead of overwriting
-        task.users.extend(assigned_users)
         task.status = 'pending'
         task.save()
         
         logger.info(
             f"✅ Task {task.task_id} transitioned successfully. "
             f"User {current_user_id} status changed to 'acted'. "
-            f"New assigned users: {[u.get('userID') for u in assigned_users]}"
+            f"New assigned users: {[item.user_id for item in assigned_items]}"
         )
         
         # Return detailed response
@@ -294,6 +289,6 @@ class TaskTransitionView(CreateAPIView):
                 'instruction': next_step.instruction,
                 'role': next_step.role_id.name if next_step.role_id else None,
             },
-            'assigned_users': assigned_users,
+            'assigned_users': [item.to_dict() for item in assigned_items],
             'task_details': serializer.data,
         }, status=status.HTTP_200_OK)
