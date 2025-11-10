@@ -6,11 +6,15 @@ from step.models import Steps
 
 class TaskItemSerializer(serializers.ModelSerializer):
     """Serializer for TaskItem (user assignment in a task)"""
+    acted_on_step_name = serializers.CharField(source='acted_on_step.name', read_only=True, allow_null=True)
+    acted_on_step_id = serializers.IntegerField(source='acted_on_step.step_id', read_only=True, allow_null=True)
+    
     class Meta:
         model = TaskItem
         fields = [
             'task_item_id', 'user_id', 'username', 'email', 'status', 
-            'role', 'assigned_on', 'status_updated_on', 'acted_on'
+            'role', 'assigned_on', 'status_updated_on', 'acted_on',
+            'acted_on_step_id', 'acted_on_step_name'
         ]
         read_only_fields = ['task_item_id', 'assigned_on']
 
@@ -88,6 +92,7 @@ class UserTaskListSerializer(serializers.ModelSerializer):
     current_step_name = serializers.CharField(source='current_step.name', read_only=True)
     current_step_role = serializers.CharField(source='current_step.role_id.name', read_only=True, allow_null=True)
     user_assignment = serializers.SerializerMethodField()
+    has_acted = serializers.SerializerMethodField()
     
     class Meta:
         model = Task
@@ -103,6 +108,7 @@ class UserTaskListSerializer(serializers.ModelSerializer):
             'current_step_role',
             'status',
             'user_assignment',
+            'has_acted',
             'created_at',
             'updated_at',
             'fetched_at',
@@ -117,7 +123,7 @@ class UserTaskListSerializer(serializers.ModelSerializer):
         user_id = self.context.get('user_id')
         if user_id:
             try:
-                task_item = TaskItem.objects.get(task=obj, user_id=user_id)
+                task_item = TaskItem.objects.select_related('acted_on_step').get(task=obj, user_id=user_id)
                 return {
                     'user_id': task_item.user_id,
                     'username': task_item.username,
@@ -127,7 +133,25 @@ class UserTaskListSerializer(serializers.ModelSerializer):
                     'assigned_on': task_item.assigned_on,
                     'status_updated_on': task_item.status_updated_on,
                     'acted_on': task_item.acted_on,
+                    'acted_on_step': {
+                        'step_id': task_item.acted_on_step.step_id,
+                        'name': task_item.acted_on_step.name
+                    } if task_item.acted_on_step else None,
                 }
             except TaskItem.DoesNotExist:
                 return None
         return None
+    
+    def get_has_acted(self, obj):
+        """
+        Check if the current user has already acted on this task.
+        Returns True if user has any TaskItem with status 'acted', False otherwise.
+        """
+        user_id = self.context.get('user_id')
+        if user_id:
+            return TaskItem.objects.filter(
+                task=obj,
+                user_id=user_id,
+                status='acted'
+            ).exists()
+        return False

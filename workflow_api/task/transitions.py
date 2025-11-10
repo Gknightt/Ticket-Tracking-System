@@ -121,12 +121,13 @@ class TaskTransitionView(CreateAPIView):
                 f"Completing task {task_id}"
             )
             
-            # Mark the user assignment as "acted"
+            # Mark the user assignment as "acted" with the current step
             user_assignment.status = 'acted'
             user_assignment.acted_on = timezone.now()
+            user_assignment.acted_on_step = task.current_step
             user_assignment.save()
             logger.info(
-                f"📝 Updated user {current_user_id} TaskItem to 'acted'"
+                f"📝 Updated user {current_user_id} TaskItem to 'acted' at step {task.current_step.name}"
             )
             
             # Mark task as completed
@@ -148,6 +149,10 @@ class TaskTransitionView(CreateAPIView):
                 'workflow_status': 'completed',
                 'current_user_id': current_user_id,
                 'user_status': 'acted',
+                'acted_on_step': {
+                    'step_id': task.current_step.step_id,
+                    'name': task.current_step.name
+                },
                 'transition_id': transition_id,
                 'is_terminal': True,
                 'task_details': serializer.data,
@@ -250,9 +255,10 @@ class TaskTransitionView(CreateAPIView):
         # Mark the user assignment as "acted" before moving to next step
         user_assignment.status = 'acted'
         user_assignment.acted_on = timezone.now()
+        user_assignment.acted_on_step = task.current_step
         user_assignment.save()
         logger.info(
-            f"📝 Updated user {current_user_id} TaskItem to 'acted'"
+            f"📝 Updated user {current_user_id} TaskItem to 'acted' at step {task.current_step.name}"
         )
         
         # Update task
@@ -262,7 +268,7 @@ class TaskTransitionView(CreateAPIView):
         
         logger.info(
             f"✅ Task {task.task_id} transitioned successfully. "
-            f"User {current_user_id} status changed to 'acted'. "
+            f"User {current_user_id} status changed to 'acted' at step {user_assignment.acted_on_step.name}. "
             f"New assigned users: {[item.user_id for item in assigned_items]}"
         )
         
@@ -275,6 +281,10 @@ class TaskTransitionView(CreateAPIView):
             'task_id': task.task_id,
             'current_user_id': current_user_id,
             'user_action_status': 'acted',
+            'acted_on_step': {
+                'step_id': user_assignment.acted_on_step.step_id,
+                'name': user_assignment.acted_on_step.name
+            },
             'previous_step': {
                 'step_id': previous_step.step_id,
                 'name': previous_step.name,

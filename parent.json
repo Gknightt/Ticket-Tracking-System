@@ -1,10 +1,6 @@
 {
     "user_id": 6,
-    "step_instance_id": "e30edddc-ca9d-4d0d-90b9-3fb8a14a32a5",
-    "step_transition_id": "fcee91ef-a5c8-4c42-8d95-20c90935af70",
-    "step_id": 13,
-    "task_id": "0988b00b-4604-4a42-95cf-8182f79c1b47",
-    "workflow_id": 5,
+    "task_id": 1,
     "ticket": {
         "ticket_number": "TX20251106444441",
         "subject": "hello this ticket is legit I suppose",
@@ -15,6 +11,5 @@
         "status": "Open",
         "department": "IT Department"
     },
-    "employee_id": 15,
     "has_acted": false
 }
