@@ -1,10 +1,10 @@
 {
     "workflow": {
-      "name": "Infrastructure Workflow",
+      "name": "Infrastructure Workflow is amazings",
       "description": "Handles IT reset requests",
       "category": "IT",
-      "sub_category": "Support",
-      "department": "IT Support"
+      "sub_category": "subcategory nigga",
+      "department": "nigga"
     },
     "graph": {
       "nodes": [
@@ -47,8 +47,8 @@
       "edges": [
         {
           "id": "temp-101",
-          "from_node": "temp-1",
-          "to_node": "temp-2",
+          "from": "temp-1",
+          "to": "temp-2",
           "name": ""
         },
         {
