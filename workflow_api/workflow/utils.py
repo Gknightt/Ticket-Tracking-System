@@ -88,17 +88,20 @@ def calculate_edge_handles(workflow_id):
     """
     Calculate and return source/target handles for all edges in a workflow.
     
-    Rules:
-    1. Always vertical workflow (default: source_handle="Bottom", target_handle="Top")
-    2. Detect upstream movement (loops): use left/right handles instead
-    3. For loops, prioritize left first, then right if left is occupied
+    Algorithm:
+    1. Identify start nodes: nodes that only appear as to_step_id (never as from_step_id)
+    2. Perform BFS from start nodes to assign depth to all reachable nodes
+    3. For each transition:
+       - If target depth > source depth → downstream (bottom → top)
+       - If target depth ≤ source depth → upstream (right → right)
+    4. Handle incomplete transitions gracefully with defaults
     
     Returns a dictionary mapping transition_id to design dict with handles.
     
     Example return:
     {
-        1: {"source_handle": "Bottom", "target_handle": "Top"},
-        2: {"source_handle": "left", "target_handle": "left"},  # loop case
+        1: {"source_handle": "bottom", "target_handle": "top"},
+        2: {"source_handle": "right", "target_handle": "right"},  # upstream/loop
     }
     """
     try:
@@ -110,58 +113,92 @@ def calculate_edge_handles(workflow_id):
     transitions = StepTransition.objects.filter(workflow_id=workflow_id)
     steps = Steps.objects.filter(workflow_id=workflow_id)
     
-    # Build a map of step_id -> order for ordering comparison
-    step_order = {step.step_id: step.order for step in steps}
+    if not steps.exists() or not transitions.exists():
+        logger.warning(f"Workflow {workflow_id} has no steps or transitions")
+        return {}
     
-    # Track handle usage per step to avoid conflicts
-    # Format: {step_id: {"left": count, "right": count}}
-    handle_usage = {step.step_id: {"left": 0, "right": 0} for step in steps}
+    # Build sets of step_ids that appear as from_step and to_step
+    from_steps = set()
+    to_steps = set()
     
+    for transition in transitions:
+        if transition.from_step_id:
+            from_steps.add(transition.from_step_id.step_id)
+        if transition.to_step_id:
+            to_steps.add(transition.to_step_id.step_id)
+    
+    # Find start nodes: appear as to_step but never as from_step
+    start_nodes = to_steps - from_steps
+    
+    # If no start node found (e.g., circular graph), pick any node
+    if not start_nodes:
+        start_nodes = {steps.first().step_id}
+        logger.warning(f"No clear start node found. Using arbitrary start: {start_nodes}")
+    
+    logger.debug(f"Identified start nodes: {start_nodes}")
+    
+    # Build adjacency list for BFS
+    adjacency = {}
+    for step in steps:
+        adjacency[step.step_id] = []
+    
+    for transition in transitions:
+        if transition.from_step_id and transition.to_step_id:
+            adjacency[transition.from_step_id.step_id].append(transition.to_step_id.step_id)
+    
+    # BFS to compute depth for each node
+    node_depth = {}
+    queue = [(node, 0) for node in start_nodes]
+    visited = set(start_nodes)
+    
+    while queue:
+        current_node, current_depth = queue.pop(0)
+        node_depth[current_node] = current_depth
+        
+        for neighbor in adjacency.get(current_node, []):
+            if neighbor not in visited:
+                visited.add(neighbor)
+                queue.append((neighbor, current_depth + 1))
+    
+    logger.debug(f"Node depths: {node_depth}")
+    
+    # Assign handles based on depth comparison
     handles_map = {}
     
     for transition in transitions:
         if not transition.from_step_id or not transition.to_step_id:
-            # Handle incomplete transitions
+            # Handle incomplete transitions with defaults
             handles_map[transition.transition_id] = {
-                "source_handle": "Bottom",
-                "target_handle": "Top"
+                "source_handle": "bottom",
+                "target_handle": "top"
             }
+            logger.debug(
+                f"Transition {transition.transition_id} is incomplete. Using default handles."
+            )
             continue
         
-        from_step_order = step_order.get(transition.from_step_id.step_id, 0)
-        to_step_order = step_order.get(transition.to_step_id.step_id, 0)
+        from_step_id = transition.from_step_id.step_id
+        to_step_id = transition.to_step_id.step_id
         
-        # Check if this is a loop (upstream movement)
-        is_loop = to_step_order <= from_step_order
+        from_depth = node_depth.get(from_step_id, 0)
+        to_depth = node_depth.get(to_step_id, 0)
         
-        if is_loop:
-            # Use left/right handles for loops
-            # Prioritize left first
-            from_left_count = handle_usage[transition.from_step_id.step_id]["left"]
-            from_right_count = handle_usage[transition.from_step_id.step_id]["right"]
-            
-            to_left_count = handle_usage[transition.to_step_id.step_id]["left"]
-            to_right_count = handle_usage[transition.to_step_id.step_id]["right"]
-            
-            # Choose handle based on usage count (less used first)
-            source_handle = "left" if from_left_count <= from_right_count else "right"
-            target_handle = "left" if to_left_count <= to_right_count else "right"
-            
-            # Update usage counters
-            handle_usage[transition.from_step_id.step_id][source_handle] += 1
-            handle_usage[transition.to_step_id.step_id][target_handle] += 1
-            
+        # Determine if downstream or upstream
+        is_downstream = to_depth > from_depth
+        
+        if is_downstream:
+            source_handle = "bottom"
+            target_handle = "top"
             logger.debug(
-                f"Loop detected: {transition.from_step_id.step_id} -> {transition.to_step_id.step_id}. "
-                f"Handles: {source_handle} -> {target_handle}"
+                f"Downstream: {from_step_id} (depth {from_depth}) → {to_step_id} (depth {to_depth}). "
+                f"Handles: {source_handle} → {target_handle}"
             )
         else:
-            # Linear flow: use bottom and top
-            source_handle = "Bottom"
-            target_handle = "Top"
+            source_handle = "right"
+            target_handle = "right"
             logger.debug(
-                f"Linear flow: {transition.from_step_id.step_id} -> {transition.to_step_id.step_id}. "
-                f"Handles: {source_handle} -> {target_handle}"
+                f"Upstream/Loop: {from_step_id} (depth {from_depth}) → {to_step_id} (depth {to_depth}). "
+                f"Handles: {source_handle} → {target_handle}"
             )
         
         handles_map[transition.transition_id] = {
