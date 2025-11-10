@@ -24,6 +24,8 @@ class Steps(models.Model):
 
     # flags
     is_initialized = models.BooleanField(default=False)
+    is_start = models.BooleanField(default=False)  # Indicates if this is the start step
+    is_end = models.BooleanField(default=False)    # Indicates if this is the end step
 
     # timestamps
     created_at = models.DateTimeField(auto_now_add=True)

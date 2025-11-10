@@ -229,7 +229,9 @@ class Command(BaseCommand):
                     # Step names are namespaced by workflow but use the clean labels
                     step_name = f"{wf.name} - {step_cfg['label']}"
                     instruction = random.choice(instructions_pool[step_cfg['instruction_type']])
-                    
+
+                    is_start = (idx == 0)
+                    is_end = (idx == len(steps_cfg) - 1)
                     step, step_created = Steps.objects.get_or_create(
                         workflow_id=wf,
                         name=step_name,
@@ -238,7 +240,9 @@ class Command(BaseCommand):
                             'role_id': role_map[step_cfg['role']],
                             'instruction': instruction,
                             'order': idx + 1,
-                            'is_initialized': (idx == 0)
+                            'is_initialized': (idx == 0),
+                            'is_start': is_start,
+                            'is_end': is_end
                         }
                     )
                     step_objs.append(step)
@@ -281,7 +285,7 @@ class Command(BaseCommand):
                             total_transitions += 1
                         except (ValidationError, IntegrityError) as e:
                             self.stdout.write(self.style.WARNING(
-                                f'  	⚠ Skipped transition: {str(e)}'
+                                f'  	 ⚠ Skipped transition: {str(e)}'
                             ))
                             continue
 
