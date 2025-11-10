@@ -152,12 +152,13 @@ def create_task_for_ticket(ticket_id):
     1. Finding matching workflow based on department-category
     2. Getting the first step and associated role
     3. Fetching users for that role from auth service
-    4. Assigning users using round-robin logic
+    4. Creating TaskItem records for assigned users using round-robin logic
     """
     from tickets.models import WorkflowTicket
     from workflow.models import Workflows
     from step.models import Steps
     from task.models import Task
+    from task.utils.assignment import assign_users_for_step
     from django.utils import timezone
     import traceback
     
@@ -190,42 +191,35 @@ def create_task_for_ticket(ticket_id):
         
         print(f"🏁 First step: {first_step.name}, Role: {first_step.role_id.name}")
         
-        # 3. Fetch users for the role from auth service
-        user_ids_for_role = fetch_users_for_role(first_step.role_id.name)
-        
-        if not user_ids_for_role:
-            print(f"⚠️ No users found for role {first_step.role_id.name}")
-            return {"status": "error", "message": "No users found for role"}
-        
-        # 4. Apply round-robin assignment
-        assigned_users = apply_round_robin_assignment(
-            user_ids_for_role, 
-            first_step.role_id.name
-        )
-        
-        # 5. Create the task
+        # 3. Create the task (without users - TaskItems will be created separately)
         task = Task.objects.create(
             ticket_id=ticket,
             workflow_id=matching_workflow,
             current_step=first_step,
-            users=assigned_users,
             status='pending',
             fetched_at=timezone.now()
         )
+        
+        # 4. Assign users for the first step using round-robin (creates TaskItem records)
+        assigned_items = assign_users_for_step(task, first_step, first_step.role_id.name)
+        
+        if not assigned_items:
+            print(f"⚠️ No users assigned for role {first_step.role_id.name}")
+            return {"status": "error", "message": "No users found for role"}
         
         # Mark ticket as task allocated
         ticket.is_task_allocated = True
         ticket.save()
         
         print(f"🎯 Task created successfully: {task.task_id}")
-        print(f"👥 Assigned users: {[user['userID'] for user in assigned_users]}")
+        print(f"👥 Assigned users: {[item.user_id for item in assigned_items]}")
         
         return {
             "status": "success", 
             "task_id": task.task_id,
             "workflow": matching_workflow.name,
             "step": first_step.name,
-            "assigned_users": assigned_users
+            "assigned_users": [item.to_dict() for item in assigned_items]
         }
         
     except WorkflowTicket.DoesNotExist:
@@ -292,6 +286,9 @@ def fetch_users_for_role(role_name):
 def apply_round_robin_assignment(user_ids, role_name, max_assignments=1):
     """Apply round-robin logic to assign a single user to a task using persistent storage.
     
+    This function is deprecated and kept for backward compatibility.
+    Use task.utils.assignment.apply_round_robin_assignment instead, which creates TaskItem records.
+    
     Args:
         user_ids: List of user IDs [3, 6, 7, ...]
         role_name: Name of the role for state tracking
@@ -299,6 +296,7 @@ def apply_round_robin_assignment(user_ids, role_name, max_assignments=1):
     
     Returns:
         List of user assignment objects with status, role, and assignment time
+        (kept for backward compatibility, but TaskItem records are created via assign_users_for_step)
     """
     from django.utils import timezone
     from tickets.models import RoundRobin
@@ -314,8 +312,9 @@ def apply_round_robin_assignment(user_ids, role_name, max_assignments=1):
     user_index = current_index % len(user_ids)
     user_id = user_ids[user_index]
 
+    # This returns data in old format for backward compatibility
     assigned_user = {
-        "userID": user_id,
+        "user_id": user_id,
         "status": "assigned",
         "assigned_on": timezone.now().isoformat(),
         "role": role_name

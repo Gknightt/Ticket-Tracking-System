@@ -130,11 +130,15 @@ def test_automatic_task_creation():
             print(f"✅ Task automatically created: {task.task_id}")
             print(f"📋 Workflow: {task.workflow_id.name}")
             print(f"🏁 Current step: {task.current_step.name}")
-            print(f"👥 Assigned users: {len(task.users)}")
+            
+            # Get assigned TaskItems
+            from task.models import TaskItem
+            task_items = TaskItem.objects.filter(task=task)
+            print(f"👥 Assigned users: {len(task_items)}")
             
             # Print user assignments
-            for user in task.users:
-                print(f"   - User {user.get('userID')}: {user.get('username')} ({user.get('status')})")
+            for item in task_items:
+                print(f"   - User {item.user_id}: {item.username} ({item.status})")
                 
             return task
         else:
@@ -178,6 +182,8 @@ def test_task_operations():
     """Test task operations like moving to next step, completing tasks"""
     print("\n⚙️ Testing task operations...")
     
+    from task.models import TaskItem
+    
     # Get the first available task
     task = Task.objects.first()
     if not task:
@@ -187,9 +193,10 @@ def test_task_operations():
     print(f"🎯 Testing with task: {task.task_id}")
     
     # Test user status update
-    if task.users:
-        first_user = task.users[0]
-        user_id = first_user.get('userID')
+    task_items = TaskItem.objects.filter(task=task)
+    if task_items.exists():
+        first_item = task_items.first()
+        user_id = first_item.user_id
         print(f"👤 Updating user {user_id} status to 'in_progress'")
         success = task.update_user_status(user_id, 'in_progress')
         print(f"✅ User status updated: {success}")

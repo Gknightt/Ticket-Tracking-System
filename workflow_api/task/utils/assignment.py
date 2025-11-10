@@ -5,7 +5,8 @@ These functions are used across tasks, steps, and transitions.
 
 from django.conf import settings
 from django.utils import timezone
-from tickets.models import RoundRobin, WorkflowTicket
+from tickets.models import RoundRobin
+from task.models import TaskItem
 import requests
 import logging
 
@@ -54,28 +55,21 @@ def fetch_users_for_role(role_name):
         return []
 
 
-def apply_round_robin_assignment(user_ids, role_name, max_assignments=1):
+def apply_round_robin_assignment(task, user_ids, role_name, max_assignments=1):
     """
-    Apply round-robin logic to assign users to a task using persistent storage.
+    Apply round-robin logic to assign users to a task and create TaskItem records.
     
     Maintains state of which user was last assigned for a role, ensuring
     fair distribution of tasks across users.
     
     Args:
+        task: Task instance to assign users to
         user_ids: List of user IDs [3, 6, 7, ...]
         role_name: Name of the role for state tracking
         max_assignments: Maximum number of users to assign (default 1)
     
     Returns:
-        List of user assignment objects with status, role, and assignment time:
-        [
-            {
-                "userID": 3,
-                "status": "assigned",
-                "assigned_on": "2025-11-09T20:14:18.865143+00:00",
-                "role": "Admin"
-            }
-        ]
+        List of created TaskItem instances
     """
     if not user_ids:
         logger.warning(f"No user IDs provided for round-robin assignment to role '{role_name}'")
@@ -95,14 +89,23 @@ def apply_round_robin_assignment(user_ids, role_name, max_assignments=1):
     user_index = current_index % len(user_ids)
     user_id = user_ids[user_index]
 
-    assigned_user = {
-        "userID": user_id,
-        "username": "",  # Will be fetched from auth service if needed
-        "email": "",     # Will be fetched from auth service if needed
-        "status": "assigned",
-        "assigned_on": timezone.now().isoformat(),
-        "role": role_name
-    }
+    # Create TaskItem for the assigned user
+    task_item, created = TaskItem.objects.get_or_create(
+        task=task,
+        user_id=user_id,
+        defaults={
+            'username': '',
+            'email': '',
+            'status': 'assigned',
+            'assigned_on': timezone.now(),
+            'role': role_name
+        }
+    )
+    
+    if created:
+        logger.info(f"👤 Created TaskItem: User {user_id} assigned to Task {task.task_id} with role '{role_name}' (round-robin index: {user_index})")
+    else:
+        logger.info(f"⚠️ TaskItem already exists: User {user_id} for Task {task.task_id}")
 
     # Update round-robin state for next assignment
     round_robin_state.current_index = (current_index + 1) % len(user_ids)
@@ -110,10 +113,10 @@ def apply_round_robin_assignment(user_ids, role_name, max_assignments=1):
     
     logger.info(f"👤 Assigned user {user_id} from role '{role_name}' (round-robin index: {user_index})")
 
-    return [assigned_user]
+    return [task_item]
 
 
-def assign_users_for_step(step, role_name):
+def assign_users_for_step(task, step, role_name):
     """
     High-level function to fetch users for a role and apply round-robin assignment.
     
@@ -121,18 +124,21 @@ def assign_users_for_step(step, role_name):
     round-robin logic in a single call.
     
     Args:
+        task: Task instance to assign users to
         step: Steps model instance
         role_name: Name of the role to assign users for
     
     Returns:
-        List of assigned user objects, or empty list if no users found
+        List of created TaskItem instances, or empty list if no users found
     
     Example:
         >>> from step.models import Steps
+        >>> from task.models import Task
+        >>> task = Task.objects.get(task_id=1)
         >>> step = Steps.objects.get(step_id=1)
-        >>> assigned_users = assign_users_for_step(step, 'Admin')
-        >>> print(assigned_users)
-        [{'userID': 6, 'status': 'assigned', 'assigned_on': '...', 'role': 'Admin'}]
+        >>> assigned_items = assign_users_for_step(task, step, 'Admin')
+        >>> print(assigned_items)
+        [<TaskItem: TaskItem 1: User 6 -> Task 1>]
     """
     # Fetch users for the role
     user_ids = fetch_users_for_role(role_name)
@@ -141,7 +147,7 @@ def assign_users_for_step(step, role_name):
         logger.warning(f"⚠️ No users found for role '{role_name}' at step {step.step_id}")
         return []
     
-    # Apply round-robin assignment
-    assigned_users = apply_round_robin_assignment(user_ids, role_name)
+    # Apply round-robin assignment and create TaskItem records
+    assigned_items = apply_round_robin_assignment(task, user_ids, role_name)
     
-    return assigned_users
+    return assigned_items

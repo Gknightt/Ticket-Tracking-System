@@ -14,11 +14,20 @@ TASK_STATUS_CHOICES = [
     ('cancelled', 'Cancelled'),
 ]
 
+# Status choices for task items (user assignments)
+TASK_ITEM_STATUS_CHOICES = [
+    ('assigned', 'Assigned'),
+    ('in_progress', 'In Progress'),
+    ('completed', 'Completed'),
+    ('on_hold', 'On Hold'),
+    ('acted', 'Acted'),
+]
+
 class Task(models.Model):
     task_id = models.AutoField(primary_key=True, unique=True)
 
     ticket_id = models.ForeignKey(
-        'tickets.WorkflowTicket',  # Assuming Ticket model is in tickets app
+        'tickets.WorkflowTicket',
         on_delete=models.CASCADE,
     )
     workflow_id = models.ForeignKey('workflow.Workflows', on_delete=models.CASCADE)
@@ -28,11 +37,6 @@ class Task(models.Model):
         null=True,
         blank=True,
         to_field='step_id'
-    )
-    users = models.JSONField(
-        default=list, 
-        blank=True,
-        help_text="Array of assigned users with format: [{userID, username, email, status, assigned_on, role}, ...]"
     )
     status = models.CharField(
         max_length=36, 
@@ -57,55 +61,50 @@ class Task(models.Model):
 
     def get_assigned_user_ids(self):
         """Get list of user IDs assigned to this task"""
-        return [user.get('userID') for user in self.users if user.get('userID')]
+        return list(self.taskitem_set.values_list('user_id', flat=True).distinct())
     
     def get_assigned_users_by_status(self, status=None):
-        """Get users filtered by their assignment status"""
+        """Get TaskItem instances filtered by their assignment status"""
         if status:
-            return [user for user in self.users if user.get('status') == status]
-        return self.users
+            return self.taskitem_set.filter(status=status)
+        return self.taskitem_set.all()
     
     def update_user_status(self, user_id, new_status):
         """Update the status of a specific assigned user"""
         from django.utils import timezone
         
-        updated = False
-        for user in self.users:
-            if user.get('userID') == user_id:
-                user['status'] = new_status
-                user['status_updated_on'] = timezone.now().isoformat()
-                updated = True
-                break
-        
-        if updated:
-            self.save()
-        return updated
+        try:
+            task_item = self.taskitem_set.get(user_id=user_id)
+            task_item.status = new_status
+            task_item.status_updated_on = timezone.now()
+            task_item.save()
+            return True
+        except TaskItem.DoesNotExist:
+            return False
     
     def add_user_assignment(self, user_data):
         """Add a new user assignment to the task"""
         from django.utils import timezone
         
         # Ensure required fields
-        if not user_data.get('userID'):
-            raise ValueError("userID is required for user assignment")
+        if not user_data.get('user_id'):
+            raise ValueError("user_id is required for user assignment")
         
         # Check if user is already assigned
-        existing_user_ids = self.get_assigned_user_ids()
-        if user_data['userID'] in existing_user_ids:
+        if self.taskitem_set.filter(user_id=user_data['user_id']).exists():
             return False  # User already assigned
         
-        # Add default fields if not provided
-        user_assignment = {
-            "userID": user_data['userID'],
-            "username": user_data.get('username', ''),
-            "email": user_data.get('email', ''),
-            "status": user_data.get('status', 'assigned'),
-            "assigned_on": user_data.get('assigned_on', timezone.now().isoformat()),
-            "role": user_data.get('role', '')
-        }
+        # Create TaskItem
+        task_item = TaskItem.objects.create(
+            task=self,
+            user_id=user_data['user_id'],
+            username=user_data.get('username', ''),
+            email=user_data.get('email', ''),
+            status=user_data.get('status', 'assigned'),
+            assigned_on=user_data.get('assigned_on', timezone.now()),
+            role=user_data.get('role', '')
+        )
         
-        self.users.append(user_assignment)
-        self.save()
         return True
 
     def __str__(self):
@@ -174,7 +173,9 @@ class Task(models.Model):
                     users_for_role, 
                     next_step.role_id.name
                 )
-                self.users.extend(new_assignments)
+                # Add new TaskItems
+                for assignment in new_assignments:
+                    self.add_user_assignment(assignment)
             # If no users, keep existing assignments (don't clear)
         
         self.status = 'pending'
@@ -282,3 +283,48 @@ class Task(models.Model):
 
             except Exception as e:
                 print(f"❌ Failed to process URL {file_url}: {e}")
+
+
+class TaskItem(models.Model):
+    """
+    Represents a single user assignment within a task.
+    Each row is one user assigned to a task.
+    """
+    task_item_id = models.AutoField(primary_key=True, unique=True)
+    
+    task = models.ForeignKey(Task, on_delete=models.CASCADE)
+    user_id = models.IntegerField(help_text="User ID from auth service")
+    username = models.CharField(max_length=150, blank=True, default='')
+    email = models.EmailField(blank=True, default='')
+    status = models.CharField(
+        max_length=50,
+        choices=TASK_ITEM_STATUS_CHOICES,
+        default='assigned',
+        help_text="Status of this user's assignment"
+    )
+    role = models.CharField(max_length=100, blank=True, default='')
+    
+    assigned_on = models.DateTimeField(auto_now_add=True)
+    status_updated_on = models.DateTimeField(null=True, blank=True)
+    acted_on = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        unique_together = ('task', 'user_id')
+        ordering = ['assigned_on']
+    
+    def __str__(self):
+        return f'TaskItem {self.task_item_id}: User {self.user_id} -> Task {self.task_id}'
+    
+    def to_dict(self):
+        """Convert to dictionary for API responses"""
+        from django.utils import timezone
+        return {
+            'user_id': self.user_id,
+            'username': self.username,
+            'email': self.email,
+            'status': self.status,
+            'role': self.role,
+            'assigned_on': self.assigned_on.isoformat() if self.assigned_on else None,
+            'status_updated_on': self.status_updated_on.isoformat() if self.status_updated_on else None,
+            'acted_on': self.acted_on.isoformat() if self.acted_on else None,
+        }
