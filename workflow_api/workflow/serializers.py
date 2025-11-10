@@ -24,6 +24,8 @@ class GraphNodeSerializer(serializers.Serializer):
     instruction = serializers.CharField(required=False, allow_blank=True)
     design = GraphNodeDesignSerializer(required=False)
     to_delete = serializers.BooleanField(default=False, required=False)
+    is_start = serializers.BooleanField(default=False, required=False)
+    is_end = serializers.BooleanField(default=False, required=False)
     
     def validate_id(self, value):
         """Validate that id is either an integer or temp-id string"""
@@ -96,6 +98,13 @@ class UpdateWorkflowGraphSerializer(serializers.Serializer):
     """
     nodes = GraphNodeSerializer(many=True, required=False)
     edges = GraphEdgeSerializer(many=True, required=False)
+    
+    def validate(self, data):
+        nodes = data.get('nodes', [])
+        start_nodes = [node for node in nodes if node.get('is_start', False)]
+        if len(start_nodes) != 1:
+            raise serializers.ValidationError("There must be exactly one start node.")
+        return data
 
 
 class WorkflowGraphResponseSerializer(serializers.Serializer):
