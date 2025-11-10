@@ -27,12 +27,12 @@ SECRET_KEY = config('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-# ALLOWED_HOSTS = config(
-#     'ALLOWED_HOSTS',
-#     default='localhost,127.0.0.1,auth_service',
-#     cast=lambda v: [s.strip() for s in v.split(',')]
-# )
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = config(
+    'ALLOWED_HOSTS',
+    default='localhost,127.0.0.1,auth_service',
+    cast=lambda v: [s.strip() for s in v.split(',')]
+)
+# ALLOWED_HOSTS = ['*']
 
 # Application definition
 # testapp
@@ -262,7 +262,11 @@ CORS_ALLOWED_ORIGINS = config(
 )
 
 # For development only - allows all origins (less secure)
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = = config(
+    'CORS_ALLOWED_ORIGINS',
+    default='http://localhost:3000',
+    cast=lambda v: [s.strip() for s in v.split(',')]
+)
 
 # Allow credentials (cookies, authorization headers) to be sent with requests
 CORS_ALLOW_CREDENTIALS = True
