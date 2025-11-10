@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 from decouple import config
 import os
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -99,7 +100,17 @@ WSGI_APPLICATION = 'auth.wsgi.application'
 
 ENVIRONMENT = config('ENVIRONMENT', default='development')
 
-if ENVIRONMENT == 'production':
+# Railway and production setup using DATABASE_URL
+if config('DATABASE_URL', default=''):
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=config('DATABASE_URL'),
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
+    }
+# Legacy production setup with individual env vars
+elif ENVIRONMENT == 'production':
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
@@ -110,6 +121,7 @@ if ENVIRONMENT == 'production':
             'PORT': config('PGPORT', default=5432),
         }
     }
+# Development setup with SQLite
 else:
     DATABASES = {
         'default': {

@@ -11,6 +11,7 @@ drf-spectacular==0.28.0
 djangorestframework-api-key
 gunicorn
 psycopg2-binary
+dj-database-url
 whitenoise
 requests
 argon2-cffi>=23.1.0
