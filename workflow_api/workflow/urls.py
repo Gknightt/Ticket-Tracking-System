@@ -7,25 +7,18 @@ workflow_router = DefaultRouter()
 workflow_router.register(r'', WorkflowViewSet, basename='workflow')
 workflow_router.register(r'categories', CategoryViewSet, basename='category')
 
+# Step and Transition management routers
+step_router = DefaultRouter()
+step_router.register(r'steps', StepManagementViewSet, basename='step')
+
+transition_router = DefaultRouter()
+transition_router.register(r'transitions', TransitionManagementViewSet, basename='transition')
+
 app_name = 'workflow'
 
 urlpatterns = [
-    # Workflow management endpoints
-    # POST /workflows/ - Create workflow with graph
-    # GET /workflows/ - List workflows
-    # GET /workflows/{id}/ - Get workflow details
-    # PUT /workflows/{id}/ - Update workflow details (non-graph)
-    # PATCH /workflows/{id}/ - Partially update workflow details
-    # PUT /workflows/{id}/update-graph/ - Update workflow graph
-    # GET /workflows/{id}/steps/ - List steps in workflow
-    # GET /workflows/{id}/transitions/ - List transitions in workflow
+    # Workflow management endpoints via router
     path('', include(workflow_router.urls)),
-    
-    # Step management endpoints
-    # PUT /steps/{id}/update-details/ - Update step details
-    path('steps/<int:step_id>/update-details/', StepManagementViewSet.as_view({'put': 'update_details'}), name='step-update-details'),
-    
-    # Transition management endpoints
-    # PUT /transitions/{id}/update-details/ - Update transition details
-    path('transitions/<int:transition_id>/update-details/', TransitionManagementViewSet.as_view({'put': 'update_details'}), name='transition-update-details'),
+    path('', include(step_router.urls)),
+    path('', include(transition_router.urls)),
 ]

@@ -1,0 +1,63 @@
+{
+    "workflow": {
+      "name": "Infrastructure Workflow",
+      "description": "Handles IT reset requests",
+      "category": "IT",
+      "sub_category": "Support",
+      "department": "IT Support"
+    },
+    "graph": {
+      "nodes": [
+        {
+          "id": "temp-1",
+          "name": "Request Received",
+          "role": "System",
+          "description": "",
+          "instruction": "",
+          "design": {}
+        },
+        {
+          "id": "temp-2",
+          "name": "Reset Password",
+          "role": "Admin",
+          "description": "",
+          "instruction": "",
+          "design": {}
+        },
+        {
+          "id": "temp-3",
+          "name": "Done",
+          "role": "System",
+          "description": "",
+          "instruction": "",
+          "design": {}
+        },
+        {
+          "id": "temp-4",
+          "name": "not a new node, but this is fine",
+          "role": "Admin",
+          "description": "",
+          "instruction": "",
+          "design": {
+            "x": 300.0,
+            "y": 400.0
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "temp-101",
+          "from": "temp-1",
+          "to": "temp-2",
+          "name": ""
+        },
+        {
+          "id": "temp-102",
+          "from": "temp-2",
+          "to": "temp-3",
+          "name": ""
+        }
+      ]
+    }
+  }
+  

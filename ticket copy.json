@@ -28,6 +28,17 @@
             }
         },
         {
+          "id": "temp-1",
+          "name": "Reset Password 2",
+          "role": "Admin",
+          "description": "",
+          "instruction": "1234",
+          "design": {
+              "x": 100,
+              "y": 200
+          }
+      },
+        {
             "id": 18,
             "name": "Done",
             "role": "System",
