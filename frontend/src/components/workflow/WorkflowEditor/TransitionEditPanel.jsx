@@ -1,0 +1,99 @@
+import React, { useState, useEffect } from 'react';
+import styles from './TransitionEditPanel.module.css';
+import { useWorkflowAPI } from '../../../api/useWorkflowAPI';
+
+export default function TransitionEditPanel({ transition, onClose, onSave }) {
+  const [formData, setFormData] = useState({
+    name: '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const { updateTransitionDetails } = useWorkflowAPI();
+
+  useEffect(() => {
+    if (transition) {
+      setFormData({
+        name: transition.label || transition.name || '',
+      });
+    }
+  }, [transition]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      const updateData = {
+        name: formData.name,
+      };
+
+      await updateTransitionDetails(transition.id, updateData);
+      onSave({
+        ...transition,
+        label: formData.name,
+        ...updateData,
+      });
+    } catch (err) {
+      setError(err.message || 'Failed to update transition');
+      console.error('Error updating transition:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className={styles.panel}>
+      <div className={styles.header}>
+        <h3>Edit Transition</h3>
+        <button className={styles.closeBtn} onClick={onClose}>
+          ✕
+        </button>
+      </div>
+
+      {error && <div className={styles.error}>{error}</div>}
+
+      <div className={styles.info}>
+        <div className={styles.infoItem}>
+          <span>From Step ID:</span>
+          <strong>{transition?.data?.from || transition?.source}</strong>
+        </div>
+        <div className={styles.infoItem}>
+          <span>To Step ID:</span>
+          <strong>{transition?.data?.to || transition?.target}</strong>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className={styles.form}>
+        <div className={styles.formGroup}>
+          <label>Transition Name / Label</label>
+          <input
+            type="text"
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+            placeholder="e.g., Approved, Rejected, Needs Revision"
+          />
+        </div>
+
+        <div className={styles.formActions}>
+          <button type="button" onClick={onClose} className={styles.cancelBtn}>
+            Cancel
+          </button>
+          <button type="submit" className={styles.saveBtn} disabled={loading}>
+            {loading ? 'Saving...' : 'Save Transition'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}

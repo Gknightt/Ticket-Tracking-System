@@ -36,6 +36,7 @@ import Test from "../pages/test";
 import AdminTicketDetail from "../pages/admin/ticket-detail-page/AdminTicketDetail";
 import AdminArchiveDetail from "../pages/admin/archive-page/AdminArchiveDetail";
 import ResetPassword from "../pages/auth/PasswordReset";
+import WorkflowEditorPage from "../pages/test/WorkflowEditorPage";
 
 // WebSocket test
 import WebSocketTest from "../components/WebSocketTest";
@@ -83,6 +84,9 @@ export default function MainRoute() {
         <Route path="/admin/workflow/:uuid" element={<WorkflowDetail />} />
         <Route path="/admin/profile" element={<AdminProfile />} />
       </Route>
+
+      {/* WORKFLOW EDITOR ROUTES - Test/development routes */}
+      <Route path="/test/workflow/:workflowId" element={<WorkflowEditorPage />} />
 
       {/* TEST ROUTE - Consider protecting or removing in production */}
       <Route path="/test" element={<Test />} />
