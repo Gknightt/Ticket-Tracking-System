@@ -1,6 +1,6 @@
 from celery import shared_task
 from workflow.models import Workflows
-from workflow.serializers import FullWorkflowSerializer
+from workflow.serializers import WorkflowDetailSerializer
 from workflow_api.celery import app  # Your Celery instance
 import logging
 
@@ -10,8 +10,8 @@ logger = logging.getLogger(__name__)
 def send_to_consumer(workflow_id):
     try:
         workflow = Workflows.objects.get(workflow_id=workflow_id)
-        serializer = FullWorkflowSerializer()
-        serialized_data = serializer.get_workflow(workflow)
+        serializer = WorkflowDetailSerializer(workflow)
+        serialized_data = serializer.data
         # Send to the consumer task in `task_service` via the queue
         app.send_task(
             "receive_workflow",  # ← Remove "workflow.tasks." prefix

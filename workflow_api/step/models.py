@@ -15,6 +15,13 @@ class Steps(models.Model):
     instruction = models.TextField(null=True, blank=True)
     order = models.PositiveIntegerField(default=0)
 
+    # frontend design coordinates
+    design = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='Store design coordinates {x, y} for frontend positioning'
+    )
+
     # flags
     is_initialized = models.BooleanField(default=False)
 
@@ -58,6 +65,10 @@ class StepTransition(models.Model):
         to_field='step_id'
     )
     name = models.CharField(max_length=64, null=True, blank=True)
+    
+    # timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         pass

@@ -1,0 +1,59 @@
+{
+  "graph": {
+    "nodes": [
+        {
+            "id": 16,
+            "name": "Request Received",
+            "role": "System",
+            "description": "",
+            "instruction": "",
+            "created_at": "2025-11-10T10:21:27.148812+00:00",
+            "updated_at": "2025-11-10T10:21:27.148821+00:00",
+            "design": {
+                "x": 100,
+                "y": 200
+            }
+        },
+        {
+            "id": 17,
+            "name": "Reset Password",
+            "role": "Admin",
+            "description": "",
+            "instruction": "",
+            "created_at": "2025-11-10T10:21:27.151306+00:00",
+            "updated_at": "2025-11-10T10:21:27.151318+00:00",
+            "design": {
+                "x": 100,
+                "y": 200
+            }
+        },
+        {
+            "id": 18,
+            "name": "Done",
+            "role": "System",
+            "description": "",
+            "instruction": "",
+            "created_at": "2025-11-10T10:21:27.153627+00:00",
+            "updated_at": "2025-11-10T10:21:27.153637+00:00",
+            "design": {
+                "x": 100,
+                "y": 200
+            }
+        }
+    ],
+    "edges": [
+        {
+            "id": 26,
+            "from": 16,
+            "to": 17,
+            "name": ""
+        },
+        {
+            "id": 27,
+            "from": 17,
+            "to": 18,
+            "name": ""
+        }
+    ]
+}
+}
