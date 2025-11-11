@@ -77,6 +77,7 @@ export const useCommentsHttp = (ticketId) => {
     try {
       const formData = new FormData();
       formData.append('content', content);
+      formData.append('ticket_id', ticketId);
 
       // Add files using the 'documents' field that the backend expects
       files.forEach((file) => {
@@ -107,6 +108,7 @@ export const useCommentsHttp = (ticketId) => {
     try {
       const formData = new FormData();
       formData.append('content', content);
+      formData.append('ticket_id', ticketId);
 
       // Add files if any
       files.forEach((file, index) => {

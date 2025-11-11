@@ -127,26 +127,29 @@ export default function AdminTicketDetail() {
 
     // Handle successful data
     if (stepInstance) {
+      // Map new ticket fields from the provided structure
+      const t = stepInstance.task.ticket;
       dispatch({
         type: "SET_TICKET",
         payload: {
           ticket: {
-            ...stepInstance.task.ticket,
-            // Map new ticket fields
-            ticket_id: stepInstance.task.ticket_id,
-            ticket_subject: stepInstance.task.ticket_subject,
-            ticket_description: stepInstance.task.ticket_description,
+            ...t,
+            ticket_id: t.ticket_id,
+            ticket_subject: t.subject, // new field
+            ticket_description: t.description, // new field
             workflow_id: stepInstance.task.workflow_id,
-            workflow_name: stepInstance.task.workflow_name,
-            current_step: stepInstance.task.current_step,
-            current_step_name: stepInstance.task.current_step_name,
-            current_step_role: stepInstance.task.current_step_role,
-            status: stepInstance.task.status,
-            user_assignment: stepInstance.task.user_assignment,
-            has_acted: stepInstance.task.has_acted,
-            created_at: stepInstance.task.created_at,
-            updated_at: stepInstance.task.updated_at,
-            fetched_at: stepInstance.task.fetched_at,
+            workflow_name: stepInstance.step.name, // fallback to step name
+            current_step: stepInstance.step.step_id,
+            current_step_name: stepInstance.step.name,
+            current_step_role: stepInstance.step.role_id, // role_id as role
+            status: stepInstance.task.status || t.status,
+            user_assignment: t.employee || { username: t.assigned_to }, // prefer employee, fallback to assigned_to
+            has_acted: stepInstance.has_acted,
+            created_at: t.created_at || t.submit_date,
+            updated_at: t.updated_at || t.update_date,
+            fetched_at: t.fetched_at,
+            priority: t.priority,
+            attachments: t.attachments || [],
           },
           action: stepInstance.available_actions || [],
           instruction: stepInstance.step.instruction,
@@ -299,10 +302,21 @@ export default function AdminTicketDetail() {
                 <h3>Attachment</h3>
                 <div className={styles.tdAttached}>
                   <i className="fa fa-upload"></i>
-                  <span className={styles.placeholderText}>
-                    {/* No attachments in new format */}
-                    No attachments available.
-                  </span>
+                  {state.ticket?.attachments && state.ticket.attachments.length > 0 ? (
+                    <ul>
+                      {state.ticket.attachments.map((file, idx) => (
+                        <li key={idx}>
+                          <a href={file.url || file} target="_blank" rel="noopener noreferrer">
+                            {file.name || `Attachment ${idx + 1}`}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <span className={styles.placeholderText}>
+                      No attachments available.
+                    </span>
+                  )}
                   <input
                     type="file"
                     id="file-upload"
@@ -393,7 +407,9 @@ export default function AdminTicketDetail() {
                               Ticket Owner
                             </div>
                             <div className={styles.tdInfoValue}>
-                              {state.ticket?.user_assignment?.username || state.ticket?.user_assignment?.email || "N/A"}
+                              {state.ticket?.user_assignment?.first_name
+                                ? `${state.ticket.user_assignment.first_name} ${state.ticket.user_assignment.last_name}`
+                                : state.ticket?.user_assignment?.username || state.ticket?.user_assignment?.email || "N/A"}
                             </div>
                           </div>
                           <div className={styles.tdInfoLabelValue}>

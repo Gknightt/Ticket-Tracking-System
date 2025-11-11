@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import api from "./axios";
 
-const useSecureStepInstance = (stepInstanceId) => {
+const useSecureStepInstance = (ticket_id) => {
   const [stepInstance, setStepInstance] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
+  // /tasks/details/?ticket_id=TX20251111322614
   useEffect(() => {
-    if (!stepInstanceId) {
+    if (!ticket_id) {
       setStepInstance(null);
       setLoading(false);
       return;
@@ -18,7 +18,7 @@ const useSecureStepInstance = (stepInstanceId) => {
       setError("");
       
       try {
-        const response = await api.get(`instances/secure/${stepInstanceId}/`);
+        const response = await api.get(`tasks/details/?ticket_id=${ticket_id}`);
         setStepInstance(response.data);
       } catch (err) {
         console.error('Failed to fetch secure step instance:', err);
@@ -38,14 +38,14 @@ const useSecureStepInstance = (stepInstanceId) => {
     };
 
     fetchStepInstance();
-  }, [stepInstanceId]);
+  }, [ticket_id]);
 
   const refetch = () => {
-    if (stepInstanceId) {
+    if (ticket_id) {
       setLoading(true);
       setError("");
       
-      api.get(`instances/secure/${stepInstanceId}/`)
+      api.get(`instances/secure/${ticket_id}/`)
         .then(response => {
           setStepInstance(response.data);
         })
