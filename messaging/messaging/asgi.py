@@ -8,14 +8,18 @@ https://docs.djangoproject.com/en/5.2/howto/deployment/asgi/
 """
 
 import os
+import django
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'messaging.settings')
+
+# Setup Django before importing models/routing
+django.setup()
+
 from django.core.asgi import get_asgi_application
 from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack
-from channels.security.websocket import AllowedHostsOriginValidator
 from comments.routing import websocket_urlpatterns as comments_websocket_urlpatterns
 from tickets.routing import websocket_urlpatterns as tickets_websocket_urlpatterns
-
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'messaging.settings')
 
 django_asgi_app = get_asgi_application()
 
@@ -24,9 +28,7 @@ all_websocket_urlpatterns = comments_websocket_urlpatterns + tickets_websocket_u
 
 application = ProtocolTypeRouter({
     "http": django_asgi_app,
-    "websocket": AllowedHostsOriginValidator(
-        AuthMiddlewareStack(
-            URLRouter(all_websocket_urlpatterns)
-        )
+    "websocket": AuthMiddlewareStack(
+        URLRouter(all_websocket_urlpatterns)
     ),
 })
