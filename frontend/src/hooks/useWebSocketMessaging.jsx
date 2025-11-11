@@ -14,7 +14,7 @@ export const useWebSocketMessaging = (ticketId, userId = 'anonymous', setMessage
     if (!ticketId) return;
 
     try {
-      const wsUrl = `${WEBSOCKET_BASE}/ws/tickets/${ticketId}/`;
+      const wsUrl = `${WEBSOCKET_BASE}ws/tickets/${ticketId}/`;
       wsRef.current = new WebSocket(wsUrl);
 
       wsRef.current.onopen = () => {

@@ -177,7 +177,7 @@ services:
       - notification-service
     command: >
       sh -c "sleep 5 && 
-             celery -A notification_service worker --loglevel=info -Q notification-queue,inapp-notification-queue"
+             celery -A notification_service worker --loglevel=info -Q notification-queue-default,inapp-notification-queue"
 
   # frontend:
   # frontend:

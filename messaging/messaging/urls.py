@@ -26,8 +26,6 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, Sp
 # Import viewsets for the main API router
 from comments.views import CommentViewSet, CommentRatingViewSet
 from tickets.views import MessageViewSet, ReactionViewSet, AttachmentViewSet
-# Import cached media views
-from .media_views import cached_media_view, cached_public_media_view
 
 # Create main API router for all viewset-based endpoints
 router = DefaultRouter()
@@ -82,6 +80,17 @@ def api_root(request):
         ]
     })
 
+# Lazy function wrappers for media views to avoid import-time issues
+def cached_media_view(request, document_id):
+    """Lazy wrapper for cached media view"""
+    from .media_views import cached_media_view as view_func
+    return view_func(request, document_id)
+
+def cached_public_media_view(request, path):
+    """Lazy wrapper for cached public media view"""
+    from .media_views import cached_public_media_view as view_func
+    return view_func(request, path)
+
 urlpatterns = [
     # Include comments URLs first to handle custom paths like download
     path('', include('comments.urls')),
@@ -107,7 +116,7 @@ urlpatterns = [
     # DRF Auth (for browsable API)
     path('api-auth/', include('rest_framework.urls')),
     
-    # Cached media serving endpoints
+    # Cached media serving endpoints (lazy imported to avoid circular imports)
     path('media/document/<str:document_id>/', cached_media_view, name='cached-document'),
     re_path(r'^media/(?P<path>.*)$', cached_public_media_view, name='cached-media'),
 ]
