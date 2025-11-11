@@ -7,12 +7,14 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
 import logging
+import uuid
 
 from .models import Task, TaskItem
 from .serializers import TaskSerializer, UserTaskListSerializer, TaskCreateSerializer
 from .utils.assignment import assign_users_for_step
 from authentication import JWTCookieAuthentication, MultiSystemPermission
 from step.models import Steps, StepTransition
+from tickets.models import WorkflowTicket
 
 logger = logging.getLogger(__name__)
 
@@ -169,3 +171,157 @@ class TaskViewSet(viewsets.ModelViewSet):
             context={**self.get_serializer_context(), 'user_id': user_id}
         )
         return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'], url_path='details')
+    def task_details(self, request):
+        """
+        GET endpoint to retrieve complete task details with step information and available transitions.
+        
+        Query Parameters:
+        - task_id: (optional) Get task by task_id (integer or UUID)
+        - ticket_id: (optional) Get task by ticket_id string (e.g., TX20251111322614)
+        
+        At least one of task_id or ticket_id must be provided.
+        
+        Examples:
+        - /tasks/details/?task_id=1
+        - /tasks/details/?ticket_id=TX20251111322614
+        
+        Response includes:
+        - step_instance_id: UUID identifier for this task instance
+        - user_id: Current authenticated user ID
+        - step_transition_id: UUID identifier for transitions
+        - has_acted: Boolean indicating if user has acted on this task
+        - step: Detailed step information (name, description, instruction, etc.)
+        - task: Complete task details with nested ticket information
+        - available_actions: List of available transitions from current step
+        """
+        task_id_param = request.query_params.get('task_id')
+        ticket_id_param = request.query_params.get('ticket_id')
+        user_id = request.user.user_id
+        
+        # Validate that at least one identifier is provided
+        if not task_id_param and not ticket_id_param:
+            return Response(
+                {
+                    'error': 'Either task_id or ticket_id query parameter must be provided',
+                    'examples': {
+                        'by_task_id': '/tasks/details/?task_id=1',
+                        'by_ticket_id': '/tasks/details/?ticket_id=TX20251111322614'
+                    }
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Fetch task based on provided identifier
+        try:
+            if task_id_param:
+                # Try to find task by task_id (integer or UUID string)
+                task = Task.objects.select_related(
+                    'ticket_id',
+                    'workflow_id',
+                    'current_step',
+                    'current_step__role_id'
+                ).get(task_id=task_id_param)
+            else:
+                # Find task by ticket_id (string like TX20251111322614)
+                # First find the ticket by ticket_id
+                ticket = WorkflowTicket.objects.get(ticket_id=ticket_id_param)
+                # Then find the task associated with this ticket
+                task = Task.objects.select_related(
+                    'ticket_id',
+                    'workflow_id',
+                    'current_step',
+                    'current_step__role_id'
+                ).get(ticket_id=ticket)
+        except WorkflowTicket.DoesNotExist:
+            return Response(
+                {
+                    'error': f'Ticket not found',
+                    'searched_by': 'ticket_id',
+                    'value': ticket_id_param
+                },
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Task.DoesNotExist:
+            return Response(
+                {
+                    'error': f'Task not found',
+                    'searched_by': 'task_id' if task_id_param else 'ticket_id',
+                    'value': task_id_param or ticket_id_param
+                },
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check if user is assigned to this task
+        has_acted = TaskItem.objects.filter(
+            task=task,
+            user_id=user_id,
+            status='acted'
+        ).exists()
+        
+        # Get step information
+        current_step = task.current_step
+        if not current_step:
+            return Response(
+                {
+                    'error': 'Task has no current step assigned',
+                    'task_id': task.task_id
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get available transitions from current step
+        available_transitions = StepTransition.objects.filter(
+            from_step_id=current_step
+        ).select_related('to_step_id', 'to_step_id__role_id')
+        
+        # Build available actions list
+        available_actions = []
+        for transition in available_transitions:
+            action_data = {
+                'id': transition.transition_id,
+                'transition_id': transition.transition_id,
+                'name': transition.name or f'{current_step.name} → {transition.to_step_id.name if transition.to_step_id else "End"}',
+                'description': transition.to_step_id.description if transition.to_step_id else 'Complete workflow',
+                'from_step_id': current_step.step_id,
+                'to_step_id': transition.to_step_id.step_id if transition.to_step_id else None,
+                'to_step_name': transition.to_step_id.name if transition.to_step_id else 'Complete',
+                'to_step_role': transition.to_step_id.role_id.name if transition.to_step_id and transition.to_step_id.role_id else None,
+            }
+            available_actions.append(action_data)
+        
+        # Serialize the ticket with all its details
+        from tickets.serializers import WorkflowTicketSerializer
+        ticket_serializer = WorkflowTicketSerializer(task.ticket_id)
+        
+        # Build response
+        response_data = {
+            'user_id': user_id,
+            'has_acted': has_acted,
+            'step': {
+                'id': current_step.step_id,
+                'step_id': str(current_step.step_id),
+                'workflow_id': str(current_step.workflow_id.workflow_id) if current_step.workflow_id else None,
+                'role_id': str(current_step.role_id.role_id) if current_step.role_id else None,
+                'name': current_step.name,
+                'description': current_step.description,
+                'is_initialized': current_step.is_initialized,
+                'created_at': current_step.created_at.isoformat() if current_step.created_at else None,
+                'updated_at': current_step.updated_at.isoformat() if current_step.updated_at else None,
+                'instruction': current_step.instruction,
+                'order': current_step.order,
+            },
+            'task': {
+                'task_id': str(task.task_id),
+                'workflow_id': task.workflow_id.workflow_id,
+                'ticket': ticket_serializer.data,
+                'status': task.status,
+                'created_at': task.created_at.isoformat() if task.created_at else None,
+                'updated_at': task.updated_at.isoformat() if task.updated_at else None,
+                'fetched_at': task.fetched_at.isoformat() if task.fetched_at else None,
+            },
+            'available_actions': available_actions,
+        }
+        
+        return Response(response_data, status=status.HTTP_200_OK)

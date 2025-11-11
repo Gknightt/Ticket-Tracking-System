@@ -54,7 +54,10 @@ export const useMessagingAPI = (ticketId, setMessages) => {
   }, [ticketId]);
 
   const sendMessage = async (messageText, attachments = []) => {
-    if (!ticketId || !messageText.trim()) return;
+    if (!ticketId) return;
+    
+    // Allow sending if there's either message text OR attachments
+    if (!messageText.trim() && attachments.length === 0) return;
 
     setIsLoading(true);
     setError(null);
@@ -64,6 +67,7 @@ export const useMessagingAPI = (ticketId, setMessages) => {
       formData.append('ticket_id', ticketId);
       formData.append('message', messageText.trim());
 
+      // Append all attachments
       attachments.forEach((file) => {
         formData.append('attachments', file);
       });
@@ -72,6 +76,7 @@ export const useMessagingAPI = (ticketId, setMessages) => {
         method: 'POST',
         credentials: 'include',
         body: formData,
+        // Don't set Content-Type header - let the browser set it for FormData with files
       });
 
       if (!result.ok) {
