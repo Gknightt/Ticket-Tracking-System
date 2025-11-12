@@ -142,14 +142,14 @@ const Messaging = ({ ticket_id , ticket_owner}) => {
       <div className={styles.header}>
         <div className={styles.headerContent}>
           <h3 className={styles.title}>{ownerName}</h3>
-          <div className={styles.statusIndicator}>
+          {/* <div className={styles.statusIndicator}>
             <span className={`${styles.statusDot} ${isConnected ? styles.connected : styles.disconnected}`} />
             <span className={styles.statusText}>
               {isConnected ? 'Connected' : 'Disconnected'}
             </span>
-          </div>
+          </div> */}
         </div>
-        {error && <div className={styles.error}>{error}</div>}
+        {/* {error && <div className={styles.error}>{error}</div>} */}
       </div>
 
       {/* Messages Container */}

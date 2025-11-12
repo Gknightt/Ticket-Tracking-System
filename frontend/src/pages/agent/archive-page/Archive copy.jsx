@@ -1,6 +1,6 @@
 // react
-import { useEffect, useState, useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useState, useMemo, useEffect } from "react";
+import useDebounce from "../../../utils/useDebounce";
 
 // components
 import AgentNav from "../../../components/navigation/AgentNav";
@@ -11,17 +11,13 @@ import styles from "./archive.module.css";
 import general from "../../../style/general.module.css";
 
 // table
-import TicketTable from "../../../tables/agent/TicketTable";
+import ArchiveTable from "../../../tables/agent/ArchiveTable";
 
-// hook
+// hooks
 import useUserTickets from "../../../api/useUserTickets";
-import useDebounce from "../../../utils/useDebounce";
 
 export default function Archive() {
   const { userTickets, loading, error } = useUserTickets();
-  // Tabs with URL sync
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab] = useState("Acted");
 
   // Filters
   const [filters, setFilters] = useState({
@@ -36,35 +32,37 @@ export default function Archive() {
   const [statusOptions, setStatusOptions] = useState([]);
   const [categoryOptions, setCategoryOptions] = useState([]);
 
-  // Extract all ticket data with step_instance_id
+  // Extract all ticket data with step_instance_id - only archived (acted) tickets
   const allTickets = useMemo(() => {
-    return (userTickets || []).map((entry) => ({
-      // Map fields from flat entry structure
-      ticket_id: String(entry.ticket_id ?? entry.ticket_number ?? ""),
-      subject: String(entry.ticket_subject ?? ""),
-      description: String(entry.ticket_description ?? ""),
-      status: entry.status,
-      priority: entry.priority || "Medium",
-      category: entry.category || "",
-      submit_date: entry.created_at,
-
-      // Additional fields from endpoint
-      ticket_number: entry.ticket_number,
-      workflow_id: entry.workflow_id,
-      workflow_name: entry.workflow_name,
-      current_step: entry.current_step,
-      current_step_name: entry.current_step_name,
-      current_step_role: entry.current_step_role,
-      user_assignment: entry.user_assignment,
-      task_id: entry.task_id,
-
-      // Metadata
-      step_instance_id: entry.task_id, // Use task_id as step_instance_id for navigation
-      hasacted: entry.has_acted,
-    }));
+    return (userTickets || [])
+      .filter((entry) => entry.has_acted)
+      .map((entry) => ({
+        // Map fields from flat entry structure
+        ticket_id: entry.ticket_id,
+        subject: entry.ticket_subject,
+        description: entry.ticket_description,
+        status: entry.status,
+        priority: entry.priority || "Medium",
+        category: entry.category || "",
+        submit_date: entry.created_at,
+        
+        // Additional fields
+        ticket_number: entry.ticket_number,
+        workflow_id: entry.workflow_id,
+        workflow_name: entry.workflow_name,
+        current_step: entry.current_step,
+        current_step_name: entry.current_step_name,
+        current_step_role: entry.current_step_role,
+        user_assignment: entry.user_assignment,
+        task_id: entry.task_id,
+        
+        // Metadata
+        step_instance_id: entry.task_id,
+        hasacted: entry.has_acted,
+      }));
   }, [userTickets]);
 
-  // fetch status and category
+  // Fetch status and category options
   useEffect(() => {
     const statusSet = new Set();
     const categorySet = new Set();
@@ -77,11 +75,6 @@ export default function Archive() {
     setStatusOptions([...Array.from(statusSet)]);
     setCategoryOptions([...Array.from(categorySet)]);
   }, [allTickets]);
-
-  // Sync tab to URL
-  useEffect(() => {
-    setSearchParams({ tab: activeTab });
-  }, [activeTab, setSearchParams]);
 
   // Handle filter input
   const handleFilterChange = (e) => {
@@ -109,14 +102,6 @@ export default function Archive() {
   // Filter tickets
   const filteredTickets = useMemo(() => {
     return allTickets.filter((ticket) => {
-      if (activeTab === "Acted") {
-        return ticket.hasacted === true;
-      }
-
-      // Exclude acted tickets from other tabs
-      if (ticket.hasacted === true) return false;
-
-      if (activeTab !== "All" && ticket.priority !== activeTab) return false;
       if (filters.category && ticket.category !== filters.category)
         return false;
       if (filters.status && ticket.status !== filters.status) return false;
@@ -127,7 +112,7 @@ export default function Archive() {
       if (start && openedDate < start) return false;
       if (end && openedDate > end) return false;
 
-      const search = (debouncedSearch || "").toLowerCase();
+      const search = debouncedSearch.toLowerCase();
       if (
         search &&
         !(
@@ -141,28 +126,18 @@ export default function Archive() {
 
       return true;
     });
-  }, [allTickets, filters, activeTab, debouncedSearch]);
+  }, [allTickets, filters, debouncedSearch]);
 
   return (
     <>
       <AgentNav />
-      <main className={styles.ticketPage}>
-        <section className={styles.tpHeader}>
-          <h1>Archive</h1>
+      <main className={styles.archivePage}>
+        <section className={styles.apHeader}>
+          <h1>Archived Tickets</h1>
         </section>
-        <section className={styles.tpBody}>
-          {/* Tabs */}
-          <div className={styles.tpTabs}>
-            <button
-              className={`${styles.tpTabLink} ${styles.active}`}
-              type="button"
-            >
-              Acted
-            </button>
-          </div>
-
+        <section className={styles.apBody}>
           {/* Filters */}
-          <div className={styles.tpFilterSection}>
+          <div className={styles.apFilterSection}>
             <FilterPanel
               filters={filters}
               onFilterChange={handleFilterChange}
@@ -173,11 +148,11 @@ export default function Archive() {
           </div>
 
           {/* Table */}
-          <div className={styles.tpTableSection}>
+          <div className={styles.apTableSection}>
             <div className={general.tpTable}>
               {error && (
                 <div className={styles.errorBanner}>
-                  <p>Error loading tickets. Please try again.</p>
+                  <p>Error loading archived tickets. Please try again.</p>
                 </div>
               )}
               {loading && (
@@ -185,7 +160,7 @@ export default function Archive() {
                   <div className={styles.loader}></div>
                 </div>
               )}
-              <TicketTable
+              <ArchiveTable
                 tickets={filteredTickets}
                 searchValue={filters.search}
                 onSearchChange={(e) =>
@@ -194,8 +169,6 @@ export default function Archive() {
                     search: e.target.value,
                   }))
                 }
-                error={error}
-                activeTab={activeTab}
               />
             </div>
           </div>
