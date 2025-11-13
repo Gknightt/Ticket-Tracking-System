@@ -1,6 +1,6 @@
 import React from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { useAuth } from "../api/AuthContext";
+import { useAuth } from "../context/AuthContext";
 
 export default function ProtectedRoute({ requireAdmin = false, requireAgent = false }) {
   const { user, loading, initialized, isAdmin, hasTtsAccess } = useAuth();

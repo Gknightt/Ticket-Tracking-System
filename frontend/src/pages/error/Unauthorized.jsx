@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { useAuth } from "../../api/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 import styles from "./unauthorized.module.css";
 
 const Unauthorized = () => {

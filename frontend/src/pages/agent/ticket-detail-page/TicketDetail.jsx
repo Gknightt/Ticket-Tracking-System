@@ -22,7 +22,7 @@ import Messaging from "../../../components/messaging";
 import useFetchActionLogs from "../../../api/workflow-graph/useActionLogs";
 import { useWorkflowProgress } from "../../../api/workflow-graph/useWorkflowProgress";
 import useSecureStepInstance from "../../../api/useSecureStepInstance";
-import { useAuth } from "../../../api/AuthContext";
+import { useAuth } from "../../../context/AuthContext";
 
 // modal
 import TicketAction from "./modals/TicketAction";

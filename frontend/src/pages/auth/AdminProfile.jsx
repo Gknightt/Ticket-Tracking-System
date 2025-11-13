@@ -8,7 +8,7 @@ import styles from "./manage-profile.module.css";
 import AdminNav from "../../components/navigation/AdminNav";
 
 // hooks
-import { useAuth } from "../../api/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 
 export default function AdminProfile() {
   const navigate = useNavigate();

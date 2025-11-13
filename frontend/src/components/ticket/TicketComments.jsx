@@ -1,7 +1,7 @@
 // src/components/ticket/TicketComments.jsx
 import React, { useState } from "react";
 
-import { useAuth } from "../../api/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 import useComments from "../../api/useComments";
 
 import Comment from "./Comment";

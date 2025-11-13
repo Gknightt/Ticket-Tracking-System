@@ -18,7 +18,7 @@ import DynamicTable from "../../../tables/components/DynamicTable";
 // hooks
 import useUserTickets from "../../../api/useUserTickets";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../../../api/AuthContext";
+import { useAuth } from "../../../context/AuthContext";
 
 // date helper
 import { format } from "date-fns";

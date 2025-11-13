@@ -15,7 +15,7 @@ import TicketTable from "../../../tables/agent/TicketTable";
 // axios
 import axios from "axios";
 import useUserTickets from "../../../api/useUserTickets";
-import { useAuth } from "../../../api/AuthContext";
+import { useAuth } from "../../../context/AuthContext";
 
 export default function AdminTicket() {
   const { userTickets, loading, error } = useUserTickets();

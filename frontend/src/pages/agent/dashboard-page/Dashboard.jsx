@@ -17,7 +17,7 @@ import general from "./components/Component.module.css";
 
 // hooks
 import useUserTickets from "../../../api/useUserTickets";
-import { useAuth } from "../../../api/AuthContext";
+import { useAuth } from "../../../context/AuthContext";
 
 export default function Dashboard() {
   const { user } = useAuth();

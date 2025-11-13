@@ -1,4 +1,4 @@
-// src/api/AuthContext.jsx
+// src/context/AuthContext.jsx
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
 import { 
@@ -9,7 +9,7 @@ import {
   getUserFromToken,
   hasSystemRole,
   hasAnySystemRole
-} from './TokenUtils';
+} from '../api/TokenUtils';
 
 const AuthContext = createContext();
 const AUTH_URL = import.meta.env.VITE_AUTH_URL || "";

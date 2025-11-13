@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { useAuth } from "../../api/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 
 const Unauthorized = () => {
   const { user, isAdmin, hasTtsAccess } = useAuth();

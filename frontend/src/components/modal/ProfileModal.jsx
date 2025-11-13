@@ -1,5 +1,5 @@
 // style
-import { useAuth } from "../../api/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 import { useLogout } from "../../api/Authentication/useLogout";
 import styles from "./profile-modal.module.css";
 

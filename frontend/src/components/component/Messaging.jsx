@@ -1,6 +1,6 @@
 // import React, { useState, useRef } from "react";
 // import { useMessaging } from "../../hooks/useMessaging";
-// import { useAuth } from "../../api/AuthContext";
+// import { useAuth } from "../../context/AuthContext";
 // import styles from "./messaging.module.css";
 
 

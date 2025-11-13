@@ -6,7 +6,7 @@ import AgentNav from "../../components/navigation/AgentNav";
 
 // react
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../../api/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 
 export default function Profile() {
   const navigate = useNavigate();

@@ -5,7 +5,7 @@ import styles from "./manage-profile.module.css";
 import AgentNav from "../../components/navigation/AgentNav";
 
 // react
-import { useAuth } from "../../api/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 
 export default function AgentProfile() {

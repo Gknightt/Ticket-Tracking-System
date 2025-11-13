@@ -10,7 +10,7 @@ import Notification from "../modal/Notification";
 import ProfileModal from "../modal/ProfileModal";
 
 // hooks
-import { useAuth } from "../../api/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 import { useNotifications } from "../../api/useNotification";
 
 export default function AgentNav() {
