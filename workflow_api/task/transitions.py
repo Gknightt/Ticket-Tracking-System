@@ -10,14 +10,36 @@ from task.serializers import TaskSerializer
 from task.utils.assignment import assign_users_for_step
 from authentication import JWTCookieAuthentication
 from step.models import Steps, StepTransition
+from workflow.models import WorkflowVersion
 
 logger = logging.getLogger(__name__)
+
+
+def get_workflow_definition(task):
+    """
+    Hydrate the workflow definition from WorkflowVersion if available.
+    Falls back to querying the database models if version is not set.
+    
+    Returns a dict with 'definition' (JSONField data) or None if not found.
+    """
+    if task.workflow_version:
+        logger.info(
+            f"📋 Using WorkflowVersion {task.workflow_version.version} for workflow {task.workflow_id.workflow_id}"
+        )
+        return task.workflow_version.definition
+    
+    logger.warning(
+        f"⚠️ Task {task.task_id} has no workflow_version assigned. "
+        f"Falling back to database models (legacy behavior)."
+    )
+    return None
 
 
 class TaskTransitionView(CreateAPIView):
     """
     POST endpoint to transition a task to the next step via a transition.
     
+
     This is a dedicated endpoint that handles workflow step transitions
     with automatic user assignment using round-robin logic.
     
@@ -102,6 +124,7 @@ class TaskTransitionView(CreateAPIView):
             task = Task.objects.select_related(
                 'ticket_id',
                 'workflow_id',
+                'workflow_version',
                 'current_step'
             ).get(task_id=task_id)
         except Task.DoesNotExist:
@@ -110,20 +133,31 @@ class TaskTransitionView(CreateAPIView):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        # Validate user is assigned to this task with "assigned" status
+        # Log workflow version information
+        if task.workflow_version:
+            logger.info(
+                f"📋 Task {task_id} using WorkflowVersion {task.workflow_version.version} "
+                f"(definition will be hydrated from JSONField)"
+            )
+        else:
+            logger.warning(
+                f"⚠️ Task {task_id} has no workflow_version. Using database models directly."
+            )
+        
+        # Validate user is assigned to this task with "assigned" or "in_progress" status
         user_assignment = None
         try:
             user_assignment = TaskItem.objects.get(
                 task=task,
                 user_id=current_user_id,
-                status='assigned'
+                status__in=['assigned', 'in_progress']  # Allow both assigned and in_progress
             )
         except TaskItem.DoesNotExist:
-            # User has no "assigned" records - either not assigned or already acted on all assignments
+            # User has no "assigned" or "in_progress" records - either not assigned or already acted on all assignments
             user_records = TaskItem.objects.filter(task=task, user_id=current_user_id)
             return Response(
                 {
-                    'error': f'User {current_user_id} has no active "assigned" status for task {task_id}',
+                    'error': f'User {current_user_id} has no active "assigned" or "in_progress" status for task {task_id}',
                     'task_id': task_id,
                     'current_user_id': current_user_id,
                     'user_records': [item.to_dict() for item in user_records],
@@ -133,7 +167,7 @@ class TaskTransitionView(CreateAPIView):
             )
         
         logger.info(
-            f"✅ User {current_user_id} validated with status 'assigned' for role '{user_assignment.role}'"
+            f"✅ User {current_user_id} validated with status '{user_assignment.status}' for role '{user_assignment.role}'"
         )
         
         # Get transition

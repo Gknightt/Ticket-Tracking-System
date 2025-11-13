@@ -31,6 +31,14 @@ class Task(models.Model):
         on_delete=models.CASCADE,
     )
     workflow_id = models.ForeignKey('workflow.Workflows', on_delete=models.CASCADE)
+    workflow_version = models.ForeignKey(
+        'workflow.WorkflowVersion',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='tasks',
+        help_text="The specific version of the workflow used for this task"
+    )
     current_step = models.ForeignKey(
         'step.Steps',
         on_delete=models.SET_NULL,
