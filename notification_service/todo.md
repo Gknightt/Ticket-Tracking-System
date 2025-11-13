@@ -1,1 +1,0 @@
-- limit request to api to header (i.e. only trust from specific endpoints)
