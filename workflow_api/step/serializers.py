@@ -81,3 +81,36 @@ class AvailableTransitionSerializer(serializers.ModelSerializer):
             'name',
         ]
         read_only_fields = fields
+
+
+class StepWeightSerializer(serializers.ModelSerializer):
+    """Serializer for step weight information"""
+    role_name = serializers.CharField(source='role_id.name', read_only=True)
+    
+    class Meta:
+        model = Steps
+        fields = [
+            'step_id',
+            'name',
+            'weight',
+            'role_id',
+            'role_name',
+            'order',
+        ]
+        read_only_fields = ['step_id', 'name', 'role_id', 'role_name', 'order']
+
+
+class WorkflowSLASerializer(serializers.Serializer):
+    """Serializer for workflow SLA information"""
+    low_sla = serializers.DurationField(allow_null=True)
+    medium_sla = serializers.DurationField(allow_null=True)
+    high_sla = serializers.DurationField(allow_null=True)
+    urgent_sla = serializers.DurationField(allow_null=True)
+
+
+class WeightManagementSerializer(serializers.Serializer):
+    """Serializer for weight management endpoint - returns workflow SLAs and steps with weights"""
+    workflow_id = serializers.IntegerField()
+    workflow_name = serializers.CharField()
+    slas = WorkflowSLASerializer()
+    steps = StepWeightSerializer(many=True)
