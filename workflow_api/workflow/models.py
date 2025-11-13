@@ -95,3 +95,36 @@ class Workflows(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()  # Trigger SLA ordering validation
         super().save(*args, **kwargs)
+
+
+class WorkflowVersion(models.Model):
+    """
+    Represents a versioned snapshot of a workflow's complete definition.
+    Created when a workflow transitions to 'initialized' status.
+    Contains the full graph structure (nodes, edges, metadata) as JSON.
+    """
+    workflow = models.ForeignKey(
+        Workflows,
+        related_name='versions',
+        on_delete=models.CASCADE
+    )
+    version = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    definition = models.JSONField(
+        help_text="Full workflow graph structure: nodes, edges, metadata"
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Indicates if this is the active version for the workflow"
+    )
+
+    class Meta:
+        unique_together = ('workflow', 'version')
+        ordering = ['workflow', '-version']
+        indexes = [
+            models.Index(fields=['workflow', '-version']),
+            models.Index(fields=['workflow', 'is_active']),
+        ]
+
+    def __str__(self):
+        return f"Workflow {self.workflow.name} - v{self.version}"

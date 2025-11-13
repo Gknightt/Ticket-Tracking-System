@@ -367,12 +367,22 @@ class TaskViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        # Check if user is assigned to this task
-        has_acted = TaskItem.objects.filter(
+        # Check if user is assigned to this task and update status to in_progress if assigned
+        user_assignment = TaskItem.objects.filter(
             task=task,
-            user_id=user_id,
-            status='acted'
-        ).exists()
+            user_id=user_id
+        ).first()
+        
+        # ✅ Set task_item status to 'in_progress' if user is assigned (and not already acted)
+        if user_assignment:
+            if user_assignment.status != 'acted':
+                user_assignment.status = 'in_progress'
+                user_assignment.save()
+                logger.info(
+                    f"✅ Task {task.task_id} set to 'in_progress' for user {user_id}"
+                )
+        
+        has_acted = user_assignment.status == 'acted' if user_assignment else False
         
         # Get step information
         current_step = task.current_step
@@ -453,6 +463,9 @@ class TaskViewSet(viewsets.ModelViewSet):
         """
         GET endpoint to retrieve workflow visualization data for a specific task.
         
+        Uses the WorkflowVersion definition stored in the task to ensure visualization
+        matches the exact workflow version that was active when the task was created.
+        
         Returns a structured format compatible with WorkflowVisualizer2 component.
         
         Query Parameters:
@@ -479,6 +492,7 @@ class TaskViewSet(viewsets.ModelViewSet):
             "metadata": {
                 "task_id": 1,
                 "workflow_id": "uuid-string",
+                "workflow_version": 1,
                 "ticket_id": "TX20251111322614",
                 "current_step_id": "2",
                 "task_status": "in_progress"
@@ -507,6 +521,7 @@ class TaskViewSet(viewsets.ModelViewSet):
                 # Try to find task by task_id (integer or UUID string)
                 task = Task.objects.select_related(
                     'workflow_id',
+                    'workflow_version',
                     'current_step'
                 ).get(task_id=task_id_param)
             else:
@@ -523,6 +538,7 @@ class TaskViewSet(viewsets.ModelViewSet):
                 # Then find the task associated with this ticket
                 task = Task.objects.select_related(
                     'workflow_id',
+                    'workflow_version',
                     'current_step'
                 ).get(ticket_id=ticket)
         except WorkflowTicket.DoesNotExist:
@@ -544,47 +560,87 @@ class TaskViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        # Get all steps in the workflow, ordered by their order field
-        workflow_steps = Steps.objects.filter(
-            workflow_id=task.workflow_id
-        ).select_related('role_id').order_by('order')
-        
-        if not workflow_steps.exists():
-            return Response(
-                {
-                    'error': 'No steps found for this workflow',
-                    'workflow_id': str(task.workflow_id.workflow_id)
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Build nodes list
+        # 📋 Use WorkflowVersion definition if available, otherwise fall back to database
         nodes = []
+        workflow_version = task.workflow_version
         current_step_id = task.current_step.step_id if task.current_step else None
         
-        for step in workflow_steps:
-            # Determine status based on current step
-            if step.step_id == current_step_id:
-                node_status = 'active'
-            elif step.order < (task.current_step.order if task.current_step else 0):
-                node_status = 'done'
-            else:
-                node_status = 'pending'
+        if workflow_version:
+            # ✅ Use the versioned workflow definition from JSONField
+            logger.info(
+                f"📋 Using WorkflowVersion {workflow_version.version} for visualization of task {task.task_id}"
+            )
+            definition = workflow_version.definition
+            workflow_nodes = definition.get('nodes', [])
             
-            node = {
-                'id': f'step-{step.step_id}',
-                'label': step.name,
-                'role': step.role_id.name if step.role_id else 'Unassigned',
-                'status': node_status
-            }
-            nodes.append(node)
+            # Build nodes from versioned definition
+            for node in workflow_nodes:
+                # Determine status based on current step
+                if node['id'] == current_step_id:
+                    node_status = 'active'
+                elif node['order'] < (task.current_step.order if task.current_step else 0):
+                    node_status = 'done'
+                else:
+                    node_status = 'pending'
+                
+                node_data = {
+                    'id': f'step-{node["id"]}',
+                    'label': node['label'],
+                    'role': node.get('role_name', 'Unassigned'),
+                    'status': node_status,
+                    'description': node.get('description', ''),
+                    'instruction': node.get('instruction', ''),
+                    'order': node.get('order', 0)
+                }
+                nodes.append(node_data)
+        else:
+            # ⚠️ Fall back to database queries if no version exists
+            logger.warning(
+                f"⚠️ No WorkflowVersion for task {task.task_id}. Falling back to database models."
+            )
+            
+            # Get all steps in the workflow, ordered by their order field
+            workflow_steps = Steps.objects.filter(
+                workflow_id=task.workflow_id
+            ).select_related('role_id').order_by('order')
+            
+            if not workflow_steps.exists():
+                return Response(
+                    {
+                        'error': 'No steps found for this workflow',
+                        'workflow_id': str(task.workflow_id.workflow_id)
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Build nodes from database
+            for step in workflow_steps:
+                # Determine status based on current step
+                if step.step_id == current_step_id:
+                    node_status = 'active'
+                elif step.order < (task.current_step.order if task.current_step else 0):
+                    node_status = 'done'
+                else:
+                    node_status = 'pending'
+                
+                node = {
+                    'id': f'step-{step.step_id}',
+                    'label': step.name,
+                    'role': step.role_id.name if step.role_id else 'Unassigned',
+                    'status': node_status,
+                    'description': step.description or '',
+                    'instruction': step.instruction or '',
+                    'order': step.order
+                }
+                nodes.append(node)
         
         response_data = {
             'nodes': nodes,
             'metadata': {
                 'task_id': task.task_id,
                 'workflow_id': str(task.workflow_id.workflow_id),
-                'ticket_id': task.ticket_id.ticket_id,
+                'workflow_version': workflow_version.version if workflow_version else None,
+                'ticket_id': task.ticket_id.ticket_number,
                 'current_step_id': str(current_step_id) if current_step_id else None,
                 'task_status': task.status
             }

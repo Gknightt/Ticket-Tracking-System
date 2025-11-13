@@ -112,10 +112,39 @@ def create_task_for_ticket(ticket_id):
         
         print(f"🏁 First step: {first_step.name}, Role: {first_step.role_id.name}")
         
+        # Get the latest workflow version
+        from workflow.models import WorkflowVersion
+        workflow_version = WorkflowVersion.objects.filter(
+            workflow=matching_workflow,
+            is_active=True
+        ).order_by('-version').first()
+        
+        if workflow_version:
+            print(f"📋 Using WorkflowVersion {workflow_version.version}")
+        else:
+            # ⚠️ If no version exists, try to create one now
+            print(f"⚠️ No active WorkflowVersion found for workflow {matching_workflow.name}")
+            print(f"🔄 Attempting to create WorkflowVersion on-demand...")
+            try:
+                from workflow.signals import create_workflow_version
+                create_workflow_version(matching_workflow)
+                # Try to fetch again
+                workflow_version = WorkflowVersion.objects.filter(
+                    workflow=matching_workflow,
+                    is_active=True
+                ).order_by('-version').first()
+                if workflow_version:
+                    print(f"✅ WorkflowVersion {workflow_version.version} created successfully")
+                else:
+                    print(f"⚠️ Still no WorkflowVersion available after creation attempt")
+            except Exception as e:
+                print(f"❌ Failed to create WorkflowVersion: {e}")
+        
         # 3. Create the task (without users - TaskItems will be created separately)
         task = Task.objects.create(
             ticket_id=ticket,
             workflow_id=matching_workflow,
+            workflow_version=workflow_version,  # ✅ Assign the workflow version (may be None if creation failed)
             current_step=first_step,
             status='pending',
             fetched_at=timezone.now()
