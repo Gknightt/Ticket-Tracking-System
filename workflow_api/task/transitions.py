@@ -53,6 +53,32 @@ class TaskTransitionView(CreateAPIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        # Validate and convert transition_id to integer
+        try:
+            transition_id = int(transition_id)
+        except (ValueError, TypeError):
+            return Response(
+                {
+                    'error': f'transition_id must be an integer, got: {transition_id}',
+                    'received_value': transition_id,
+                    'received_type': type(transition_id).__name__
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate and convert task_id to integer
+        try:
+            task_id = int(task_id)
+        except (ValueError, TypeError):
+            return Response(
+                {
+                    'error': f'task_id must be an integer, got: {task_id}',
+                    'received_value': task_id,
+                    'received_type': type(task_id).__name__
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
         # Validate notes are provided and not empty
         if not notes:
             return Response(

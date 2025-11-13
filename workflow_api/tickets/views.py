@@ -241,7 +241,12 @@ class ManualTaskAssignmentView(APIView):
     # WorkflowTicket.DoesNotExist
     def post(self, request, ticket_id, workflow_id,):
         try:
-            ticket = WorkflowTicket.objects.get(ticket_id=ticket_id)
+            # Try ticket_id as ticket_number first, then search ticket_data
+            try:
+                ticket = WorkflowTicket.objects.get(ticket_number=ticket_id)
+            except WorkflowTicket.DoesNotExist:
+                ticket = WorkflowTicket.objects.get(ticket_data__ticket_id=ticket_id)
+            
             workflow = Workflows.objects.get(workflow_id=workflow_id)
             logger.info(f"hello {ticket} {workflow}")
         except (WorkflowTicket.DoesNotExist):
@@ -264,7 +269,11 @@ class TaskAssignmentView(APIView):
         workflow_id = serializer.validated_data['workflow_id']
 
         try:
-            ticket = WorkflowTicket.objects.get(ticket_id=ticket_id)
+            # Try ticket_id as ticket_number first, then search ticket_data
+            try:
+                ticket = WorkflowTicket.objects.get(ticket_number=ticket_id)
+            except WorkflowTicket.DoesNotExist:
+                ticket = WorkflowTicket.objects.get(ticket_data__ticket_id=ticket_id)
         except WorkflowTicket.DoesNotExist:
             return Response({"detail": f"Ticket not found: {ticket_id}"}, status=404)
 
