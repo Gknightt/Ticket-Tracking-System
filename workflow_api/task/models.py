@@ -48,6 +48,8 @@ class Task(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     fetched_at = models.DateTimeField(null=True, blank=True)
+    target_resolution = models.DateTimeField(null=True, blank=True, help_text="Target date and time for task resolution")
+    resolution_time = models.DateTimeField(null=True, blank=True, help_text="Actual date and time when the task was resolved")
 
     def get_workflow(self):
         # Optional: only if you need to reference it somewhere dynamically
@@ -344,4 +346,5 @@ class TaskItem(models.Model):
                 'step_id': self.acted_on_step.step_id,
                 'name': self.acted_on_step.name
             } if self.acted_on_step else None,
+            'resolution_time': str(self.resolution_time) if self.resolution_time else None,
         }

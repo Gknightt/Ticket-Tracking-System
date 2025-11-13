@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.generics import ListAPIView
+from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
 import logging
 
@@ -10,7 +11,9 @@ from .models import Steps, StepTransition
 from .serializers import (
     StepDetailSerializer, 
     StepTransitionSerializer, 
-    AvailableTransitionSerializer
+    AvailableTransitionSerializer,
+    StepWeightSerializer,
+    WeightManagementSerializer
 )
 from authentication import JWTCookieAuthentication
 from task.models import Task
@@ -195,3 +198,152 @@ class StepViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['workflow_id', 'role_id']
+
+
+class StepWeightManagementView(APIView):
+    """
+    Weight management endpoint for a workflow.
+    
+    GET /weights/workflow/<workflow_id>/
+    - Retrieve all SLAs (low, medium, high, urgent) for the workflow
+    - Retrieve all steps for that workflow with their weights
+    
+    PUT /weights/workflow/<workflow_id>/
+    - Update weights for steps in the workflow
+    - Expected payload: {"steps": [{"step_id": 1, "weight": 5}, ...]}
+    """
+    
+    authentication_classes = [JWTCookieAuthentication]
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, workflow_id):
+        """
+        Retrieve workflow SLAs and all steps with their weights.
+        
+        Returns:
+        {
+            "workflow_id": 1,
+            "workflow_name": "Request Processing",
+            "slas": {
+                "low_sla": "5 days",
+                "medium_sla": "3 days",
+                "high_sla": "1 day",
+                "urgent_sla": "4 hours"
+            },
+            "steps": [
+                {
+                    "step_id": 1,
+                    "name": "Submission",
+                    "weight": 1,
+                    "role_id": 1,
+                    "role_name": "Submitter",
+                    "order": 0
+                },
+                ...
+            ]
+        }
+        """
+        try:
+            from workflow.models import Workflows
+            workflow = Workflows.objects.get(workflow_id=workflow_id)
+        except Workflows.DoesNotExist:
+            return Response(
+                {'error': f'Workflow with ID {workflow_id} not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get all steps for this workflow, ordered
+        steps = Steps.objects.filter(
+            workflow_id=workflow_id
+        ).select_related('role_id').order_by('order')
+        
+        # Prepare response
+        response_data = {
+            'workflow_id': workflow.workflow_id,
+            'workflow_name': workflow.name,
+            'slas': {
+                'low_sla': str(workflow.low_sla) if workflow.low_sla else None,
+                'medium_sla': str(workflow.medium_sla) if workflow.medium_sla else None,
+                'high_sla': str(workflow.high_sla) if workflow.high_sla else None,
+                'urgent_sla': str(workflow.urgent_sla) if workflow.urgent_sla else None,
+            },
+            'steps': StepWeightSerializer(steps, many=True).data
+        }
+        
+        return Response(response_data, status=status.HTTP_200_OK)
+    
+    def put(self, request, workflow_id):
+        """
+        Update weights for steps in the workflow.
+        
+        Expected payload:
+        {
+            "steps": [
+                {"step_id": 1, "weight": 5},
+                {"step_id": 2, "weight": 10},
+                ...
+            ]
+        }
+        
+        Returns:
+        {
+            "message": "Weights updated successfully",
+            "updated_count": 2,
+            "steps": [...]
+        }
+        """
+        try:
+            from workflow.models import Workflows
+            workflow = Workflows.objects.get(workflow_id=workflow_id)
+        except Workflows.DoesNotExist:
+            return Response(
+                {'error': f'Workflow with ID {workflow_id} not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get the steps data from request
+        steps_data = request.data.get('steps', [])
+        
+        if not steps_data:
+            return Response(
+                {'error': 'No steps data provided in request body'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        updated_count = 0
+        updated_steps = []
+        errors = []
+        
+        for step_info in steps_data:
+            step_id = step_info.get('step_id')
+            weight = step_info.get('weight')
+            
+            if not step_id or weight is None:
+                errors.append(f'Missing step_id or weight in: {step_info}')
+                continue
+            
+            try:
+                step = Steps.objects.get(step_id=step_id, workflow_id=workflow_id)
+                step.weight = weight
+                step.save()
+                updated_count += 1
+                updated_steps.append(StepWeightSerializer(step).data)
+                logger.info(f"✅ Updated weight for step {step_id} to {weight}")
+            except Steps.DoesNotExist:
+                errors.append(f'Step with ID {step_id} not found in workflow {workflow_id}')
+            except (ValueError, TypeError) as e:
+                errors.append(f'Invalid weight value for step {step_id}: {str(e)}')
+        
+        response_data = {
+            'message': f'Updated {updated_count} step weights',
+            'updated_count': updated_count,
+            'steps': updated_steps,
+        }
+        
+        if errors:
+            response_data['errors'] = errors
+        
+        return Response(
+            response_data,
+            status=status.HTTP_200_OK if updated_count > 0 else status.HTTP_400_BAD_REQUEST
+        )

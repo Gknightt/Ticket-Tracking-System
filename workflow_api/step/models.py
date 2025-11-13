@@ -15,6 +15,8 @@ class Steps(models.Model):
     instruction = models.TextField(null=True, blank=True)
     order = models.PositiveIntegerField(default=0)
 
+    weight = models.IntegerField(default=1)
+
     # frontend design coordinates
     design = models.JSONField(
         default=dict,
