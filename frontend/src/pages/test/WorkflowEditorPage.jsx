@@ -2,10 +2,10 @@ import React from 'react';
 import { useParams } from 'react-router-dom';
 import WorkflowEditorLayout from '../../components/workflow/WorkflowEditor/WorkflowEditorLayout';
 import styles from './WorkflowEditorPage.module.css';
-
+ 
 export default function WorkflowEditorPage() {
   const { workflowId } = useParams();
-
+ 
   if (!workflowId) {
     return (
       <div className={styles.page}>
@@ -16,7 +16,7 @@ export default function WorkflowEditorPage() {
       </div>
     );
   }
-
+ 
   return (
     <div className={styles.page}>
       <WorkflowEditorLayout workflowId={workflowId} />
