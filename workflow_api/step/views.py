@@ -262,10 +262,10 @@ class StepWeightManagementView(APIView):
             'workflow_id': workflow.workflow_id,
             'workflow_name': workflow.name,
             'slas': {
-                'low_sla': str(workflow.low_sla) if workflow.low_sla else None,
-                'medium_sla': str(workflow.medium_sla) if workflow.medium_sla else None,
-                'high_sla': str(workflow.high_sla) if workflow.high_sla else None,
-                'urgent_sla': str(workflow.urgent_sla) if workflow.urgent_sla else None,
+                'low_sla': (workflow.low_sla) if workflow.low_sla else None,
+                'medium_sla': (workflow.medium_sla) if workflow.medium_sla else None,
+                'high_sla': (workflow.high_sla) if workflow.high_sla else None,
+                'urgent_sla': (workflow.urgent_sla) if workflow.urgent_sla else None,
             },
             'steps': StepWeightSerializer(steps, many=True).data
         }
