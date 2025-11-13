@@ -236,8 +236,15 @@ class TaskViewSet(viewsets.ModelViewSet):
                     'workflow_id'
                 ).get(task_id=task_id_param)
             else:
-                # Find task by ticket_id
-                ticket = WorkflowTicket.objects.get(ticket_id=ticket_id_param)
+                # Find task by ticket_id - search in both ticket_number and ticket_data
+                ticket = None
+                try:
+                    # Try as ticket_number first
+                    ticket = WorkflowTicket.objects.get(ticket_number=ticket_id_param)
+                except WorkflowTicket.DoesNotExist:
+                    # Try as ticket_id in ticket_data
+                    ticket = WorkflowTicket.objects.get(ticket_data__ticket_id=ticket_id_param)
+                
                 task = Task.objects.select_related(
                     'ticket_id',
                     'workflow_id'
@@ -324,8 +331,16 @@ class TaskViewSet(viewsets.ModelViewSet):
                 ).get(task_id=task_id_param)
             else:
                 # Find task by ticket_id (string like TX20251111322614)
-                # First find the ticket by ticket_id
-                ticket = WorkflowTicket.objects.get(ticket_id=ticket_id_param)
+                # The ticket_id is now stored in ticket_data, so search by ticket_number first,
+                # or search by ticket_data__ticket_id if not a ticket_number
+                ticket = None
+                try:
+                    # Try as ticket_number (the new primary identifier)
+                    ticket = WorkflowTicket.objects.get(ticket_number=ticket_id_param)
+                except WorkflowTicket.DoesNotExist:
+                    # Try as ticket_id in ticket_data (the old format)
+                    ticket = WorkflowTicket.objects.get(ticket_data__ticket_id=ticket_id_param)
+                
                 # Then find the task associated with this ticket
                 task = Task.objects.select_related(
                     'ticket_id',
@@ -375,28 +390,40 @@ class TaskViewSet(viewsets.ModelViewSet):
             from_step_id=current_step
         ).select_related('to_step_id', 'to_step_id__role_id')
         
-        # Build available actions list
+        # Build available_actions list
         available_actions = []
         for transition in available_transitions:
             action_data = {
+                'transition_id': str(transition.transition_id),
                 'id': transition.transition_id,
-                'transition_id': transition.transition_id,
                 'name': transition.name or f'{current_step.name} → {transition.to_step_id.name if transition.to_step_id else "End"}',
                 'description': transition.to_step_id.description if transition.to_step_id else 'Complete workflow',
-                'from_step_id': current_step.step_id,
-                'to_step_id': transition.to_step_id.step_id if transition.to_step_id else None,
-                'to_step_name': transition.to_step_id.name if transition.to_step_id else 'Complete',
-                'to_step_role': transition.to_step_id.role_id.name if transition.to_step_id and transition.to_step_id.role_id else None,
             }
             available_actions.append(action_data)
         
-        # Serialize the ticket with all its details
-        from tickets.serializers import WorkflowTicketSerializer
-        ticket_serializer = WorkflowTicketSerializer(task.ticket_id)
+        # Get first step transition for step_transition_id (use from_step outgoing transitions)
+        step_transition_id = None
+        if available_transitions.exists():
+            step_transition_id = str(available_transitions.first().transition_id)
+        
+        # Flatten ticket data - merge ticket_data fields directly into ticket object
+        ticket_data = task.ticket_id.ticket_data.copy() if task.ticket_id.ticket_data else {}
+        ticket_response = {
+            'id': task.ticket_id.id,
+            'ticket_number': task.ticket_id.ticket_number,
+            'is_task_allocated': task.ticket_id.is_task_allocated,
+            'fetched_at': task.ticket_id.fetched_at.isoformat() if task.ticket_id.fetched_at else None,
+            'created_at': task.ticket_id.created_at.isoformat() if task.ticket_id.created_at else None,
+            'updated_at': task.ticket_id.updated_at.isoformat() if task.ticket_id.updated_at else None,
+        }
+        # Merge all ticket_data fields into the response
+        ticket_response.update(ticket_data)
         
         # Build response
         response_data = {
+            'step_instance_id': str(task.task_id),
             'user_id': user_id,
+            'step_transition_id': step_transition_id,
             'has_acted': has_acted,
             'step': {
                 'id': current_step.step_id,
@@ -409,15 +436,11 @@ class TaskViewSet(viewsets.ModelViewSet):
                 'created_at': current_step.created_at.isoformat() if current_step.created_at else None,
                 'updated_at': current_step.updated_at.isoformat() if current_step.updated_at else None,
                 'instruction': current_step.instruction,
-                'order': current_step.order,
             },
             'task': {
                 'task_id': str(task.task_id),
                 'workflow_id': task.workflow_id.workflow_id,
-                'ticket': ticket_serializer.data,
-                'status': task.status,
-                'created_at': task.created_at.isoformat() if task.created_at else None,
-                'updated_at': task.updated_at.isoformat() if task.updated_at else None,
+                'ticket': ticket_response,
                 'fetched_at': task.fetched_at.isoformat() if task.fetched_at else None,
             },
             'available_actions': available_actions,
@@ -488,8 +511,15 @@ class TaskViewSet(viewsets.ModelViewSet):
                 ).get(task_id=task_id_param)
             else:
                 # Find task by ticket_id (string like TX20251111322614)
-                # First find the ticket by ticket_id
-                ticket = WorkflowTicket.objects.get(ticket_id=ticket_id_param)
+                # Search in both ticket_number and ticket_data__ticket_id
+                ticket = None
+                try:
+                    # Try as ticket_number first
+                    ticket = WorkflowTicket.objects.get(ticket_number=ticket_id_param)
+                except WorkflowTicket.DoesNotExist:
+                    # Try as ticket_id in ticket_data
+                    ticket = WorkflowTicket.objects.get(ticket_data__ticket_id=ticket_id_param)
+                
                 # Then find the task associated with this ticket
                 task = Task.objects.select_related(
                     'workflow_id',
