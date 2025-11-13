@@ -1,7 +1,7 @@
 // src/api/useTriggerAction.js
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { useAuth } from "./AuthContext"; // ✅ Import auth context
+import { useAuth } from "../context/AuthContext"; // ✅ Import auth context
 
 const useTriggerAction = ({ task_id, transition_id, method = "post", trigger = false, notes = "" } = {}) => {
   const [response, setResponse] = useState(null);

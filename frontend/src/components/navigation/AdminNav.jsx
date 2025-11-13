@@ -14,7 +14,7 @@ import AdminProfileModal from "../modal/AdminProfileModal";
 import { useNotifications } from "../../api/useNotification";
 
 // hooks
-import { useAuth } from "../../api/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 
 export default function AdminNav() {
   const { user, loading } = useAuth();

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useMessaging } from '../../hooks/useMessaging';
-import { useAuth } from '../../api/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import { useAutoScroll } from '../../hooks/useAutoScroll';
 import MessageBubble from './MessageBubble';
 import MessageInput from './MessageInput';
