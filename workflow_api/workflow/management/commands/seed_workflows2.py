@@ -4,44 +4,45 @@ from django.core.exceptions import ValidationError
 from role.models import Roles
 from workflow.models import Workflows, Category
 from step.models import Steps, StepTransition
+from datetime import timedelta
 import random
 
 # Revised instruction pool for the 3-step (Triage, Resolve, Finalize) process
 instructions_pool = {
     'triage_generic': [
-        "Verify ticket completeness: ensure all required fields, details, and justifications are present.",
-        "Confirm the ticket is assigned to the correct department and category. Re-route if necessary.",
-        "Assign the correct resolver or resolver group based on the request type (e.g., Asset, IT, Budget).",
-        "Check for all required attachments (e.g., quotes, approval emails, photos) before submission.",
-        "Set the initial priority level (Low, Medium, High) based on business impact and urgency.",
+        "Verify ticket completeness: Review the submission to ensure every mandatory field is filled. Check for a clear title, a detailed description, the business unit, and contact information. Ensure a strong 'Business Justification' is provided. If critical information is missing, return the ticket to the requester specifying what is required.",
+        "Confirm department and category: Cross-reference the request type (e.g., 'new laptop,' 'password reset') with the internal service catalog. Confirm it is routed to the correct queue (e.g., IT Hardware, Finance). If misrouted, re-assign the ticket to the appropriate department and category with a note.",
+        "Assign resolver group: Based on the validated category, assign the ticket to the specific specialist group responsible for that service (e.g., 'Network Team' for VPN, 'Asset Management' for a monitor). Avoid assigning to a general queue if a specialized team exists.",
+        "Check for required attachments: Scrutinize the ticket for necessary supporting documentation. Purchasing requests must include vendor quotes. Access requests must have a manager's approval email attached. Bug reports should include screenshots or error logs. Do not proceed until all attachments are present.",
+        "Set initial priority level: Evaluate the request's Impact (how many users or critical systems are affected?) and Urgency (how quickly is a resolution needed?). Use the organization's priority matrix (e.g., High Impact + High Urgency = P1) to set the initial priority (P1-P4) and apply the correct SLA.",
     ],
     'resolve_asset': [
-        "For Check-in: Inspect physical condition, compare with documentation, and verify serial numbers/asset tags.",
-        "For Check-out: Verify authorization, document asset condition at handover, and update custody records.",
-        "Update the asset's status (e.g., 'In Stock', 'Assigned', 'In Repair') in the inventory system.",
-        "Ensure all asset tracking requirements are met, including barcode scanning and location updates.",
-        "Authorize the custody transfer and update the asset management system with the new location or custodian.",
+        "For Check-in: Perform a detailed physical inspection of the returned asset. Note any new damage. Power on the device to test basic functionality. Compare the physical serial number and asset tag against the check-out documentation and the Asset Management Database. Flag any discrepancies.",
+        "For Check-out: Verify in the system that the request has been fully approved by the user's line manager. Document the asset's condition (e.g., 'New in box' or 'Grade A refurbished') with time-stamped photos if necessary. Have the user digitally or physically sign a handover form acknowledging receipt.",
+        "Update the asset's status in inventory: Immediately update the asset's record in the central Asset Management System (AMS). Change the status from 'In Stock' to 'Assigned' (or 'In Repair', 'Awaiting Disposal') to maintain a real-time, accurate inventory and prevent 'ghost' assets.",
+        "Ensure all asset tracking requirements are met: Use a barcode scanner to log the asset's movement. Scan the asset tag and the new location (e.g., user's desk, repair-room shelf). This physical scan must match the digital update in the AMS to ensure a verifiable chain of custody.",
+        "Authorize the custody transfer: After all physical checks and user sign-offs are complete, formally authorize the transfer in the AMS. This final action should update the asset's location, associate the custodian's employee ID with the asset record, and update the associated department code for depreciation.",
     ],
     'resolve_budget': [
-        "Analyze the proposed budget for accuracy, completeness, and alignment with departmental allocations.",
-        "Review the project justification, ROI analysis, and risk factors against current fiscal priorities.",
-        "Verify all required financial documentation is attached, including quotes, estimates, and vendor proposals.",
-        "Final authorization of budget allocation, ensuring funds are available and properly coded.",
-        "Authorize budget release and establish financial tracking mechanisms for the project.",
+        "Analyze the proposed budget for accuracy: Conduct a detailed line-item review of the submitted budget. Check all calculations for mathematical accuracy (sums, tax, unit costs). Verify that all anticipated costs (labor, materials, overhead) are included and that nothing significant is omitted.",
+        "Review the project justification and ROI: Read the business case thoroughly. Assess the Return on Investment (ROI) calculation: are the projected benefits realistic and measurable? Does the project's justification align with current strategic goals (e.g., 'cost-cutting', 'market expansion')? Evaluate the listed risk factors.",
+        "Verify all required financial documentation is attached: Confirm that all required financial attachments are present, valid, and from approved vendors. For procurement, this typically means at least two to three competing vendor quotes. For project work, a detailed Statement of Work (SOW) must be included.",
+        "Final authorization of budget allocation: After confirming justification and documentation, perform a final check of the source fund or cost center. Verify that sufficient funds are available for this allocation. Formally authorize the allocation and apply the correct General Ledger (GL) codes and cost center tags.",
+        "Authorize budget release and establish tracking: Execute the formal budget release, which may involve coordinating with the accounting department to move or reserve funds. Establish a tracking mechanism (e.g., a new project code) to monitor spending against the newly approved budget and set up reporting requirements.",
     ],
     'resolve_it': [
-        "For Access Request: Verify the request complies with IT security policies and data classification standards.",
-        "For Software Install: Confirm licensing compliance, check for existing licenses, and review for security vulnerabilities.",
-        "Review technical requirements for compatibility with existing infrastructure and enterprise architecture.",
-        "Provision the requested access or deploy the software using standard IT procedures.",
-        "Final authorization for provisioning. Verify all security assessments and compliance checks are complete.",
+        "For Access Request: Verify the request complies with IT security policies. Review the request against the 'Principle of Least Privilege.' Does this user's role absolutely require this level of access (e.g., 'Admin')? Check the data's classification (e.g., 'Confidential', 'PII'). Any request for PII data must have explicit, multi-level approval from the data owner.",
+        "For Software Install: Confirm licensing compliance and check for security vulnerabilities. Check the software against the 'Approved Software List.' If on the list, confirm a license is available. If the software is new, route the request to IT Security and Architecture for a vulnerability and compatibility review *before* purchase.",
+        "Review technical requirements for compatibility: Evaluate the software or access's technical specifications. Will it run on the user's standard-build machine? Does it require specific firewall ports? Does it have dependencies (e.g., a specific Java version) that conflict with other enterprise applications?",
+        "Provision the requested access or deploy the software: Once all checks and approvals are passed, proceed with the technical work. For access, add the user to the correct Active Directory security group. For software, use the approved deployment tool (e.g., SCCM, Intune) to push the application to the user's device. Avoid manual installs.",
+        "Final authorization for provisioning: Before closing, perform a final check. Has the security assessment been completed and attached? Has the license been assigned in the asset system? Is the manager's and data owner's approval documented in the ticket? Formally authorize the provisioning only after all compliance checks are complete.",
     ],
     'finalize_generic': [
-        "Confirm that the primary task is completed and all data has been accurately updated in the relevant systems.",
-        "Notify the original requester and any other key stakeholders that the ticket has been resolved.",
-        "Log or archive the ticket and all related documentation for future audit and compliance purposes.",
-        "Add any final notes, resolution codes, or knowledge base articles related to the completed work.",
-        "Formally close the ticket in the system to stop the clock and mark the workflow as complete.",
+        "Confirm that the primary task is completed: Perform a final 'definition of done' check. Was the user's request *actually* fulfilled? Ask the user to confirm the software launches or they can access the folder. Double-check that all data has been accurately updated in all relevant systems (AMS, AD, Finance).",
+        "Notify the original requester and key stakeholders: Send a clear, concise resolution notification to the original requester. Use plain language to summarize the work done and the final outcome. If the ticket involved other key stakeholders (e.g., the user's manager, a department head), ensure they are CC'd.",
+        "Log or archive the ticket for audit: Ensure all conversations, approval emails, attachments (quotes, screenshots), and resolution notes are permanently logged within the ticket. The closed ticket must serve as a complete and standalone audit record of the entire workflow, from request to resolution.",
+        "Add any final notes and resolution codes: In the private/resolver notes, add technical details that future support staff might need if this issue reappears. Select the correct resolution code (e.g., 'Software Install - Completed'). If this was a new issue, draft or update a Knowledge Base (KB) article.",
+        "Formally close the ticket in the system: Change the ticket's status to 'Resolved' or 'Closed.' This action officially stops the SLA timer, removes the ticket from all active work queues, and marks the entire workflow as complete. This often triggers a customer satisfaction (CSAT) survey for the requester.",
     ],
 }
 
@@ -207,6 +208,10 @@ class Command(BaseCommand):
                         'is_published': True,
                         'end_logic': end_logic,
                         'department': wf_data["department"],
+                        'urgent_sla': timedelta(hours=4),
+                        'high_sla': timedelta(hours=8),
+                        'medium_sla': timedelta(days=2),
+                        'low_sla': timedelta(days=5),
                     }
                 )
 

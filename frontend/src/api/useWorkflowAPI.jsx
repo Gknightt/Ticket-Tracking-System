@@ -6,7 +6,6 @@ const WORKFLOW_BASE_URL = '/workflows';
 export const useWorkflowAPI = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-
   // Get workflow details with graph
   const getWorkflowDetail = useCallback(async (workflowId) => {
     setLoading(true);
@@ -114,6 +113,41 @@ export const useWorkflowAPI = () => {
       setLoading(false);
     }
   }, []);
+  // /steps/weights/workflow/2/
+  // Get weight management data (SLAs and step weights)
+  const getWeightData = useCallback(async (workflowId) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await api.get(`/steps/weights/workflow/${workflowId}/`);
+      return response.data;
+    } catch (err) {
+      const errorMsg = err.response?.data?.error || 'Failed to fetch weight data';
+      setError(errorMsg);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Update step weights
+  const updateStepWeights = useCallback(async (workflowId, stepsData) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await api.put(
+        `/steps/weights/workflow/${workflowId}/`,
+        { steps: stepsData }
+      );
+      return response.data;
+    } catch (err) {
+      const errorMsg = err.response?.data?.error || 'Failed to update step weights';
+      setError(errorMsg);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   return {
     getWorkflowDetail,
@@ -122,6 +156,8 @@ export const useWorkflowAPI = () => {
     updateWorkflowDetails,
     updateStepDetails,
     updateTransitionDetails,
+    getWeightData,
+    updateStepWeights,
     loading,
     error,
   };

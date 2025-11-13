@@ -14,8 +14,11 @@ class Steps(models.Model):
     description = models.CharField(max_length=256, null=True)
     instruction = models.TextField(null=True, blank=True)
     order = models.PositiveIntegerField(default=0)
-
-    weight = models.IntegerField(default=1)
+    weight = models.DecimalField(
+        max_digits=4,  # total digits including decimal places
+        decimal_places=2,  # number of digits after decimal
+        default=0.5
+    )
 
     # frontend design coordinates
     design = models.JSONField(

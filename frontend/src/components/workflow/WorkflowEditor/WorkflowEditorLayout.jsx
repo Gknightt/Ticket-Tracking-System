@@ -6,6 +6,7 @@ import WorkflowEditPanel from './WorkflowEditPanel';
 import WorkflowEditorContent from './WorkflowEditorContent';
 import WorkflowEditorSidebar from './WorkflowEditorSidebar';
 import WorkflowEditorToolbar from './WorkflowEditorToolbar';
+import SLAWeightEditor from './SLAWeightEditor';
 import { useWorkflowAPI } from '../../../api/useWorkflowAPI';
 import { useWorkflowRoles } from '../../../api/useWorkflowRoles';
 import AdminNav from "../../../components/navigation/AdminNav";
@@ -19,6 +20,7 @@ export default function WorkflowEditorLayout({ workflowId }) {
   const [activeTopTab, setActiveTopTab] = useState('manage');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUnsavedPopup, setShowUnsavedPopup] = useState(false);
+  const [showWeightEditor, setShowWeightEditor] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem('workflow-sidebar-width');
     return saved ? parseInt(saved, 10) : 280;
@@ -221,6 +223,15 @@ export default function WorkflowEditorLayout({ workflowId }) {
 
         <div className={styles.ribbonRight}>
           <button
+            className={styles.actionBtn}
+            onClick={() => setShowWeightEditor(true)}
+            title="Manage step weights and SLA"
+          >
+            <span className={styles.btnIcon}>⚖️</span>
+            <span className={styles.btnText}>Weight Management</span>
+          </button>
+          
+          <button
             className={`${styles.actionBtn} ${styles.actionBtnPrimary} ${hasUnsavedChanges ? styles.actionBtnUnsaved : ''}`}
             onClick={handleSaveAll}
             title={hasUnsavedChanges ? 'You have unsaved changes - click to save' : 'All changes saved'}
@@ -296,6 +307,18 @@ export default function WorkflowEditorLayout({ workflowId }) {
             }}
             readOnly={false}
           />
+        </div>
+      )}
+
+      {/* WEIGHT EDITOR MODAL */}
+      {showWeightEditor && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modalContent}>
+            <SLAWeightEditor
+              workflowId={workflowId}
+              onClose={() => setShowWeightEditor(false)}
+            />
+          </div>
         </div>
       )}
     </div>
