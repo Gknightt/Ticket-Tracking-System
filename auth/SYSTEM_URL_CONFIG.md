@@ -12,7 +12,7 @@ Configure the following environment variables in your `.env` file or deployment 
 
 ### System-Specific URLs
 
-- `TTS_SYSTEM_URL` - URL for the TTS (Transportation Tracking System) interface
+- `TTS_SYSTEM_URL` - URL for the TTS (Ticket Tracking System) interface
 - `AMS_SYSTEM_URL` - URL for the AMS (Asset Management System) interface  
 - `HDTS_SYSTEM_URL` - URL for the HDTS (Human Development & Training System) interface
 - `BMS_SYSTEM_URL` - URL for the BMS (Building Management System) interface
