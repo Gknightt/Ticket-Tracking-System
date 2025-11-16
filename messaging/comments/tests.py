@@ -221,9 +221,12 @@ class DocumentAttachmentServiceTests(TestCase):
             self.comment, [file1, file2], self.user_data
         )
         
-        # Both should be attached to comment
-        self.assertEqual(len(attached), 2)
-        # But only one DocumentStorage should exist
+        # Only one should be attached since they have identical content
+        self.assertEqual(len(attached), 1)
+        # The second one should generate an error
+        self.assertEqual(len(errors), 1)
+        self.assertIn('already attached', errors[0])
+        # Only one DocumentStorage should exist
         self.assertEqual(DocumentStorage.objects.count(), 1)
     
     def test_handle_document_attachments(self):
@@ -298,7 +301,7 @@ class CommentServiceTests(TestCase):
         """Test creating a comment with file attachments"""
         validated_data = {
             'ticket_id': self.ticket.ticket_id,
-            'text': 'Test comment'
+            'content': 'Test comment'
         }
         
         user_data = {
@@ -326,7 +329,7 @@ class CommentServiceTests(TestCase):
         """Test creating a comment without file attachments"""
         validated_data = {
             'ticket_id': self.ticket.ticket_id,
-            'text': 'Test comment no files'
+            'content': 'Test comment no files'
         }
         
         user_data = {

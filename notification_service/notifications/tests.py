@@ -14,11 +14,11 @@ class NotificationServiceTests(TestCase):
     
     def setUp(self):
         """Set up test data"""
-        # Create a test template
+        # Create a test template (using Django template syntax)
         self.template = NotificationTemplate.objects.create(
             notification_type='account_created',
-            subject='Welcome {user_name}!',
-            body_text='Hello {user_name}, your account has been created at {timestamp}.',
+            subject='Welcome {{ user_name }}!',
+            body_text='Hello {{ user_name }}, your account has been created at {{ timestamp }}.',
             is_active=True
         )
         
@@ -355,7 +355,7 @@ class NotificationServiceTests(TestCase):
         # Check that HTML alternative was added
         self.assertEqual(len(mail.outbox[0].alternatives), 1)
     
-    @patch('notifications.services.EmailMultiAlternatives.send')
+    @patch('django.core.mail.EmailMultiAlternatives.send')
     def test_send_email_direct_failure(self, mock_send):
         """Test handling of direct email sending failure"""
         mock_send.side_effect = Exception('Email error')

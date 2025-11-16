@@ -205,14 +205,18 @@ class CommentService:
     @staticmethod
     def create_comment_with_attachments(validated_data, files, user_data):
         """Create a comment with file attachments"""
+        # Get the ticket object
+        from tickets.models import Ticket
+        ticket = Ticket.objects.get(ticket_id=validated_data['ticket_id'])
+        
         # Create comment with JWT user data
         comment = Comment.objects.create(
-            ticket_id=validated_data['ticket_id'],
+            ticket=ticket,
             user_id=user_data['user_id'],
             firstname=user_data['firstname'],
             lastname=user_data['lastname'],
             role=user_data['role'],
-            text=validated_data['text']
+            content=validated_data.get('content', validated_data.get('text', ''))
         )
         
         # Handle attachments using the correct models
