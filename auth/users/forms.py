@@ -5,8 +5,12 @@ from django.core.exceptions import ValidationError
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from captcha.fields import CaptchaField
 from .models import User, UserOTP
-from .serializers import validate_profile_picture_file_size, validate_profile_picture_dimensions, CustomTokenObtainPairSerializer
-from systems.models import System
+from .rate_limiting import check_login_rate_limits
+from .serializers import (
+    validate_profile_picture_file_size,
+    validate_profile_picture_dimensions,
+    CustomTokenObtainPairSerializer,
+)
 
 class ProfileSettingsForm(forms.ModelForm):
     """
@@ -293,10 +297,9 @@ class ProfileSettingsForm(forms.ModelForm):
 
 
 class LoginForm(forms.Form):
-    """
-    Login form with support for email/password authentication, 2FA OTP,
-    system selection, and captcha protection.
-    """
+    """Login form with support for email/password authentication, 2FA OTP, and captcha protection."""
+
+    CAPTCHA_FAILED_ATTEMPT_THRESHOLD = 5
     email = forms.EmailField(
         max_length=254,
         widget=forms.EmailInput(attrs={
@@ -320,19 +323,6 @@ class LoginForm(forms.Form):
         }),
         error_messages={
             'required': 'Password is required.'
-        }
-    )
-    
-    system = forms.ModelChoiceField(
-        queryset=System.objects.all(),
-        empty_label="Select a system to access",
-        widget=forms.Select(attrs={
-            'class': 'form-control',
-            'required': True
-        }),
-        error_messages={
-            'required': 'Please select a system to access.',
-            'invalid_choice': 'Please select a valid system.'
         }
     )
     
@@ -366,7 +356,7 @@ class LoginForm(forms.Form):
     
     def __init__(self, *args, **kwargs):
         self.request = kwargs.pop('request', None)
-        self.selected_system = kwargs.pop('system', None)
+        self.rate_limit_state = kwargs.pop('rate_limit_state', None)
         super().__init__(*args, **kwargs)
         
         # Check if we're in OTP verification mode (credentials stored in session)
@@ -376,85 +366,47 @@ class LoginForm(forms.Form):
                 self.fields['email'].required = False
             if 'password' in self.fields:
                 self.fields['password'].required = False
-            if 'system' in self.fields:
-                self.fields['system'].required = False
         
-        # Check if captcha is needed based on failed login attempts
+        session_email = None
+        if self.request:
+            session_email = self.request.session.get('force_captcha_email')
+            if session_email and not self.data:
+                self.initial.setdefault('email', session_email)
+
+        # Determine which email value we can inspect for captcha rules
         email = None
-        if self.request and self.request.method == 'POST':
-            email = self.request.POST.get('email')
-        elif self.data and 'email' in self.data:
+        if self.data and 'email' in self.data:
             email = self.data.get('email')
-        
-        # If in OTP mode, get email from session
-        if not email and self.request and self.request.session.get('otp_email'):
-            email = self.request.session.get('otp_email')
-        
-        # Remove captcha field if not needed
-        if email:
-            try:
-                user = User.objects.get(email=email)
-                # Only show captcha if user has 5+ failed attempts or is locked
-                if user.failed_login_attempts < 5 and not user.is_locked:
-                    self.fields.pop('captcha', None)
-            except User.DoesNotExist:
-                # If user doesn't exist, still show captcha for security
-                pass
-        else:
-            # If no email provided yet, don't show captcha initially
+        elif self.request:
+            if self.request.method == 'POST':
+                email = self.request.POST.get('email')
+            if not email:
+                email = self.request.session.get('otp_email')
+        if not email:
+            email = session_email
+
+        # Decide whether to render captcha based on multiple signals
+        self.show_captcha = self.should_require_captcha(
+            request=self.request,
+            email=email,
+            rate_limit_state=self.rate_limit_state,
+        )
+
+        if not self.show_captcha:
             self.fields.pop('captcha', None)
         
-        # Pre-select system if provided via URL parameter
-        if self.selected_system:
-            try:
-                system_obj = System.objects.get(slug=self.selected_system)
-                self.fields['system'].initial = system_obj
-            except System.DoesNotExist:
-                pass
-        
-        # Remember last selected system from session
-        if self.request and hasattr(self.request, 'session') and self.request.session.get('last_selected_system'):
-            try:
-                system_obj = System.objects.get(slug=self.request.session['last_selected_system'])
-                if not self.selected_system:  # Only use remembered system if not explicitly provided
-                    self.fields['system'].initial = system_obj
-            except System.DoesNotExist:
-                pass
-    
     def clean(self):
         cleaned_data = super().clean()
         email = cleaned_data.get('email')
         password = cleaned_data.get('password')
         otp_code = cleaned_data.get('otp_code')
-        system = cleaned_data.get('system')
         
         # Check if we're in OTP verification mode (credentials in session)
         if self.request and self.request.session.get('otp_email'):
             email = self.request.session.get('otp_email')
             password = self.request.session.get('otp_password')
-            system_id = self.request.session.get('otp_system')
-            if system_id:
-                try:
-                    from systems.models import System
-                    system = System.objects.get(pk=system_id)
-                except System.DoesNotExist:
-                    pass
         
         if email and password:
-            # First, check if user has access to the selected system BEFORE doing OTP
-            if system:
-                try:
-                    temp_user = User.objects.get(email=email)
-                    has_system_access = temp_user.system_roles.filter(system=system, is_active=True).exists()
-                    if not has_system_access:
-                        raise ValidationError(
-                            f'You do not have access to the {system.name} system. Please contact your administrator.',
-                            code='system_access_denied'
-                        )
-                except User.DoesNotExist:
-                    # Don't reveal that user doesn't exist - will be caught by authentication
-                    pass
-            
             # Use the same authentication logic as the API
             # Provide both username and email to match serializer expectations
             serializer_data = {
@@ -475,16 +427,6 @@ class LoginForm(forms.Form):
                 if serializer.is_valid(raise_exception=True):
                     # Get the authenticated user
                     user = serializer.user
-                    
-                    # System access already checked above, just store the user
-                    # Check if user has access to the selected system
-                    if system:
-                        has_system_access = user.system_roles.filter(system=system, is_active=True).exists()
-                        if not has_system_access:
-                            raise ValidationError(
-                                f'You do not have access to the {system.name} system. Please contact your administrator.',
-                                code='system_access_denied'
-                            )
                     
                     # Store the authenticated user for the view
                     self.user_cache = user
@@ -550,6 +492,38 @@ class LoginForm(forms.Form):
     def get_user(self):
         """Return the authenticated user."""
         return getattr(self, 'user_cache', None)
+
+    @classmethod
+    def should_require_captcha(cls, request=None, email=None, rate_limit_state=None):
+        """Centralized logic for deciding if captcha should be enforced."""
+        captcha_required = False
+
+        if request:
+            if request.session.get('otp_email'):
+                return False
+            # Session flag wins immediately
+            captcha_required = request.session.get('force_captcha', False)
+
+            if not captcha_required:
+                override = getattr(request, 'captcha_required_override', False)
+                captcha_required = bool(override)
+
+            if not captcha_required:
+                state = rate_limit_state
+                if state is None:
+                    state = check_login_rate_limits(request)
+                if state:
+                    captcha_required = state.get('captcha_required', False)
+
+        if not captcha_required and email:
+            user = User.objects.filter(email__iexact=email).first()
+            if user:
+                captcha_required = (
+                    user.failed_login_attempts >= cls.CAPTCHA_FAILED_ATTEMPT_THRESHOLD
+                    or user.is_locked
+                )
+
+        return captcha_required
 
 
 class ForgotPasswordForm(forms.Form):

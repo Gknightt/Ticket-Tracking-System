@@ -46,7 +46,7 @@
 
             <!-- Login / OTP Form -->
             <!-- The view should set `two_factor_required` in the template context when the user's credentials were accepted but an OTP is required. -->
-            <form method="post" novalidate class="lpForm" data-two-factor="{{ two_factor_required|default:False }}">
+            <form method="post" novalidate class="lpForm" data-two-factor="{{ two_factor_required|default:False }}" id="loginFormMain">
                 {% csrf_token %}
 
                 {# If two_factor_required is not True, show the normal credential inputs #}
@@ -73,16 +73,7 @@
                         <p class="errorMsg fieldError">Password is required.</p>
                     {% endif %}
                 </fieldset>
-
-                <!-- System Selection -->
-                <fieldset>
-                    <label for="{{ form.system.id_for_label }}">System:</label>
-                    {{ form.system }}
-                    {% if form.system.errors %}
-                        <p class="errorMsg fieldError">System selection is required.</p>
-                    {% endif %}
-                </fieldset>
-
+ 
                 <!-- Non-field errors -->
                  <!-- Non-field errors 
                 {% if form.non_field_errors %}
@@ -104,9 +95,11 @@
                     <div style="background: #ffebee; padding: 8px; border-radius: 4px; margin-bottom: 0.5rem; font-size: 0.85rem; color: #c62828;">
                         Security verification required due to multiple failed login attempts.
                     </div>
-                    {{ form.captcha }}
+                    <div class="captcha-wrapper">
+                        {{ form.captcha }}
+                    </div>
                     {% if form.captcha.errors %}
-                        <div class="invalid-feedback d-block">
+                        <div class="errorMsg" style="margin-top: 0.5rem; text-align: center;">
                             {% for error in form.captcha.errors %}
                                 {{ error }}
                             {% endfor %}
@@ -122,7 +115,7 @@
                 </div>
 
                 <!-- Submit Button -->
-                <button type="submit" class="logInButton" id="loginButton">
+                <button type="submit" class="logInButton" id="loginButton" data-original-text="Log In">
                     <span class="buttonText">Log In</span>
                     <span class="spinner" style="display:none;"></span>
                 </button>
@@ -134,9 +127,6 @@
                 <!-- Hidden fields (optional) - include if your view expects to receive them again. Remove if using session-based state. -->
                 {% if email_value %}
                     <input type="hidden" name="email" value="{{ email_value }}">
-                {% endif %}
-                {% if system_value %}
-                    <input type="hidden" name="system" value="{{ system_value }}">
                 {% endif %}
 
                 <!-- OTP Field -->
@@ -201,16 +191,54 @@
                 }, 5000);
             });
 
-            // Handle login button loading state
+            // Handle form submission to disable buttons and show loading state
             const loginForm = document.querySelector('.lpForm');
             const loginButton = document.getElementById('loginButton');
-            const buttonText = loginButton.querySelector('.buttonText');
-            const spinner = loginButton.querySelector('.spinner');
-
-            loginForm.addEventListener('submit', function () {
-                loginButton.disabled = true;
-                buttonText.textContent = 'Logging in...';
-                spinner.style.display = 'inline-block';
+            const otpButton = document.getElementById('otpButton');
+            
+            // Track if form has been submitted to prevent accidental re-submission via Enter key
+            let isFormSubmitting = false;
+            
+            loginForm.addEventListener('submit', function (e) {
+                // Prevent accidental double submission via keyboard
+                if (isFormSubmitting) {
+                    e.preventDefault();
+                    return false;
+                }
+                
+                isFormSubmitting = true;
+                
+                // Disable submit buttons only to prevent clicking twice
+                [loginButton, otpButton].forEach(btn => {
+                    if (btn) {
+                        btn.disabled = true;
+                        const buttonText = btn.querySelector('.buttonText');
+                        const spinner = btn.querySelector('.spinner');
+                        const originalText = btn.getAttribute('data-original-text') || 'Submitting...';
+                        
+                        buttonText.textContent = originalText === 'Log In' ? 'Logging in...' : 'Verifying...';
+                        spinner.style.display = 'inline-block';
+                    }
+                });
+            });
+            
+            // Reset form state if user goes back (for OTP screen)
+            window.addEventListener('pageshow', function(event) {
+                if (event.persisted) {
+                    // Page was restored from browser cache - reset the flag
+                    isFormSubmitting = false;
+                    // Re-enable submit buttons
+                    [loginButton, otpButton].forEach(btn => {
+                        if (btn) {
+                            btn.disabled = false;
+                            const buttonText = btn.querySelector('.buttonText');
+                            const spinner = btn.querySelector('.spinner');
+                            const originalText = btn.getAttribute('data-original-text');
+                            buttonText.textContent = originalText;
+                            spinner.style.display = 'none';
+                        }
+                    });
+                }
             });
 
             // Toast auto-hide
@@ -227,6 +255,8 @@
             if (backToLoginBtn) {
                 backToLoginBtn.addEventListener('click', function(e) {
                     e.preventDefault();
+                    // Reset form submission state
+                    isFormSubmitting = false;
                     // Add timestamp to prevent caching and force session cleanup
                     window.location.href = this.href + '?clear_otp=1&t=' + Date.now();
                 });

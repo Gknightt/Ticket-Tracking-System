@@ -420,6 +420,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                 
                 # Verify the provided OTP code
                 if not otp_instance.verify(otp_code):
+                    # OTP is invalid, but DON'T increment failed_login_attempts
+                    # because the email/password were already validated
                     raise serializers.ValidationError(
                         'Invalid OTP code. Please check your code and try again.',
                         code='otp_invalid'

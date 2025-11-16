@@ -4,31 +4,15 @@ from rest_framework.decorators import api_view
 from rest_framework import serializers
 from rest_framework.routers import DefaultRouter
 from drf_spectacular.utils import extend_schema
-from .views import (
-    RegisterView, 
-    ProfileView, 
-    CustomTokenObtainPairView,
-    CookieTokenRefreshView,
-    CookieLogoutView,
-    ValidateTokenView,
-    RequestOTPView, 
-    Enable2FAView, 
-    Disable2FAView,
-    request_otp_authenticated_view,
-    verify_disable_otp_view,
-    ForgotPasswordView,
-    ForgotPasswordUIView,
-    ResetPasswordView,
-    UserViewSet,
-    ProfilePasswordResetView,
-    profile_settings_view,
-    agent_management_view,
-    LoginView,
-    request_otp_for_login,
-    SystemWelcomeView,
-    UILogoutView,
-    ChangePasswordUIView
-)
+
+# Import directly from individual modules
+from .views.auth_views import RegisterView, CustomTokenObtainPairView, CookieTokenRefreshView, CookieLogoutView, ValidateTokenView, UILogoutView
+from .views.profile_views import ProfileView, profile_settings_view
+from .views.otp_views import RequestOTPView, Enable2FAView, Disable2FAView, request_otp_authenticated_view, verify_disable_otp_view
+from .views.password_views import ForgotPasswordView, ForgotPasswordUIView, ResetPasswordView, ProfilePasswordResetView, ChangePasswordUIView
+from .views.user_management_views import UserViewSet, agent_management_view, invite_agent_view
+from .views.login_views import LoginView, request_otp_for_login, SystemWelcomeView
+from .views.captcha_views import CaptchaGenerateView, CaptchaVerifyView, captcha_required_view
 
 class PasswordResetSerializer(serializers.Serializer):
     forgot = serializers.URLField()
@@ -40,12 +24,18 @@ class TwoFASerializer(serializers.Serializer):
     enable = serializers.URLField()
     disable = serializers.URLField()
 
+class CaptchaSerializer(serializers.Serializer):
+    generate = serializers.URLField()
+    verify = serializers.URLField()
+    required = serializers.URLField()
+
 class UsersRootSerializer(serializers.Serializer):
     register = serializers.URLField()
     profile = serializers.URLField()
     list_users = serializers.URLField()
     password_reset = PasswordResetSerializer()
     two_fa = TwoFASerializer(source='2fa')
+    captcha = CaptchaSerializer()
 
 @extend_schema(responses=UsersRootSerializer)
 @api_view(['GET'])
@@ -63,6 +53,11 @@ def users_root(request):
             "request_otp": request.build_absolute_uri("2fa/request-otp/"),
             "enable": request.build_absolute_uri("2fa/enable/"),
             "disable": request.build_absolute_uri("2fa/disable/"),
+        },
+        "captcha": {
+            "generate": request.build_absolute_uri("captcha/generate/"),
+            "verify": request.build_absolute_uri("captcha/verify/"),
+            "required": request.build_absolute_uri("captcha/required/"),
         },
         "settings": {
             "profile": request.build_absolute_uri("settings/profile/"),
@@ -111,8 +106,16 @@ urlpatterns = [
     path('password/change/', ProfilePasswordResetView.as_view(), name='change-password'),
     path('password/change/ui/', ChangePasswordUIView.as_view(), name='change-password-ui'),
     
+    # CAPTCHA endpoints
+    path('captcha/generate/', CaptchaGenerateView.as_view(), name='captcha-generate'),
+    path('captcha/verify/', CaptchaVerifyView.as_view(), name='captcha-verify'),
+    path('captcha/required/', captcha_required_view, name='captcha-required'),
+    
     # User listing endpoint
     path('list/', UserViewSet.as_view({'get': 'list'}), name='user-list'),
+    
+    # Agent management endpoint
+    path('agents/', UserViewSet.as_view({'get': 'list'}), name='user-agents'),
     
     # User management endpoints (for admins) - CRUD operations
     path('management/', include(router.urls)),
