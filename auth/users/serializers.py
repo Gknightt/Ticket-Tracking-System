@@ -387,16 +387,34 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             if user_auth.otp_enabled:
                 # Check if OTP code is empty or missing
                 if not otp_code or otp_code.strip() == '':
+                    # Auto-generate and send OTP if not provided
+                    otp_instance = UserOTP.generate_for_user(user_auth, otp_type='email')
+                    
+                    # Send OTP email
+                    try:
+                        send_otp_email(user_auth, otp_instance.otp_code)
+                        print(f"OTP sent to {user_auth.email}: {otp_instance.otp_code}")  # Debug print
+                    except Exception as e:
+                        print(f"Failed to send OTP email: {str(e)}")  # Debug print
+                    
                     raise serializers.ValidationError(
-                        'OTP code is required for this account. Please provide the OTP code.',
+                        'OTP code is required for this account. An OTP has been sent to your email.',
                         code='otp_required'
                     )
 
                 # Get the most recent valid OTP for this user
                 otp_instance = UserOTP.get_valid_otp_for_user(user_auth)
                 if not otp_instance:
+                    # Generate new OTP if expired
+                    otp_instance = UserOTP.generate_for_user(user_auth, otp_type='email')
+                    try:
+                        send_otp_email(user_auth, otp_instance.otp_code)
+                        print(f"New OTP sent to {user_auth.email}: {otp_instance.otp_code}")  # Debug print
+                    except Exception as e:
+                        print(f"Failed to send OTP email: {str(e)}")  # Debug print
+                    
                     raise serializers.ValidationError(
-                        'No valid OTP found. Please request a new OTP code.',
+                        'Your previous OTP expired. A new OTP has been sent to your email.',
                         code='otp_expired'
                     )
                 
@@ -613,17 +631,31 @@ Authentication Service Team
     '''
     
     try:
-        send_mail(
-            subject=subject,
-            message=message.strip(),
-            from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@example.com'),
-            recipient_list=[user.email],
-            fail_silently=False,
-        )
+        # Send email asynchronously to avoid blocking the request
+        from threading import Thread
+        
+        def send_async():
+            try:
+                send_mail(
+                    subject=subject,
+                    message=message.strip(),
+                    from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@example.com'),
+                    recipient_list=[user.email],
+                    fail_silently=False,
+                )
+            except Exception as e:
+                # Log the error in production
+                print(f"Failed to send password reset email to {user.email}: {str(e)}")
+        
+        # Start the email sending in a separate thread
+        email_thread = Thread(target=send_async)
+        email_thread.daemon = True
+        email_thread.start()
+        
         return True
     except Exception as e:
         # Log the error in production
-        print(f"Failed to send password reset email to {user.email}: {str(e)}")
+        print(f"Failed to initiate password reset email to {user.email}: {str(e)}")
         return False
 
 
