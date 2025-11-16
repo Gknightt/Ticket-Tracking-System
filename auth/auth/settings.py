@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 from decouple import config
 import os
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -27,12 +28,12 @@ SECRET_KEY = config('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-# ALLOWED_HOSTS = config(
-#     'ALLOWED_HOSTS',
-#     default='localhost,127.0.0.1,auth_service',
-#     cast=lambda v: [s.strip() for s in v.split(',')]
-# )
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = config(
+    'ALLOWED_HOSTS',
+    default='localhost,127.0.0.1,auth_service',
+    cast=lambda v: [s.strip() for s in v.split(',')]
+)
+# ALLOWED_HOSTS = ['*']
 
 # Application definition
 # testapp
@@ -99,7 +100,17 @@ WSGI_APPLICATION = 'auth.wsgi.application'
 
 ENVIRONMENT = config('ENVIRONMENT', default='development')
 
-if ENVIRONMENT == 'production':
+# Railway and production setup using DATABASE_URL
+if config('DATABASE_URL', default=''):
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=config('DATABASE_URL'),
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
+    }
+# Legacy production setup with individual env vars
+elif ENVIRONMENT == 'production':
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
@@ -110,6 +121,7 @@ if ENVIRONMENT == 'production':
             'PORT': config('PGPORT', default=5432),
         }
     }
+# Development setup with SQLite
 else:
     DATABASES = {
         'default': {
@@ -155,10 +167,13 @@ REST_FRAMEWORK = {
     ],
     
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
-    "DEFAULT_RENDERER_CLASSES": [
-    "rest_framework.renderers.JSONRenderer",
-    "rest_framework.renderers.BrowsableAPIRenderer",  # Enables clickable UI
-    ],
+    # Conditionally enable browsable API only in DEBUG mode
+    "DEFAULT_RENDERER_CLASSES": (
+        "rest_framework.renderers.JSONRenderer",
+        "rest_framework.renderers.BrowsableAPIRenderer",  # Browsable UI (only in DEBUG)
+    ) if DEBUG else (
+        "rest_framework.renderers.JSONRenderer",
+    ),
     
 }
 # JWT Settings (optional; good defaults)
@@ -243,6 +258,21 @@ FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
 
 # Cookie domain configuration
 COOKIE_DOMAIN = config('COOKIE_DOMAIN', default='localhost')
+
+# Session and Cookie Security Settings
+# Only enforce secure cookies in production with HTTPS
+# For development, allow HTTP even when DEBUG=False
+SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=False, cast=bool)
+CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', default=False, cast=bool)
+# Set to True in production with HTTPS
+
+# CSRF Trusted Origins - Required for Django 4.0+
+# Add your Railway domain and frontend domain here
+CSRF_TRUSTED_ORIGINS = config(
+    'CSRF_TRUSTED_ORIGINS',
+    default='http://localhost:3000,http://127.0.0.1:3000',
+    cast=lambda v: [s.strip() for s in v.split(',')]
+)
 
 # CORS Configuration - Allow frontend to access backend
 CORS_ALLOWED_ORIGINS = config(
