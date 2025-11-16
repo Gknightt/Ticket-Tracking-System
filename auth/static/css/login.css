@@ -418,6 +418,39 @@ select.is-invalid {
     border: 2px solid #e1e8ed;
 }
 
+.captcha-wrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+}
+
+.captcha-wrapper img {
+    width: 100%;
+    max-width: 320px;
+    height: auto;
+    display: block;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+}
+
+.captcha-wrapper input {
+    display: flex;
+    width: 100%;
+    height: 44px;
+    padding: 18px 16px;
+    border-radius: 40px;
+    border: 1px solid #d3d3d3;
+    background-color: #fcfcfc;
+    font-family: "Poppins", sans-serif;
+}
+
+.captcha-wrapper input:focus {
+    outline: 2px solid #007bff;
+}
+
 /* Password requirements */
 .passwordRequirements {
     margin-top: 10px;

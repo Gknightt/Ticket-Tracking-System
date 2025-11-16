@@ -58,6 +58,8 @@ urlpatterns = [
     # Profile and Settings shortcuts (direct access without /api/v1/users/)
     path('settings/profile/', profile_settings_view, name='profile-settings'),
     path('agent-management/', agent_management_view, name='agent-management'),
+    path('invite-agent/', invite_agent_view, name='invite-agent'),
+    path('password-change/', ChangePasswordUIView.as_view(), name='password-change-shortcut'),
 
     # Shortcut: Token obtain and logout at root level
     path('token/', CustomTokenObtainPairView.as_view(), name='root_token_obtain'),

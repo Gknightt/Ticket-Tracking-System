@@ -309,3 +309,125 @@ class PasswordResetToken(models.Model):
 
 # Manager to handle user creation (e.g., 'create_user', 'create_superuser')
 # auth_service/users/models.py
+
+
+class IPAddressRateLimit(models.Model):
+    """
+    Track login attempts per IP address for strict rate limiting.
+    Used to block automated attacks at the network level.
+    """
+    ip_address = models.GenericIPAddressField(unique=True)
+    failed_attempts = models.IntegerField(default=0)
+    last_attempt = models.DateTimeField(auto_now=True)
+    blocked_until = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        db_table = 'auth_ip_rate_limit'
+        verbose_name = 'IP Address Rate Limit'
+        verbose_name_plural = 'IP Address Rate Limits'
+    
+    def __str__(self):
+        return f"IP: {self.ip_address} - Attempts: {self.failed_attempts}"
+    
+    def increment_failed_attempts(self):
+        """Increment failed attempts and update timestamp"""
+        self.failed_attempts += 1
+        self.last_attempt = timezone.now()
+        self.save(update_fields=['failed_attempts', 'last_attempt'])
+    
+    def reset_attempts(self):
+        """Reset failed attempts"""
+        self.failed_attempts = 0
+        self.blocked_until = None
+        self.save(update_fields=['failed_attempts', 'blocked_until'])
+    
+    def is_blocked(self):
+        """Check if IP is currently blocked"""
+        if self.blocked_until and timezone.now() < self.blocked_until:
+            return True
+        return False
+    
+    def block_until(self, duration_minutes=30):
+        """Block IP for specified duration"""
+        self.blocked_until = timezone.now() + timedelta(minutes=duration_minutes)
+        self.save(update_fields=['blocked_until'])
+
+
+class DeviceFingerprint(models.Model):
+    """
+    Track device/browser fingerprints to identify repeat offenders.
+    A fingerprint is created from browser/device characteristics (User-Agent, Accept-Language, etc.)
+    """
+    fingerprint_hash = models.CharField(max_length=255, unique=True, db_index=True)
+    failed_attempts = models.IntegerField(default=0)
+    last_attempt = models.DateTimeField(auto_now=True)
+    requires_captcha = models.BooleanField(default=False)
+    blocked_until = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        db_table = 'auth_device_fingerprint'
+        verbose_name = 'Device Fingerprint'
+        verbose_name_plural = 'Device Fingerprints'
+    
+    def __str__(self):
+        return f"Device: {self.fingerprint_hash[:16]}... - Attempts: {self.failed_attempts}"
+    
+    def increment_failed_attempts(self):
+        """Increment failed attempts and update timestamp"""
+        self.failed_attempts += 1
+        self.last_attempt = timezone.now()
+        self.save(update_fields=['failed_attempts', 'last_attempt'])
+    
+    def reset_attempts(self):
+        """Reset failed attempts"""
+        self.failed_attempts = 0
+        self.requires_captcha = False
+        self.blocked_until = None
+        self.save(update_fields=['failed_attempts', 'requires_captcha', 'blocked_until'])
+    
+    def is_blocked(self):
+        """Check if device is currently blocked"""
+        if self.blocked_until and timezone.now() < self.blocked_until:
+            return True
+        return False
+    
+    def block_until(self, duration_minutes=30):
+        """Block device for specified duration"""
+        self.blocked_until = timezone.now() + timedelta(minutes=duration_minutes)
+        self.save(update_fields=['blocked_until'])
+
+
+class RateLimitConfig(models.Model):
+    """
+    Configuration for rate limiting thresholds.
+    This allows adjusting limits without code changes.
+    """
+    # IP-based limits
+    ip_attempt_threshold = models.IntegerField(default=10, help_text="Failed attempts per IP before blocking")
+    ip_block_duration_minutes = models.IntegerField(default=30, help_text="Minutes to block an IP")
+    
+    # Device-based limits
+    device_attempt_threshold = models.IntegerField(default=5, help_text="Failed attempts per device before captcha")
+    device_captcha_threshold = models.IntegerField(default=8, help_text="Failed attempts per device before blocking")
+    device_block_duration_minutes = models.IntegerField(default=20, help_text="Minutes to block a device")
+    
+    # Time windows
+    attempt_reset_hours = models.IntegerField(default=24, help_text="Hours before resetting attempt count")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'auth_rate_limit_config'
+        verbose_name = 'Rate Limit Configuration'
+        verbose_name_plural = 'Rate Limit Configuration'
+    
+    def __str__(self):
+        return "Rate Limit Configuration"
+    
+    @classmethod
+    def get_config(cls):
+        """Get or create default configuration"""
+        config, created = cls.objects.get_or_create(pk=1)
+        return config
+
