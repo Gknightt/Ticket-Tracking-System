@@ -49,7 +49,7 @@ services:
       - media_files:/app/media
     command: >
       sh -c "sleep 20 && 
-             celery -A workflow_api worker --pool=solo --loglevel=info -Q role_send-default,TICKET_TASKS_PRODUCTION"
+             celery -A workflow_api worker --pool=solo --loglevel=info -Q role_send-default,TICKET_TASKS_PRODUCTION,tts.role.sync,tts.user_system_role.sync,workflow_seed_queue,workflow_seed"
     depends_on:
       - rabbitmq
       - db

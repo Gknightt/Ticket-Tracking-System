@@ -12,21 +12,35 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
+from decouple import config
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Environment detection
+DJANGO_ENV = config('DJANGO_ENV', default='development')
+IS_PRODUCTION = DJANGO_ENV.lower() == 'production'
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'your-auth-service-secret-key-here'
+SECRET_KEY = config(
+    'DJANGO_SECRET_KEY',
+    default='your-messaging-service-secret-key-change-in-production' if not IS_PRODUCTION else None
+)
+if IS_PRODUCTION and not config('DJANGO_SECRET_KEY', default=None):
+    raise ValueError('DJANGO_SECRET_KEY must be set in production environment')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config('DJANGO_DEBUG', default='False' if IS_PRODUCTION else 'True', cast=lambda x: x.lower() in ('true', '1', 'yes'))
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',') if os.environ.get('ALLOWED_HOSTS') else ['*']
+ALLOWED_HOSTS = config(
+    'DJANGO_ALLOWED_HOSTS',
+    default='*' if DEBUG else 'localhost,127.0.0.1',
+    cast=lambda v: [s.strip() for s in v.split(',')]
+)
 
 
 # Application definition
@@ -82,12 +96,35 @@ ASGI_APPLICATION = 'messaging.asgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'messaging_db.sqlite3',
+# Support DATABASE_URL (e.g., from Railway or other platforms)
+if config('DATABASE_URL', default=''):
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=config('DATABASE_URL'),
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
     }
-}
+# Production setup with individual env vars (PostgreSQL)
+elif DJANGO_ENV == 'production':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('POSTGRES_DB', default='messaging_db'),
+            'USER': config('POSTGRES_USER', default='postgres'),
+            'PASSWORD': config('POSTGRES_PASSWORD', default=''),
+            'HOST': config('PGHOST', default='localhost'),
+            'PORT': config('PGPORT', default=5432),
+        }
+    }
+# Development setup with SQLite
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'messaging_db.sqlite3',
+        }
+    }
 
 
 # Django REST Framework settings
@@ -122,7 +159,15 @@ REST_FRAMEWORK = {
 }
 
 # JWT Settings
+# Use the same signing key as auth service for token verification
+JWT_SIGNING_KEY = config(
+    'DJANGO_JWT_SIGNING_KEY',
+    default=SECRET_KEY  # Fallback to SECRET_KEY if not explicitly set
+)
+
 SIMPLE_JWT = {
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': JWT_SIGNING_KEY,
     'USER_ID_FIELD': 'id',
     'USER_ID_CLAIM': 'user_id',
 }
@@ -149,8 +194,8 @@ SPECTACULAR_SETTINGS = {
 }
 
 # CORS settings
-_env_origins = os.environ.get('CORS_ALLOWED_ORIGINS')
-if (_env_origins):
+_env_origins = config('DJANGO_CORS_ALLOWED_ORIGINS', default='')
+if _env_origins:
     CORS_ALLOWED_ORIGINS = [origin.strip() for origin in _env_origins.split(',') if origin.strip()]
 else:
     CORS_ALLOWED_ORIGINS = [
@@ -162,16 +207,16 @@ else:
         "http://127.0.0.1:1000",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
-    ]
+    ] if not IS_PRODUCTION else ["https://yourdomain.com"]
 
 # IMPORTANT: When the frontend sends credentialed requests (withCredentials / credentials: 'include'),
 # the backend must return an explicit Access-Control-Allow-Origin header (not '*'). Therefore default CORS_ALLOW_ALL_ORIGINS is False. Use CORS_ALLOWED_ORIGINS or set
 # CORS_ALLOWED_ORIGINS via env to include your frontend origin(s).
-CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', 'False').lower() in ('1', 'true', 'yes')
+CORS_ALLOW_ALL_ORIGINS = config('DJANGO_CORS_ALLOW_ALL_ORIGINS', default='False' if not IS_PRODUCTION else 'False', cast=lambda x: x.lower() in ('true', '1', 'yes'))
 
 # Allow cookies/credentials to be sent in cross-site requests. Default True for dev,
 # but ensure CORS_ALLOW_ALL_ORIGINS is False when this is enabled.
-CORS_ALLOW_CREDENTIALS = os.environ.get('CORS_ALLOW_CREDENTIALS', 'True').lower() in ('1', 'true', 'yes')
+CORS_ALLOW_CREDENTIALS = config('DJANGO_CORS_ALLOW_CREDENTIALS', default='True', cast=lambda x: x.lower() in ('true', '1', 'yes'))
 
 # Standard CORS headers - removed cache-busting headers
 CORS_ALLOW_HEADERS = [
@@ -234,7 +279,7 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # Base URL for media files (used for WebSocket messages when no request context is available)
-MEDIA_BASE_URL = os.environ.get('MEDIA_BASE_URL', 'http://localhost:8005')
+MEDIA_BASE_URL = config('DJANGO_MEDIA_BASE_URL', default='http://localhost:8005' if not IS_PRODUCTION else 'https://yourdomain.com')
 
 # File upload settings
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB

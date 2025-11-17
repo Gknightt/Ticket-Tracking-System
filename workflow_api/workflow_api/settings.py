@@ -1,23 +1,32 @@
 import os
 from pathlib import Path
 from datetime import timedelta
-from dotenv import load_dotenv
+from decouple import config
 import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Load environment variables from .env file if not in production
-if not os.getenv('DJANGO_ENV') == 'production':
-    load_dotenv(BASE_DIR / '.env')
+# Environment detection
+DJANGO_ENV = config('DJANGO_ENV', default='development')
+IS_PRODUCTION = DJANGO_ENV.lower() == 'production'
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'your-auth-service-secret-key-here')
+SECRET_KEY = config(
+    'DJANGO_SECRET_KEY',
+    default='your-auth-service-secret-key-change-in-production' if not IS_PRODUCTION else None
+)
+if IS_PRODUCTION and not config('DJANGO_SECRET_KEY', default=None):
+    raise ValueError('DJANGO_SECRET_KEY must be set in production environment')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() == 'false'
+DEBUG = config('DJANGO_DEBUG', default='False' if IS_PRODUCTION else 'True', cast=lambda x: x.lower() in ('true', '1', 'yes'))
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = config(
+    'DJANGO_ALLOWED_HOSTS',
+    default='*' if DEBUG else 'localhost',
+    cast=lambda v: [s.strip() for s in v.split(',')]
+)
 
 # Application definition
 INSTALLED_APPS = [
@@ -81,12 +90,25 @@ TEMPLATES = [
 WSGI_APPLICATION = 'workflow_api.wsgi.application'
 
 # Database
-if os.getenv('DATABASE_URL'):
+if config('DATABASE_URL', default=''):
     DATABASES = {
         'default': dj_database_url.config(
-            default=os.environ.get('DATABASE_URL')
+            default=config('DATABASE_URL')
         )
     }
+# Production setup with individual env vars (PostgreSQL)
+elif DJANGO_ENV == 'production':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('POSTGRES_DB', default='workflow_db'),
+            'USER': config('POSTGRES_USER', default='postgres'),
+            'PASSWORD': config('POSTGRES_PASSWORD', default=''),
+            'HOST': config('PGHOST', default='localhost'),
+            'PORT': config('PGPORT', default=5432),
+        }
+    }
+# Development setup with SQLite
 else:
     DATABASES = {
         'default': {
@@ -133,13 +155,19 @@ REST_FRAMEWORK = {
 }
 
 # JWT Settings
+# Use the same signing key as auth service for token verification
+JWT_SIGNING_KEY = config(
+    'DJANGO_JWT_SIGNING_KEY',
+    default=SECRET_KEY  # Fallback to SECRET_KEY if not explicitly set
+)
+
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'ALGORITHM': 'HS256',
-    'SIGNING_KEY': SECRET_KEY,
+    'SIGNING_KEY': JWT_SIGNING_KEY,
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
@@ -152,7 +180,7 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 # Celery Configuration
-CELERY_BROKER_URL = os.getenv('DJANGO_CELERY_BROKER_URL', 'amqp://guest:guest@localhost:5672//')
+CELERY_BROKER_URL = config('DJANGO_CELERY_BROKER_URL', default='amqp://admin:admin@localhost:5672/')
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_TASK_ACKS_LATE = True
@@ -163,19 +191,19 @@ CELERY_WORKER_PREFETCH_MULTIPLIER = 1  # Prefetch only 1 message at a time
 CELERY_TASK_TRACK_STARTED = True  # Track task start
 
 # Auth Service Configuration
-AUTH_SERVICE_URL = os.getenv('AUTH_SERVICE_URL', 'http://localhost:8001')
+AUTH_SERVICE_URL = config('DJANGO_AUTH_SERVICE_URL', default='http://localhost:8001')
 
 # Notification Service Configuration
-NOTIFICATION_SERVICE_URL = os.getenv('NOTIFICATION_SERVICE_URL', 'http://localhost:8001')
-NOTIFICATION_SERVICE_BROKER_URL = os.getenv('NOTIFICATION_SERVICE_BROKER_URL', 'amqp://guest:guest@localhost:5672//')
+NOTIFICATION_SERVICE_URL = config('DJANGO_NOTIFICATION_SERVICE_URL', default='http://localhost:8001')
+NOTIFICATION_SERVICE_BROKER_URL = config('DJANGO_NOTIFICATION_SERVICE_BROKER_URL', default='amqp://admin:admin@localhost:5672/')
 
 # TTS (Ticket Tracking Service) Configuration for round-robin assignment
-TTS_SERVICE_URL = os.getenv('TTS_SERVICE_URL', 'http://localhost:8002')
+TTS_SERVICE_URL = config('DJANGO_TTS_SERVICE_URL', default='http://localhost:8002')
 
 # Queue Configuration
-DJANGO_NOTIFICATION_QUEUE = os.getenv('DJANGO_NOTIFICATION_QUEUE', 'notification-queue-default')
-DJANGO_TICKET_STATUS_QUEUE = os.getenv('DJANGO_TICKET_STATUS_QUEUE', 'ticket_status-default')
-INAPP_NOTIFICATION_QUEUE = os.getenv('INAPP_NOTIFICATION_QUEUE', 'inapp-notification-queue')
+DJANGO_NOTIFICATION_QUEUE = config('DJANGO_NOTIFICATION_QUEUE', default='notification-queue-default')
+DJANGO_TICKET_STATUS_QUEUE = config('DJANGO_TICKET_STATUS_QUEUE', default='ticket_status-default')
+INAPP_NOTIFICATION_QUEUE = config('DJANGO_INAPP_NOTIFICATION_QUEUE', default='inapp-notification-queue')
 
 CELERY_TASK_DEFAULT_QUEUE = DJANGO_NOTIFICATION_QUEUE
 CELERY_TASK_ROUTES = {
@@ -190,6 +218,6 @@ CELERY_TASK_ROUTES = {
 }
 
 # External Services
-USER_SERVICE_URL = os.getenv('DJANGO_USER_SERVICE')
-AUTH_SERVICE_URL = os.getenv('DJANGO_AUTH_SERVICE')
-BASE_URL = os.getenv('DJANGO_USER_SERVICE')
+USER_SERVICE_URL = config('DJANGO_USER_SERVICE_URL', default='http://localhost:8000')
+AUTH_SERVICE_URL = config('DJANGO_AUTH_SERVICE_URL', default='http://localhost:8000')
+BASE_URL = config('DJANGO_BASE_URL', default='http://localhost:8000')

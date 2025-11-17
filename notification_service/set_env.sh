@@ -7,7 +7,7 @@ export DEBUG="True"
 export ALLOWED_HOSTS="localhost,127.0.0.1"
 
 # Celery configuration
-export CELERY_BROKER_URL="amqp://guest:guest@localhost:5672//"
+export CELERY_BROKER_URL="amqp://admin:admin@localhost:5672/"
 export NOTIFICATION_QUEUE="notification-queue"
 export INAPP_NOTIFICATION_QUEUE="inapp-notification-queue"
 
