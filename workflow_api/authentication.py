@@ -26,7 +26,7 @@ class JWTCookieAuthentication(BaseAuthentication):
             # Decode JWT token
             payload = jwt.decode(
                 token, 
-                settings.SECRET_KEY, 
+                settings.JWT_SIGNING_KEY, 
                 algorithms=['HS256']
             )
             
