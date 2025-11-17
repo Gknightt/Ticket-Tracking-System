@@ -525,3 +525,220 @@ def notification_types_v2(request):
     return Response({
         'notification_types': types
     }, status=status.HTTP_200_OK)
+
+
+# ===========================
+# Gmail API Email Endpoints
+# ===========================
+
+@api_view(['POST'])
+@authentication_classes([APIKeyAuthentication])
+@permission_classes([IsAuthenticated])
+def send_password_reset_email(request):
+    """
+    Send password reset email via Gmail API
+    
+    POST data:
+    - recipient_email: Email address
+    - reset_url: Password reset URL with token
+    - user_name: Optional user's name
+    """
+    from .email_service import get_email_service
+    
+    recipient_email = request.data.get('recipient_email')
+    reset_url = request.data.get('reset_url')
+    user_name = request.data.get('user_name')
+    
+    if not recipient_email or not reset_url:
+        return Response({
+            'success': False,
+            'error': 'recipient_email and reset_url are required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        email_service = get_email_service()
+        result = email_service.send_password_reset_email(
+            to=recipient_email,
+            reset_url=reset_url,
+            user_name=user_name
+        )
+        
+        # Log the notification
+        NotificationLog.objects.create(
+            user_email=recipient_email,
+            notification_type='password_reset',
+            recipient_email=recipient_email,
+            subject='Password Reset Request',
+            message=f'Password reset link sent to {recipient_email}',
+            context_data={'reset_url': reset_url},
+            status='sent' if result.get('success') else 'failed',
+            sent_at=timezone.now() if result.get('success') else None,
+            error_message=result.get('error') if not result.get('success') else None
+        )
+        
+        return Response(result, status=status.HTTP_200_OK if result.get('success') else status.HTTP_400_BAD_REQUEST)
+    
+    except Exception as e:
+        logger.error(f"Error sending password reset email: {str(e)}")
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@authentication_classes([APIKeyAuthentication])
+@permission_classes([IsAuthenticated])
+def send_ticket_notification_email(request):
+    """
+    Send ticket notification email via Gmail API
+    
+    POST data:
+    - recipient_email: Email address
+    - ticket_id: Ticket ID
+    - ticket_title: Ticket title
+    - action: Action performed (created, updated, assigned, etc.)
+    - user_name: Optional user's name
+    - ticket_url: Optional URL to view ticket
+    """
+    from .email_service import get_email_service
+    
+    recipient_email = request.data.get('recipient_email')
+    ticket_id = request.data.get('ticket_id')
+    ticket_title = request.data.get('ticket_title')
+    action = request.data.get('action')
+    user_name = request.data.get('user_name')
+    ticket_url = request.data.get('ticket_url')
+    
+    if not all([recipient_email, ticket_id, ticket_title, action]):
+        return Response({
+            'success': False,
+            'error': 'recipient_email, ticket_id, ticket_title, and action are required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        email_service = get_email_service()
+        result = email_service.send_ticket_notification(
+            to=recipient_email,
+            ticket_id=ticket_id,
+            ticket_title=ticket_title,
+            action=action,
+            user_name=user_name,
+            ticket_url=ticket_url
+        )
+        
+        # Log the notification
+        NotificationLog.objects.create(
+            user_email=recipient_email,
+            notification_type='ticket_notification',
+            recipient_email=recipient_email,
+            subject=f'Ticket #{ticket_id}: {action.title()}',
+            message=f'Ticket {action}: {ticket_title}',
+            context_data={
+                'ticket_id': ticket_id,
+                'ticket_title': ticket_title,
+                'action': action,
+                'ticket_url': ticket_url
+            },
+            status='sent' if result.get('success') else 'failed',
+            sent_at=timezone.now() if result.get('success') else None,
+            error_message=result.get('error') if not result.get('success') else None
+        )
+        
+        return Response(result, status=status.HTTP_200_OK if result.get('success') else status.HTTP_400_BAD_REQUEST)
+    
+    except Exception as e:
+        logger.error(f"Error sending ticket notification email: {str(e)}")
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@authentication_classes([APIKeyAuthentication])
+@permission_classes([IsAuthenticated])
+def send_invitation_email(request):
+    """
+    Send invitation email via Gmail API
+    
+    POST data:
+    - recipient_email: Email address
+    - invitation_url: URL to accept invitation
+    - invited_by: Optional name of person who sent invitation
+    - organization: Optional organization name
+    """
+    from .email_service import get_email_service
+    
+    recipient_email = request.data.get('recipient_email')
+    invitation_url = request.data.get('invitation_url')
+    invited_by = request.data.get('invited_by')
+    organization = request.data.get('organization')
+    
+    if not recipient_email or not invitation_url:
+        return Response({
+            'success': False,
+            'error': 'recipient_email and invitation_url are required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        email_service = get_email_service()
+        result = email_service.send_invitation_email(
+            to=recipient_email,
+            invitation_url=invitation_url,
+            invited_by=invited_by,
+            organization=organization
+        )
+        
+        # Log the notification
+        NotificationLog.objects.create(
+            user_email=recipient_email,
+            notification_type='invitation',
+            recipient_email=recipient_email,
+            subject="You've been invited to TTS System",
+            message=f'Invitation sent to {recipient_email}',
+            context_data={
+                'invitation_url': invitation_url,
+                'invited_by': invited_by,
+                'organization': organization
+            },
+            status='sent' if result.get('success') else 'failed',
+            sent_at=timezone.now() if result.get('success') else None,
+            error_message=result.get('error') if not result.get('success') else None
+        )
+        
+        return Response(result, status=status.HTTP_200_OK if result.get('success') else status.HTTP_400_BAD_REQUEST)
+    
+    except Exception as e:
+        logger.error(f"Error sending invitation email: {str(e)}")
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@authentication_classes([APIKeyAuthentication])
+@permission_classes([IsAuthenticated])
+def email_service_status(request):
+    """
+    Get email service status and provider information
+    """
+    from .email_service import get_email_service
+    
+    try:
+        email_service = get_email_service()
+        provider_info = email_service.get_provider_info()
+        test_result = email_service.test_connection()
+        
+        return Response({
+            'provider_info': provider_info,
+            'connection_test': test_result
+        }, status=status.HTTP_200_OK)
+    
+    except Exception as e:
+        logger.error(f"Error checking email service status: {str(e)}")
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

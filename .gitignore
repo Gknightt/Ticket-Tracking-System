@@ -5,6 +5,10 @@ env/
 # Ignore all .env files
 *.env
 
+# Gmail API credentials (notification service)
+credentials.json
+token.pickle
+token.json
 
 # Ignore test directory
 test/

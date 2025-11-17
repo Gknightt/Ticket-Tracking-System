@@ -22,6 +22,11 @@ def api_v2_root(request, format=None):
         'fetch_notifications': reverse('api_v2:fetch_notifications_v2', request=request, format=format),
         'health': reverse('api_v2:health_check_v2', request=request, format=format),
         'notification_types': reverse('api_v2:notification_types_v2', request=request, format=format),
+        # Gmail API endpoints
+        'email_password_reset': reverse('api_v2:send_password_reset_email', request=request, format=format),
+        'email_ticket_notification': reverse('api_v2:send_ticket_notification_email', request=request, format=format),
+        'email_invitation': reverse('api_v2:send_invitation_email', request=request, format=format),
+        'email_status': reverse('api_v2:email_service_status', request=request, format=format),
     })
 
 urlpatterns = [
@@ -36,4 +41,10 @@ urlpatterns = [
     # Utility endpoints
     path('health/', views_v2.HealthCheckV2View.as_view(), name='health_check_v2'),
     path('types/', views_v2.NotificationTypesV2View.as_view(), name='notification_types_v2'),
+    
+    # Gmail API Email endpoints
+    path('email/password-reset/', views_v2.send_password_reset_email, name='send_password_reset_email'),
+    path('email/ticket-notification/', views_v2.send_ticket_notification_email, name='send_ticket_notification_email'),
+    path('email/invitation/', views_v2.send_invitation_email, name='send_invitation_email'),
+    path('email/status/', views_v2.email_service_status, name='email_service_status'),
 ]

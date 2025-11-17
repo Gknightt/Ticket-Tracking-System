@@ -3,6 +3,7 @@ from django.conf import settings
 from django.utils import timezone
 from django.template import Template, Context
 from .models import NotificationTemplate, NotificationLog, NotificationRequest
+from .email_service import EmailService
 import logging
 
 logger = logging.getLogger(__name__)
@@ -115,6 +116,12 @@ class NotificationService:
             rendered_subject = subject_template.render(Context(context))
             rendered_body = body_template.render(Context(context))
             
+            # Render HTML body if available
+            rendered_html = None
+            if template.body_html:
+                html_template = Template(template.body_html)
+                rendered_html = html_template.render(Context(context))
+            
             # Create notification log entry
             notification_log = NotificationLog.objects.create(
                 user_id=user_id,
@@ -128,22 +135,31 @@ class NotificationService:
             )
             
             try:
-                # Send the email
-                send_mail(
+                # Use Gmail API for sending emails
+                email_service = EmailService()
+                result = email_service.send_email(
+                    to=user_email,
                     subject=rendered_subject,
-                    message=rendered_body,
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[user_email],
-                    fail_silently=False,
+                    body_text=rendered_body,
+                    body_html=rendered_html
                 )
                 
-                # Update log status
-                notification_log.status = 'sent'
-                notification_log.sent_at = timezone.now()
-                notification_log.save()
-                
-                logger.info(f"Notification '{notification_type}' sent successfully to {user_email}")
-                return True
+                if result.get('success'):
+                    # Update log status
+                    notification_log.status = 'sent'
+                    notification_log.sent_at = timezone.now()
+                    notification_log.save()
+                    
+                    logger.info(f"Notification '{notification_type}' sent successfully to {user_email} via Gmail API")
+                    return True
+                else:
+                    # Update log with error
+                    notification_log.status = 'failed'
+                    notification_log.error_message = result.get('error', 'Unknown error')
+                    notification_log.save()
+                    
+                    logger.error(f"Failed to send notification '{notification_type}' to {user_email}: {result.get('error')}")
+                    return False
                 
             except Exception as e:
                 # Update log with error
