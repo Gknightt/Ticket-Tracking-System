@@ -19,24 +19,29 @@ from corsheaders.defaults import default_headers
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Environment detection
+DJANGO_ENV = config('DJANGO_ENV', default='development')
+IS_PRODUCTION = DJANGO_ENV.lower() == 'production'
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-16*1i1yo%z4_*-#82g=+c5*few2=q2#k&^z_)lo_r&tl2szy1k')
+SECRET_KEY = config(
+    'DJANGO_SECRET_KEY',
+    default='django-insecure-16*1i1yo%z4_*-#82g=+c5*few2=q2#k&^z_)lo_r&tl2szy1k' if not IS_PRODUCTION else None
+)
+if IS_PRODUCTION and not config('DJANGO_SECRET_KEY', default=None):
+    raise ValueError('DJANGO_SECRET_KEY must be set in production environment')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG', default=True, cast=bool)
+DEBUG = config('DJANGO_DEBUG', default='False' if IS_PRODUCTION else 'True', cast=lambda x: x.lower() in ('true', '1', 'yes'))
 
 ALLOWED_HOSTS = config(
-    'ALLOWED_HOSTS',
-    default='localhost,127.0.0.1',
+    'DJANGO_ALLOWED_HOSTS',
+    default='*' if DEBUG else 'localhost,127.0.0.1',
     cast=lambda v: [s.strip() for s in v.split(',')]
 )
-
-# Environment settings
-ENVIRONMENT = config('DJANGO_ENV', default='development')
 
 # Application definition
 
@@ -94,15 +99,30 @@ WSGI_APPLICATION = 'notification_service.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-if ENVIRONMENT == 'production':
-    # Use PostgreSQL in production
-    DATABASES = {
-        'default': dj_database_url.config(
-            default=config('DATABASE_URL', default='postgres://postgres:postgrespass@db:5432/notificationservice'),
-            conn_max_age=600,
-            conn_health_checks=True,
-        )
-    }
+# Database
+# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+
+if DJANGO_ENV.lower() == 'production':
+    # Use PostgreSQL in production via DATABASE_URL or individual env vars
+    if config('DATABASE_URL', default=''):
+        DATABASES = {
+            'default': dj_database_url.config(
+                default=config('DATABASE_URL'),
+                conn_max_age=600,
+                conn_health_checks=True,
+            )
+        }
+    else:
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': config('POSTGRES_DB', default='notification_db'),
+                'USER': config('POSTGRES_USER', default='postgres'),
+                'PASSWORD': config('POSTGRES_PASSWORD', default=''),
+                'HOST': config('PGHOST', default='localhost'),
+                'PORT': config('PGPORT', default=5432),
+            }
+        }
 else:
     # Use SQLite in development
     DATABASES = {
@@ -177,45 +197,51 @@ REST_FRAMEWORK = {
 }
 
 # Email Configuration
-EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
-EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
-EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
-EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
-EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
-EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
-DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@notifications.com')
+EMAIL_BACKEND = config('DJANGO_EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend' if not IS_PRODUCTION else 'django.core.mail.backends.smtp.EmailBackend')
+EMAIL_HOST = config('DJANGO_EMAIL_HOST', default='smtp.gmail.com')
+EMAIL_PORT = config('DJANGO_EMAIL_PORT', default=587, cast=int)
+EMAIL_USE_TLS = config('DJANGO_EMAIL_USE_TLS', default=True, cast=bool)
+EMAIL_HOST_USER = config('DJANGO_EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = config('DJANGO_EMAIL_HOST_PASSWORD', default='')
+DEFAULT_FROM_EMAIL = config('DJANGO_DEFAULT_FROM_EMAIL', default='noreply@notifications.com')
 
 # Notification Service Settings
-NOTIFICATION_SERVICE_PORT = config('NOTIFICATION_SERVICE_PORT', default=8001, cast=int)
-AUTH_SERVICE_URL = config('AUTH_SERVICE_URL', default='http://localhost:8000')
+NOTIFICATION_SERVICE_PORT = config('DJANGO_NOTIFICATION_SERVICE_PORT', default=8001, cast=int)
+AUTH_SERVICE_URL = config('DJANGO_AUTH_SERVICE_URL', default='http://localhost:8000')
 
 # API Key Authentication for v2 endpoints
 NOTIFICATION_API_KEYS = config(
-    'NOTIFICATION_API_KEYS',
+    'DJANGO_NOTIFICATION_API_KEYS',
     default='demo-api-key-123,test-api-key-456',
     cast=lambda v: [s.strip() for s in v.split(',')]
 )
 
 # API Key for in-app notifications
-API_KEY = config('API_KEY', default='in-app-notification-api-key-secure')
+API_KEY = config('DJANGO_API_KEY', default='in-app-notification-api-key-secure' if not IS_PRODUCTION else None)
+if IS_PRODUCTION and not config('DJANGO_API_KEY', default=None):
+    raise ValueError('DJANGO_API_KEY must be set in production environment')
 
 # JWT Authentication settings
-JWT_SHARED_SECRET_KEY = config(
-    'JWT_SHARED_SECRET_KEY',
+# Signing key for token verification - should match auth service
+JWT_SIGNING_KEY = config(
+    'DJANGO_JWT_SIGNING_KEY',
     default=SECRET_KEY  # Fallback to using Django's secret key if not explicitly provided
 )
 
+# Legacy: JWT_SHARED_SECRET_KEY kept for backward compatibility
+JWT_SHARED_SECRET_KEY = JWT_SIGNING_KEY
+
 # Celery Configuration
-CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='amqp://guest:guest@localhost:5672//')
+CELERY_BROKER_URL = config('DJANGO_CELERY_BROKER_URL', default='amqp://admin:admin@localhost:5672/')
 CELERY_RESULT_BACKEND = 'django-db'
 CELERY_ACCEPT_CONTENT = ['application/json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
-CELERY_TIMEZONE = TIME_ZONE
+CELERY_TIMEZONE = 'UTC'
 
 # Queues configuration for notification service
-NOTIFICATION_QUEUE = config('NOTIFICATION_QUEUE', default='notification-queue')
-INAPP_NOTIFICATION_QUEUE = config('INAPP_NOTIFICATION_QUEUE', default='inapp-notification-queue')
+NOTIFICATION_QUEUE = config('DJANGO_NOTIFICATION_QUEUE', default='notification-queue')
+INAPP_NOTIFICATION_QUEUE = config('DJANGO_INAPP_NOTIFICATION_QUEUE', default='inapp-notification-queue')
 
 CELERY_TASK_ROUTES = {
     'task.send_assignment_notification': {'queue': INAPP_NOTIFICATION_QUEUE},
@@ -227,10 +253,10 @@ CELERY_TASK_ROUTES = {
 # CORS configuration
 # Allow the frontend dev server origin by default; can be overridden via env var CORS_ALLOWED_ORIGINS
 CORS_ALLOWED_ORIGINS = config(
-    'CORS_ALLOWED_ORIGINS',
-    default='http://localhost:1000',
+    'DJANGO_CORS_ALLOWED_ORIGINS',
+    default='http://localhost:1000' if not IS_PRODUCTION else 'https://yourdomain.com',
     cast=lambda v: [s.strip() for s in v.split(',')]
 )
-CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_CREDENTIALS = config('DJANGO_CORS_ALLOW_CREDENTIALS', default='True', cast=lambda x: x.lower() in ('true', '1', 'yes'))
 # Ensure common headers (Authorization, Content-Type, etc.) are allowed
 CORS_ALLOW_HEADERS = list(default_headers)
