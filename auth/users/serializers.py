@@ -153,6 +153,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
                 'system_slug': assignment.system.slug,
                 'role_name': assignment.role.name,
                 'assigned_at': assignment.assigned_at,
+                'last_logged_on': assignment.last_logged_on,  # Last login timestamp for this system role
                 'is_active': assignment.is_active  # System-specific is_active status
             }
             for assignment in system_roles

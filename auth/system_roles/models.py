@@ -12,6 +12,7 @@ class UserSystemRole(models.Model):
     assigned_at = models.DateTimeField(default=now)
     is_active = models.BooleanField(default=True)  # Can login
     settings = models.JSONField(default=dict, blank=True)  # Additional settings storage
+    last_logged_on = models.DateTimeField(null=True, blank=True)  # Last login timestamp for this system role
     class Meta:
         unique_together = ('user', 'system', 'role')  # Prevent duplicate assignments
 

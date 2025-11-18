@@ -177,6 +177,10 @@ class CustomTokenObtainPairView(TokenObtainPairView):
         # Log the user into Django's session framework
         login(request, user)
 
+        # Update last_logged_on for all user system roles
+        from django.utils.timezone import now
+        UserSystemRole.objects.filter(user=user).update(last_logged_on=now())
+
         # Get system roles for the user
         system_roles_data = []
         user_system_roles = UserSystemRole.objects.filter(user=user).select_related('system', 'role')

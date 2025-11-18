@@ -59,10 +59,10 @@ def users_root(request):
             "verify": request.build_absolute_uri("captcha/verify/"),
             "required": request.build_absolute_uri("captcha/required/"),
         },
-        "settings": {
-            "profile": request.build_absolute_uri("settings/profile/"),
-            "agent_management": request.build_absolute_uri("agent-management/"),
-        }
+        # "settings": {
+        #     "profile": request.build_absolute_uri("settings/profile/"),
+        #     "agent_management": request.build_absolute_uri("agent-management/"),
+        # }
     })
 
 # Create router for UserViewSet

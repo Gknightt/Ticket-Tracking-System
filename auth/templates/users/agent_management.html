@@ -38,10 +38,17 @@
             <h2 id="agents-title">System Agents</h2>
 
             <div class="agentsSearch">
+              <select id="system-filter" class="filterSelect">
+                <option value="">All Systems</option>
+                <option value="tts">TTS</option>
+                <option value="hdts">HDTS</option>
+                <option value="ams">AMS</option>
+                <option value="bms">BMS</option>
+              </select>
               <input
                 type="search"
                 id="search-input"
-                placeholder="Search agents by username, email, name, company, or phone..."
+                placeholder="Search agents by name, email, phone, or role..."
               />
               <button id="clear-search" class="btn btnSecondary">Clear</button>
               <a href="{% url 'invite-agent' %}" class="btn btnPrimary">+ Invite Agent</a>
@@ -59,6 +66,7 @@
                   <th>Avatar</th>
                   <th>Name</th>
                   <th>Role</th>
+                  <th>System</th>
                   <th>Email</th>
                   <th>Company</th>
                   <th>Phone</th>
@@ -266,7 +274,14 @@
         showLoading();
 
         try {
-          const response = await fetch("/api/v1/users/list/", {
+          const systemFilter = document.getElementById("system-filter").value;
+          let url = "/api/v1/users/list/";
+          
+          if (systemFilter) {
+            url += `?system_slug=${systemFilter}`;
+          }
+
+          const response = await fetch(url, {
             method: "GET",
             headers: {
               "Content-Type": "application/json",
@@ -313,7 +328,7 @@
         if (agentsData.length === 0) {
           tableBody.innerHTML = `
             <tr>
-                <td colspan="9" class="noAgents">No agents found.</td>
+                <td colspan="10" class="noAgents">No agents found.</td>
             </tr>`;
           return;
         }
@@ -351,20 +366,20 @@
         }
 
         const filtered = agents.filter((a) => {
-          const username = (a.username || "").toLowerCase();
           const email = (a.email || "").toLowerCase();
-          const company = (a.company_name || "").toLowerCase();
           const phone = (a.phone_number || "").toLowerCase();
           const fullName = `${a.first_name || ""} ${
             a.last_name || ""
           }`.toLowerCase();
+          const roleName = a.system_roles && a.system_roles.length > 0
+            ? (a.system_roles[0].role_name || "").toLowerCase()
+            : "";
 
           return (
-            username.includes(query) ||
             email.includes(query) ||
-            company.includes(query) ||
             phone.includes(query) ||
-            fullName.includes(query)
+            fullName.includes(query) ||
+            roleName.includes(query)
           );
         });
 
@@ -381,6 +396,8 @@
       // Attach listeners for search input and clear button
       const searchInput = document.getElementById("search-input");
       const clearButton = document.getElementById("clear-search");
+      const systemFilter = document.getElementById("system-filter");
+      
       if (searchInput) {
         searchInput.addEventListener("input", debouncedApplySearch);
       }
@@ -390,18 +407,64 @@
           applySearchFilter();
         });
       }
+      if (systemFilter) {
+        systemFilter.addEventListener("change", function () {
+          loadAgents();
+        });
+      }
+
+      // Format time relative to now (e.g., "5 min ago", "2 hours ago")
+      function formatRelativeTime(dateString) {
+        if (!dateString) return "Never";
+        
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffInSeconds = Math.floor((now - date) / 1000);
+        
+        if (diffInSeconds < 60) return "Just now";
+        
+        const diffInMinutes = Math.floor(diffInSeconds / 60);
+        if (diffInMinutes < 60) return `${diffInMinutes} min ago`;
+        
+        const diffInHours = Math.floor(diffInMinutes / 60);
+        if (diffInHours < 24) return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
+        
+        const diffInDays = Math.floor(diffInHours / 24);
+        if (diffInDays < 7) return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
+        
+        const diffInWeeks = Math.floor(diffInDays / 7);
+        if (diffInWeeks < 4) return `${diffInWeeks} week${diffInWeeks > 1 ? 's' : ''} ago`;
+        
+        // Fall back to date format
+        return date.toLocaleDateString();
+      }
+
+      // Format date and time for display (e.g., "Nov 18, 2025 at 2:30 PM")
+      function formatFullDateTime(dateString) {
+        if (!dateString) return "Never";
+        
+        const date = new Date(dateString);
+        const options = { 
+          year: 'numeric', 
+          month: 'short', 
+          day: 'numeric', 
+          hour: '2-digit', 
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: true
+        };
+        return date.toLocaleString(undefined, options);
+      }
 
       // Create table row for an agent
       function createAgentRow(agent) {
-        const roleName =
-          agent.system_roles && agent.system_roles.length > 0
-            ? agent.system_roles[0].role_name
-            : "N/A"; // fallback if no role
-
-        // Get the is_active status from system role (or fallback to user is_active)
-        const isActive = agent.system_roles && agent.system_roles.length > 0
-          ? agent.system_roles[0].is_active
-          : agent.is_active;
+        const systemRole = agent.system_roles && agent.system_roles.length > 0
+          ? agent.system_roles[0]
+          : {};
+        const roleName = systemRole.role_name || "N/A";
+        const systemSlug = systemRole.system_slug || "N/A";
+        const isActive = systemRole.is_active !== undefined ? systemRole.is_active : agent.is_active;
+        const lastLoggedOn = formatRelativeTime(systemRole.last_logged_on);
 
         const row = document.createElement("tr");
         row.innerHTML = `
@@ -415,8 +478,9 @@
         </td>
         <td>${agent.first_name || ""} ${agent.last_name || ""}</td>
         <td>${roleName}</td>
+        <td>${systemSlug}</td>
         <td>${agent.email}</td>
-        <td>${agent.company_name || "N/A"}</td>
+        <td>${agent.company_id || "N/A"}</td>
         <td>${agent.phone_number || "N/A"}</td>
         <td>
             <span class="agentStatus ${
@@ -425,11 +489,7 @@
                 ${isActive ? "Active" : "Inactive"}
             </span>
         </td>
-        <td>${
-          agent.last_login
-            ? new Date(agent.last_login).toLocaleDateString()
-            : "Never"
-        }</td>
+        <td>${lastLoggedOn}</td>
         <td>
             <button onclick="viewAgent(${
               agent.id
@@ -461,6 +521,12 @@
           const agent = await response.json();
           currentAgentId = agentId;
 
+          // Get system role info
+          const systemRole = agent.system_roles && agent.system_roles.length > 0
+            ? agent.system_roles[0]
+            : {};
+          const lastLoggedOnFull = formatFullDateTime(systemRole.last_logged_on);
+
           const detailsHtml = `
             <div class="agentProfileContainer">
               <div class="agentProfileImage">
@@ -478,7 +544,7 @@
                     agent.phone_number || "N/A"
                   }</div>
                   <div><strong>Company:</strong> ${
-                    agent.company_name || "N/A"
+                    agent.company_id || "N/A"
                   }</div>
                   <div><strong>Status:</strong> 
                     <span class="agentStatus ${
@@ -490,11 +556,7 @@
                   <div><strong>Date Joined:</strong> ${new Date(
                     agent.date_joined
                   ).toLocaleDateString()}</div>
-                  <div><strong>Last Login:</strong> ${
-                    agent.last_login
-                      ? new Date(agent.last_login).toLocaleDateString()
-                      : "Never"
-                  }</div>
+                  <div><strong>Last Login:</strong> ${lastLoggedOnFull}</div>
                 </div>
               </div>
             </div>
