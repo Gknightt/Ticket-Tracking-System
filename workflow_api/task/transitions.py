@@ -16,23 +16,8 @@ logger = logging.getLogger(__name__)
 
 
 def get_workflow_definition(task):
-    """
-    Hydrate the workflow definition from WorkflowVersion if available.
-    Falls back to querying the database models if version is not set.
-    
-    Returns a dict with 'definition' (JSONField data) or None if not found.
-    """
-    if task.workflow_version:
-        logger.info(
-            f"📋 Using WorkflowVersion {task.workflow_version.version} for workflow {task.workflow_id.workflow_id}"
-        )
-        return task.workflow_version.definition
-    
-    logger.warning(
-        f"⚠️ Task {task.task_id} has no workflow_version assigned. "
-        f"Falling back to database models (legacy behavior)."
-    )
-    return None
+    """Get workflow definition from WorkflowVersion."""
+    return task.workflow_version.definition if task.workflow_version else None
 
 
 class TaskTransitionView(CreateAPIView):
@@ -80,11 +65,7 @@ class TaskTransitionView(CreateAPIView):
             transition_id = int(transition_id)
         except (ValueError, TypeError):
             return Response(
-                {
-                    'error': f'transition_id must be an integer, got: {transition_id}',
-                    'received_value': transition_id,
-                    'received_type': type(transition_id).__name__
-                },
+                {'error': f'transition_id must be an integer'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -93,11 +74,7 @@ class TaskTransitionView(CreateAPIView):
             task_id = int(task_id)
         except (ValueError, TypeError):
             return Response(
-                {
-                    'error': f'task_id must be an integer, got: {task_id}',
-                    'received_value': task_id,
-                    'received_type': type(task_id).__name__
-                },
+                {'error': f'task_id must be an integer'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -116,8 +93,7 @@ class TaskTransitionView(CreateAPIView):
             )
         
         current_user_id = request.user.user_id
-        current_user_full_name = getattr(request.user, 'full_name', '')
-        logger.info(f"👤 User {current_user_id} ({current_user_full_name}) attempting transition")
+        logger.info(f"User {current_user_id} attempting transition")
         
         # Get task
         try:
@@ -133,28 +109,17 @@ class TaskTransitionView(CreateAPIView):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        # Log workflow version information
-        if task.workflow_version:
-            logger.info(
-                f"📋 Task {task_id} using WorkflowVersion {task.workflow_version.version} "
-                f"(definition will be hydrated from JSONField)"
-            )
-        else:
-            logger.warning(
-                f"⚠️ Task {task_id} has no workflow_version. Using database models directly."
-            )
-        
         # Validate user is assigned to this task with "assigned" or "in_progress" status
         user_assignment = None
         try:
-            user_assignment = TaskItem.objects.get(
+            user_assignment = TaskItem.objects.select_related('role_user').get(
                 task=task,
-                user_id=current_user_id,
-                status__in=['assigned', 'in_progress']  # Allow both assigned and in_progress
+                role_user__user_id=current_user_id,
+                status__in=['assigned', 'in_progress']
             )
         except TaskItem.DoesNotExist:
             # User has no "assigned" or "in_progress" records - either not assigned or already acted on all assignments
-            user_records = TaskItem.objects.filter(task=task, user_id=current_user_id)
+            user_records = TaskItem.objects.filter(task=task, role_user__user_id=current_user_id)
             return Response(
                 {
                     'error': f'User {current_user_id} has no active "assigned" or "in_progress" status for task {task_id}',
@@ -166,9 +131,7 @@ class TaskTransitionView(CreateAPIView):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        logger.info(
-            f"✅ User {current_user_id} validated with status '{user_assignment.status}' for role '{user_assignment.role}'"
-        )
+        logger.info(f"User {current_user_id} validated for transition")
         
         # Get transition
         try:
@@ -185,31 +148,21 @@ class TaskTransitionView(CreateAPIView):
         
         # Handle terminal transitions (to_step_id is NULL)
         if not transition.to_step_id:
-            logger.info(
-                f"🏁 Terminal transition {transition_id} detected (to_step_id is NULL). "
-                f"Completing task {task_id}"
-            )
+            logger.info(f"Terminal transition detected: completing task {task_id}")
             
             # Mark the user assignment as "acted" with the current step
-            # Log the current user's full name on the TaskItem they are acting on
-            user_assignment.name = current_user_full_name
             user_assignment.status = 'acted'
             user_assignment.acted_on = timezone.now()
             user_assignment.acted_on_step = task.current_step
             user_assignment.notes = notes  # Store notes
             user_assignment.save()
-            logger.info(
-                f"📝 Updated user {current_user_id} ({current_user_full_name}) TaskItem to 'acted' at step {task.current_step.name}"
-            )
+            logger.info(f"User {current_user_id} marked as acted")
             
             # Mark task as completed
             task.status = 'completed'
             task.save()
             
-            logger.info(
-                f"✅ Task {task_id} completed successfully. "
-                f"User {current_user_id} status updated to 'acted'"
-            )
+            logger.info(f"Task {task_id} completed")
             
             # Return completion response
             serializer = TaskSerializer(task)
@@ -244,10 +197,8 @@ class TaskTransitionView(CreateAPIView):
             if task.current_step and task.current_step != transition.to_step_id:
                 return Response(
                     {
-                        'error': f'Cannot use START transition {transition_id}: '
-                                 f'task is already at step {task.current_step.step_id} '
-                                 f'({task.current_step.name}). '
-                                 f'START transitions (from_step_id=NULL) can only transition from initial state.',
+                        'error': f'Cannot use START transition: task already at step {task.current_step.step_id}',
+
                         'current_step_id': task.current_step.step_id,
                         'current_step_name': task.current_step.name,
                         'transition_id': transition_id,
@@ -256,7 +207,7 @@ class TaskTransitionView(CreateAPIView):
                     },
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            logger.info(f"📍 START transition {transition_id} detected (from_step_id is NULL)")
+            logger.info(f"START transition detected")
         else:
             # This is a NORMAL transition - task MUST be at the from_step_id
             if not task.current_step:
@@ -290,7 +241,7 @@ class TaskTransitionView(CreateAPIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            logger.info(f"✅ Normal transition {transition_id} valid: step {task.current_step.step_id} → {transition.to_step_id.step_id}")
+            logger.info(f"Transition valid: step {task.current_step.step_id} → {transition.to_step_id.step_id}")
         
         # Store previous step for response
         previous_step = task.current_step
@@ -306,10 +257,7 @@ class TaskTransitionView(CreateAPIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        logger.info(
-            f"🚀 Transitioning task {task.task_id} from step {previous_step.name} "
-            f"to {next_step.name} via transition {transition_id}"
-        )
+        logger.info(f"Transitioning task {task.task_id} to step {next_step.name}")
         
         # Assign users for the next step using round-robin
         assigned_items = assign_users_for_step(task, next_step, next_step.role_id.name)
@@ -325,27 +273,19 @@ class TaskTransitionView(CreateAPIView):
             )
         
         # Mark the user assignment as "acted" before moving to next step
-        # Log the current user's full name on the TaskItem they are acting on
-        user_assignment.name = current_user_full_name
         user_assignment.status = 'acted'
         user_assignment.acted_on = timezone.now()
         user_assignment.acted_on_step = task.current_step
-        user_assignment.notes = notes  # Store notes
+        user_assignment.notes = notes
         user_assignment.save()
-        logger.info(
-            f"📝 Updated user {current_user_id} ({current_user_full_name}) TaskItem to 'acted' at step {task.current_step.name}"
-        )
+        logger.info(f"User {current_user_id} marked as acted")
         
         # Update task
         task.current_step = next_step
         task.status = 'pending'
         task.save()
         
-        logger.info(
-            f"✅ Task {task.task_id} transitioned successfully. "
-            f"User {current_user_id} status changed to 'acted' at step {user_assignment.acted_on_step.name}. "
-            f"New assigned users: {[item.user_id for item in assigned_items]}"
-        )
+        logger.info(f"Task {task.task_id} transitioned successfully")
         
         # Return detailed response
         serializer = TaskSerializer(task)

@@ -3,6 +3,11 @@ import os
 from decouple import config
 import dj_database_url
 
+# Explicitly load .env file
+from dotenv import load_dotenv
+env_file = Path(__file__).resolve().parent.parent / '.env'
+load_dotenv(env_file, override=True)
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -172,12 +177,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 # Celery
-CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL')
-# CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'amqp://admin:admin@localhost:5672/')
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL') or config('CELERY_BROKER_URL', default='amqp://admin:admin@localhost:5672/')
 CELERY_RESULT_BACKEND = 'rpc://'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
-CELERY_TASK_DEFAULT_QUEUE = os.getenv('CELERY_TASK_DEFAULT_QUEUE', 'ticket_tasks-default')
+CELERY_TASK_DEFAULT_QUEUE = os.getenv('CELERY_TASK_DEFAULT_QUEUE') or config('CELERY_TASK_DEFAULT_QUEUE', default='ticket_tasks-default')
 
 # Option to disable Celery tasks for local development
 CELERY_TASK_ALWAYS_EAGER = os.getenv('CELERY_TASK_ALWAYS_EAGER', 'False').lower() in ('true', '1', 't')

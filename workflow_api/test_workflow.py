@@ -142,7 +142,7 @@ def test_automatic_task_creation():
             
             # Print user assignments
             for item in task_items:
-                print(f"   - User {item.user_id}: {item.username} ({item.status})")
+                print(f"   - User {item.role_user.user_id}: {item.role_user.user_full_name} ({item.status})")
                 
             return task
         else:
@@ -205,7 +205,7 @@ def test_task_operations():
     task_items = TaskItem.objects.filter(task=task)
     if task_items.exists():
         first_item = task_items.first()
-        user_id = first_item.user_id
+        user_id = first_item.role_user.user_id
         print(f"👤 Updating user {user_id} status to 'in_progress'")
         success = task.update_user_status(user_id, 'in_progress')
         print(f"✅ User status updated: {success}")

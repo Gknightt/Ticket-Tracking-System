@@ -36,28 +36,24 @@ class UserTaskListView(ListAPIView):
     ordering = ['-created_at']
     
     def get_queryset(self):
-        """
-        Filter tasks to only those assigned to the current user.
-        Extended filtering based on query parameters.
-        """
+        """Filter tasks assigned to the current user."""
         user_id = self.request.user.user_id
         
-        # Get all tasks that have this user assigned via TaskItem
         queryset = Task.objects.filter(
-            taskitem__user_id=user_id
+            taskitem__role_user__user_id=user_id
         ).distinct()
         
-        # Apply additional filters from query parameters
+        # Apply role/status filters if provided
         role = self.request.query_params.get('role')
         assignment_status = self.request.query_params.get('assignment_status')
         
         if role:
             # Filter by role - check TaskItems for matching role
-            queryset = queryset.filter(taskitem__user_id=user_id, taskitem__role=role)
+            queryset = queryset.filter(taskitem__role_user__user_id=user_id, taskitem__role_user__role_id__name=role)
         
         if assignment_status:
             # Filter by assignment status - check TaskItems for matching status
-            queryset = queryset.filter(taskitem__user_id=user_id, taskitem__status=assignment_status)
+            queryset = queryset.filter(taskitem__role_user__user_id=user_id, taskitem__status=assignment_status)
         
         return queryset.select_related('ticket_id', 'workflow_id', 'current_step').distinct()
     
@@ -69,23 +65,7 @@ class UserTaskListView(ListAPIView):
 
 
 class TaskViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for managing tasks with authentication.
-    
-    Actions:
-    - list: GET /tasks/ - List all tasks
-    - retrieve: GET /tasks/{id}/ - Get task details
-    - create: POST /tasks/ - Create new task
-    - update: PUT /tasks/{id}/ - Update task
-    - partial_update: PATCH /tasks/{id}/ - Partially update task
-    - destroy: DELETE /tasks/{id}/ - Delete task
-    - my-tasks: GET /tasks/my-tasks/ - Get user's assigned tasks
-    - logs: GET /tasks/logs/ - Get action logs for a task
-    - update-user-status: POST /tasks/{id}/update-user-status/ - Update user's task status
-    - workflow-visualization: GET /tasks/workflow-visualization/?task_id={task_id} - Get workflow visualization data
-    
-    Note: Task transitions are handled by a separate endpoint at POST /transitions/
-    """
+    """ViewSet for managing tasks with authentication."""
     
     queryset = Task.objects.select_related('ticket_id', 'workflow_id', 'current_step')
     serializer_class = TaskSerializer
@@ -145,7 +125,7 @@ class TaskViewSet(viewsets.ModelViewSet):
         
         # Filter tasks by user ID via TaskItems
         filtered_tasks = Task.objects.filter(
-            taskitem__user_id=user_id
+            taskitem__role_user__user_id=user_id
         ).select_related('ticket_id', 'workflow_id', 'current_step').distinct()
         
         # Apply pagination if needed
@@ -197,7 +177,7 @@ class TaskViewSet(viewsets.ModelViewSet):
         
         # Get or create TaskItem for this user
         try:
-            task_item = TaskItem.objects.get(task=task, user_id=user_id)
+            task_item = TaskItem.objects.get(task=task, role_user__user_id=user_id)
             old_task_item = deepcopy(task_item)
             task_item.status = new_status
             task_item.save()
@@ -417,7 +397,7 @@ class TaskViewSet(viewsets.ModelViewSet):
         # Check if user is assigned to this task and update status to in_progress if assigned
         user_assignment = TaskItem.objects.filter(
             task=task,
-            user_id=user_id
+            role_user__user_id=user_id
         ).first()
         
         # ✅ Set task_item status to 'in_progress' if user is assigned (and not already acted)

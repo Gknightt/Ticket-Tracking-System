@@ -118,6 +118,9 @@ def sync_user_system_role(user_system_role_data):
         logger.info(f"Processing UserSystemRole sync: ID={user_system_role_id}, user_id={user_id}, role_id={role_id}, is_active={is_active}, action={action}")
         logger.info(f"Full data received: {user_system_role_data}")
         
+        user_full_name = user_system_role_data.get('user_full_name', '')
+        logger.info(f"User full name extracted: '{user_full_name}'")
+        
         # Verify role exists
         try:
             role = Roles.objects.get(role_id=role_id)
@@ -159,6 +162,7 @@ def sync_user_system_role(user_system_role_data):
                 role_id=role,
                 user_id=user_id,
                 defaults={
+                    'user_full_name': user_system_role_data.get('user_full_name', ''),
                     'is_active': is_active,
                     'settings': user_system_role_data.get('settings', {}),
                 }
@@ -167,7 +171,7 @@ def sync_user_system_role(user_system_role_data):
             
             # Verify the update actually happened
             verify = RoleUsers.objects.get(role_id=role, user_id=user_id)
-            logger.info(f"Verification after update: is_active={verify.is_active}")
+            logger.info(f"Verification after update: is_active={verify.is_active}, user_full_name='{verify.user_full_name}'")
             
             # Double check: list all RoleUsers for this role
             all_for_role = RoleUsers.objects.filter(role_id=role)
@@ -186,6 +190,7 @@ def sync_user_system_role(user_system_role_data):
                 role_id=role,
                 user_id=user_id,
                 defaults={
+                    'user_full_name': user_system_role_data.get('user_full_name', ''),
                     'is_active': is_active,
                     'settings': user_system_role_data.get('settings', {}),
                 }
@@ -195,7 +200,7 @@ def sync_user_system_role(user_system_role_data):
             
             # Verify the creation/update actually happened
             verify = RoleUsers.objects.get(role_id=role, user_id=user_id)
-            logger.info(f"Verification after create/update: is_active={verify.is_active}")
+            logger.info(f"Verification after create/update: is_active={verify.is_active}, user_full_name='{verify.user_full_name}'")
             
             return {"status": "success", "user_system_role_id": user_system_role_id, "action": "create"}
     

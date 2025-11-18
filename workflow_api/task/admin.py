@@ -20,16 +20,28 @@ class TaskAdmin(admin.ModelAdmin):
 
 @admin.register(TaskItem)
 class TaskItemAdmin(admin.ModelAdmin):
-    list_display = ['task_item_id', 'task', 'user_id', 'username', 'role', 'status', 'assigned_on']
-    list_filter = ['status', 'role', 'assigned_on']
-    search_fields = ['task__task_id', 'user_id', 'username', 'email']
+    list_display = ['task_item_id', 'task', 'get_user_id', 'get_user_full_name', 'get_role', 'status', 'assigned_on']
+    list_filter = ['status', 'role_user__role_id', 'assigned_on']
+    search_fields = ['task__task_id', 'role_user__user_id', 'role_user__user_full_name']
     readonly_fields = ['task_item_id', 'assigned_on']
     
     fieldsets = (
         ('Assignment Info', {
-            'fields': ('task_item_id', 'task', 'user_id', 'username', 'email', 'role')
+            'fields': ('task_item_id', 'task', 'role_user')
         }),
         ('Status', {
             'fields': ('status', 'assigned_on', 'status_updated_on', 'acted_on')
         }),
     )
+    
+    def get_user_id(self, obj):
+        return obj.role_user.user_id if obj.role_user else None
+    get_user_id.short_description = 'User ID'
+    
+    def get_user_full_name(self, obj):
+        return obj.role_user.user_full_name if obj.role_user else None
+    get_user_full_name.short_description = 'User Full Name'
+    
+    def get_role(self, obj):
+        return obj.role_user.role_id.name if obj.role_user else None
+    get_role.short_description = 'Role'
