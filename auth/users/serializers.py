@@ -8,6 +8,27 @@ from notification_client import notification_client
 from system_roles.models import UserSystemRole
 import hashlib
 import requests
+import re
+
+
+def validate_phone_number(phone_number):
+    """
+    Validate phone number in E.164 format.
+    Returns (is_valid, error_message)
+    """
+    if not phone_number or not phone_number.strip():
+        return True, None  # Phone is optional
+    
+    phone = phone_number.strip()
+    
+    # E.164 format: +{country_code}{number}
+    # Pattern: +1-3 digit country code + 10-14 digit number = 11-17 total
+    e164_pattern = r'^\+\d{1,3}\d{10,14}$'
+    
+    if not re.match(e164_pattern, phone):
+        return False, "Phone number must be in E.164 format (e.g., +15551234567). Ensure country code is included."
+    
+    return True, None
 
 
 def check_password_pwned(password):
@@ -208,12 +229,23 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer):
         return value
 
     def validate_phone_number(self, value):
-        """Validate that phone number is unique (excluding current user)."""
-        if value:  # Only validate if phone number is provided
-            user = self.instance
-            if User.objects.filter(phone_number=value).exclude(pk=user.pk).exists():
-                raise serializers.ValidationError("A user with this phone number already exists.")
-        return value
+        """Validate phone number format (E.164) and uniqueness (excluding current user)."""
+        if not value:
+            return None  # Phone is optional
+        
+        phone = value.strip() if isinstance(value, str) else value
+        
+        # Validate E.164 format
+        is_valid, error_msg = validate_phone_number(phone)
+        if not is_valid:
+            raise serializers.ValidationError(error_msg)
+        
+        # Check uniqueness (excluding current user)
+        user = self.instance
+        if User.objects.filter(phone_number=phone).exclude(pk=user.pk).exists():
+            raise serializers.ValidationError("A user with this phone number already exists.")
+        
+        return phone
 
 
 class AdminUserProfileUpdateSerializer(serializers.ModelSerializer):
@@ -248,12 +280,23 @@ class AdminUserProfileUpdateSerializer(serializers.ModelSerializer):
         read_only_fields = ('username', 'email')  # Explicitly mark as read-only
 
     def validate_phone_number(self, value):
-        """Validate that phone number is unique (excluding current user)."""
-        if value:  # Only validate if phone number is provided
-            user = self.instance
-            if User.objects.filter(phone_number=value).exclude(pk=user.pk).exists():
-                raise serializers.ValidationError("A user with this phone number already exists.")
-        return value
+        """Validate phone number format (E.164) and uniqueness (excluding current user)."""
+        if not value:
+            return None  # Phone is optional
+        
+        phone = value.strip() if isinstance(value, str) else value
+        
+        # Validate E.164 format
+        is_valid, error_msg = validate_phone_number(phone)
+        if not is_valid:
+            raise serializers.ValidationError(error_msg)
+        
+        # Check uniqueness (excluding current user)
+        user = self.instance
+        if User.objects.filter(phone_number=phone).exclude(pk=user.pk).exists():
+            raise serializers.ValidationError("A user with this phone number already exists.")
+        
+        return phone
 
     def update(self, instance, validated_data):
         """Custom update method to handle UserSystemRole is_active updates."""

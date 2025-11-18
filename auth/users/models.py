@@ -99,7 +99,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     middle_name = models.CharField(max_length=100, blank=True, null=True)  # Optional middle name
     suffix = models.CharField(max_length=10, choices=SUFFIX_CHOICES, blank=True, null=True)  # Optional suffix
     last_name = models.CharField(max_length=100, blank=True)  # Optional last name
-    phone_number = models.CharField(max_length=20, unique=True, null=True, blank=True)  # Optional phone number
+    phone_number = models.CharField(max_length=20, unique=True, null=True, blank=True)  # Optional phone number (in E.164 format)
     company_id = models.CharField(max_length=8, unique=True, null=True, blank=True)  # Auto-generated company ID
     department = models.CharField(max_length=100, choices=DEPARTMENT_CHOICES, blank=True, null=True)  # Optional department
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='Pending')  # User status

@@ -7,6 +7,27 @@ from django.utils.crypto import get_random_string
 from django.core.mail import send_mail
 from django.conf import settings
 from django.db import IntegrityError
+import re
+
+
+def validate_phone_number_format(phone_number):
+    """
+    Validate phone number in E.164 format.
+    E.164 format: +{country_code}{number} where country code is 1-3 digits and number is 10-14 digits.
+    Returns (is_valid, error_message)
+    """
+    if not phone_number or not phone_number.strip():
+        return True, None  # Phone is optional
+    
+    phone = phone_number.strip()
+    
+    # E.164 format pattern: +1-15 digits total
+    e164_pattern = r'^\+\d{1,3}\d{10,14}$'
+    
+    if not re.match(e164_pattern, phone):
+        return False, "Phone number must be in E.164 format (e.g., +15551234567). Include country code and 10-15 total digits."
+    
+    return True, None
 
 
 def send_invitation_email(user, temp_password, system_name, role_name):
@@ -244,14 +265,24 @@ class AdminInviteUserSerializer(serializers.Serializer):
         return value
 
     def validate_phone_number(self, value):
-        """Validate that phone number is unique if provided"""
-        if value and value.strip():
-            if User.objects.filter(phone_number=value.strip()).exists():
-                raise serializers.ValidationError(
-                    "This phone number is already registered in the system. Please use a different phone number."
-                )
-            return value.strip()
-        return None  # Return None for empty phone numbers to allow multiple users with no phone
+        """Validate phone number format (E.164) and uniqueness"""
+        if not value or not value.strip():
+            return None  # Phone is optional
+        
+        phone = value.strip()
+        
+        # Validate E.164 format
+        is_valid, error_msg = validate_phone_number_format(phone)
+        if not is_valid:
+            raise serializers.ValidationError(error_msg)
+        
+        # Check uniqueness
+        if User.objects.filter(phone_number=phone).exists():
+            raise serializers.ValidationError(
+                "This phone number is already registered in the system. Please use a different phone number."
+            )
+        
+        return phone
 
     def create(self, validated_data):
         role = validated_data.pop("role_id")
