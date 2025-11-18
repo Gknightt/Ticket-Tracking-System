@@ -123,14 +123,26 @@ fieldset {
 }
 
 .forgotPassword,
-.registerBtn {
+.registerButton {
     color: #007bff;
     cursor: pointer;
+    text-decoration: none;
 }
 
 .forgotPassword:hover,
-.registerBtn:hover {
+.registerButton:hover {
     color: rgba(0, 123, 255, 0.8);
+}
+
+.form-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    max-width: 400px;
+    margin-top: 20px;
+    gap: 10px;
+    font-size: 14px;
 }
 
 .loginPage p {

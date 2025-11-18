@@ -156,8 +156,11 @@
                 {% endif %}
             </form>
 
-            <!-- Forgot Password -->
-            <a href="{{ forgot_password_url }}" class="forgotPassword">Forgot Password?</a>
+            <!-- Forgot Password & Register -->
+            <div class="form-footer">
+                <a href="{{ forgot_password_url }}" class="forgotPassword">Forgot Password?</a>
+                <a href="{% url 'hdts-register-shortcut' %}" class="registerButton">Create Account</a>
+            </div>
         </section>
     </main>
 
