@@ -11,6 +11,7 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, Sp
 from drf_spectacular.utils import extend_schema
 from users.views import *
 from tts.views import assign_agent_to_role_form, role_management_view
+from hdts import views as hdts_views
 
 def root_redirect(request):
     """Redirect root URL to login page"""
@@ -72,6 +73,9 @@ urlpatterns = [
     
     # Shortcut: Role management
     path('role-management/', role_management_view, name='role_management_shortcut'),
+    
+    # Shortcut: HDTS Register (direct access to /register/)
+    path('register/', hdts_views.register_user_view, name='hdts-register-shortcut'),
 ]
 
 # Include API documentation URLs only in DEBUG mode
