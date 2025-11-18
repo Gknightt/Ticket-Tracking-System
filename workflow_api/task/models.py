@@ -92,28 +92,24 @@ class Task(models.Model):
         except TaskItem.DoesNotExist:
             return False
     
-    def add_user_assignment(self, user_data):
+    def add_user_assignment(self, role_user):
         """Add a new user assignment to the task"""
         from django.utils import timezone
         
         # Ensure required fields
-        if not user_data.get('user_id'):
-            raise ValueError("user_id is required for user assignment")
+        if not role_user:
+            raise ValueError("role_user is required for user assignment")
         
-        # Check if user is already assigned
-        if self.taskitem_set.filter(user_id=user_data['user_id']).exists():
+        # Check if user is already assigned to this task
+        if self.taskitem_set.filter(role_user=role_user).exists():
             return False  # User already assigned
         
         # Create TaskItem
         task_item = TaskItem.objects.create(
             task=self,
-            user_id=user_data['user_id'],
-            username=user_data.get('username', ''),
-            email=user_data.get('email', ''),
-            name=user_data.get('name', ''),
-            status=user_data.get('status', 'assigned'),
-            assigned_on=user_data.get('assigned_on', timezone.now()),
-            role=user_data.get('role', '')
+            role_user=role_user,
+            status='assigned',
+            assigned_on=timezone.now()
         )
         
         return True
@@ -314,22 +310,18 @@ class Task(models.Model):
 class TaskItem(models.Model):
     """
     Represents a single user assignment within a task.
-    Each row is one user assigned to a task.
+    Each row is one user assigned to a task via a RoleUsers assignment.
     """
     task_item_id = models.AutoField(primary_key=True, unique=True)
     
     task = models.ForeignKey(Task, on_delete=models.CASCADE)
-    user_id = models.IntegerField(help_text="User ID from auth service")
-    username = models.CharField(max_length=150, blank=True, default='')
-    email = models.EmailField(blank=True, default='')
-    name = models.CharField(max_length=255, blank=True, default='', help_text="Full name of the assigned user")
+    role_user = models.ForeignKey('role.RoleUsers', on_delete=models.CASCADE, help_text="Link to RoleUsers for user and role info")
     status = models.CharField(
         max_length=50,
         choices=TASK_ITEM_STATUS_CHOICES,
         default='assigned',
         help_text="Status of this user's assignment"
     )
-    role = models.CharField(max_length=100, blank=True, default='')
     notes = models.TextField(blank=True, help_text="Notes provided during action transition")
     
     assigned_on = models.DateTimeField(auto_now_add=True)
@@ -347,22 +339,19 @@ class TaskItem(models.Model):
     )
     
     class Meta:
-        unique_together = ('task', 'user_id')
+        unique_together = ('task', 'role_user')
         ordering = ['assigned_on']
     
     def __str__(self):
-        return f'TaskItem {self.task_item_id}: User {self.user_id} -> Task {self.task_id}'
+        return f'TaskItem {self.task_item_id}: User {self.role_user.user_id} → Task {self.task_id}'
     
     def to_dict(self):
         """Convert to dictionary for API responses"""
-        from django.utils import timezone
         return {
-            'user_id': self.user_id,
-            'username': self.username,
-            'email': self.email,
-            'name': self.name,
+            'user_id': self.role_user.user_id,
+            'user_full_name': self.role_user.user_full_name,
+            'role': self.role_user.role_id.name,
             'status': self.status,
-            'role': self.role,
             'notes': self.notes,
             'assigned_on': self.assigned_on.isoformat() if self.assigned_on else None,
             'status_updated_on': self.status_updated_on.isoformat() if self.status_updated_on else None,
@@ -371,5 +360,5 @@ class TaskItem(models.Model):
                 'step_id': self.acted_on_step.step_id,
                 'name': self.acted_on_step.name
             } if self.acted_on_step else None,
-            'resolution_time': str(self.resolution_time) if self.resolution_time else None,
         }
+

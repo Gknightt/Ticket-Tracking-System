@@ -162,7 +162,7 @@ def create_task_for_ticket(ticket_id):
         ticket.save()
         
         print(f"🎯 Task created successfully: {task.task_id}")
-        print(f"👥 Assigned users: {[item.user_id for item in assigned_items]}")
+        print(f"👥 Assigned users: {[item.role_user.user_id for item in assigned_items]}")
         
         return {
             "status": "success", 

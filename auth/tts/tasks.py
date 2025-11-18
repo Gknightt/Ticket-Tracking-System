@@ -100,10 +100,14 @@ def sync_user_system_role_to_workflow_api(user_system_role_id, action='create'):
             return {"status": "skipped", "reason": "not_tts_system"}
         
         # Prepare the full user_system_role data
+        user_full_name = user_system_role.user.get_full_name()
+        logger.info(f"DEBUG: User {user_system_role.user.id} - first_name='{user_system_role.user.first_name}', last_name='{user_system_role.user.last_name}', get_full_name()='{user_full_name}'")
+        
         user_system_role_data = {
             "user_system_role_id": user_system_role.id,
             "user_id": user_system_role.user.id,
             "user_email": user_system_role.user.email,
+            "user_full_name": user_full_name,
             "system": user_system_role.system.slug,
             "role_id": user_system_role.role.id,
             "role_name": user_system_role.role.name,
@@ -113,7 +117,7 @@ def sync_user_system_role_to_workflow_api(user_system_role_id, action='create'):
             "action": action,  # Include action for the consumer to handle
         }
         
-        # Send message to workflow_api via Celery task
+        logger.info(f"Syncing UserSystemRole data: {user_system_role_data}")
         current_app.send_task(
             'role.tasks.sync_user_system_role',
             args=[user_system_role_data],

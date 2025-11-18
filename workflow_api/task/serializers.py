@@ -6,13 +6,16 @@ from step.models import Steps
 
 class TaskItemSerializer(serializers.ModelSerializer):
     """Serializer for TaskItem (user assignment in a task)"""
+    user_id = serializers.IntegerField(source='role_user.user_id', read_only=True)
+    user_full_name = serializers.CharField(source='role_user.user_full_name', read_only=True)
+    role = serializers.CharField(source='role_user.role_id.name', read_only=True)
     acted_on_step_name = serializers.CharField(source='acted_on_step.name', read_only=True, allow_null=True)
     acted_on_step_id = serializers.IntegerField(source='acted_on_step.step_id', read_only=True, allow_null=True)
     
     class Meta:
         model = TaskItem
         fields = [
-            'task_item_id', 'user_id', 'username', 'email', 'status', 
+            'task_item_id', 'user_id', 'user_full_name', 'status', 
             'role', 'notes', 'assigned_on', 'status_updated_on', 'acted_on',
             'acted_on_step_id', 'acted_on_step_name', 'target_resolution', 'resolution_time'
         ]
@@ -67,35 +70,6 @@ class TaskCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
         fields = ['ticket_id', 'workflow_id', 'current_step', 'status']
-    
-    def create(self, validated_data):
-        return super().create(validated_data)
-
-class UserAssignmentSerializer(serializers.Serializer):
-    """Serializer for user assignment data"""
-    user_id = serializers.IntegerField()
-    username = serializers.CharField(max_length=150, required=False, allow_blank=True)
-    email = serializers.EmailField(required=False, allow_blank=True)
-    status = serializers.CharField(max_length=50, default='assigned')
-    role = serializers.CharField(max_length=100, required=False, allow_blank=True)
-    
-    def validate_status(self, value):
-        valid_statuses = ['assigned', 'in_progress', 'completed', 'on_hold', 'acted']
-        if value not in valid_statuses:
-            raise serializers.ValidationError(f"Status must be one of: {valid_statuses}")
-        return value
-
-class UserAssignmentDetailSerializer(serializers.Serializer):
-    """Serializer for individual user assignment in a task"""
-    user_id = serializers.IntegerField()
-    username = serializers.CharField(max_length=150, required=False, allow_blank=True)
-    email = serializers.EmailField(required=False, allow_blank=True)
-    status = serializers.CharField(max_length=50)
-    assigned_on = serializers.DateTimeField()
-    role = serializers.CharField(max_length=100, required=False, allow_blank=True)
-    status_updated_on = serializers.DateTimeField(required=False, allow_null=True)
-    acted_on = serializers.DateTimeField(required=False, allow_null=True)
-
 
 class UserTaskListSerializer(serializers.ModelSerializer):
     """
@@ -154,13 +128,12 @@ class UserTaskListSerializer(serializers.ModelSerializer):
         user_id = self.context.get('user_id')
         if user_id:
             try:
-                task_item = TaskItem.objects.select_related('acted_on_step').get(task=obj, user_id=user_id)
+                task_item = TaskItem.objects.select_related('role_user', 'acted_on_step').get(task=obj, role_user__user_id=user_id)
                 return {
-                    'user_id': task_item.user_id,
-                    'username': task_item.username,
-                    'email': task_item.email,
+                    'user_id': task_item.role_user.user_id,
+                    'user_full_name': task_item.role_user.user_full_name,
                     'status': task_item.status,
-                    'role': task_item.role,
+                    'role': task_item.role_user.role_id.name,
                     'assigned_on': task_item.assigned_on,
                     'status_updated_on': task_item.status_updated_on,
                     'acted_on': task_item.acted_on,
@@ -183,7 +156,7 @@ class UserTaskListSerializer(serializers.ModelSerializer):
         if user_id:
             return TaskItem.objects.filter(
                 task=obj,
-                user_id=user_id,
+                role_user__user_id=user_id,
                 status='acted'
             ).exists()
         return False
@@ -192,15 +165,20 @@ class ActionLogSerializer(serializers.Serializer):
     """
     Serializer for action logs - converts TaskItem records into action log format.
     Infers role from the acted_on_step's role_id.
-    Includes the full name of the user who performed the action.
+    Includes the full name of the user who performed the action from RoleUsers.
     """
     id = serializers.IntegerField(source='task_item_id')
     action = serializers.SerializerMethodField()
     acted_on = serializers.DateTimeField()
-    # user = serializers.CharField(source='username')
-    user = serializers.CharField(source='name', allow_null=True)
+    user = serializers.SerializerMethodField()
     role = serializers.SerializerMethodField()
     comment = serializers.CharField(source='notes', allow_null=True)
+    
+    def get_user(self, obj):
+        """Get user full name from RoleUsers"""
+        if obj.role_user:
+            return obj.role_user.user_full_name
+        return None
     
     def get_action(self, obj):
         """Infer action name from acted_on_step"""
@@ -221,7 +199,7 @@ class ActionLogSerializer(serializers.Serializer):
         return {'name': 'Unknown Action'}
     
     def get_role(self, obj):
-        """Get role from the acted_on_step's role_id"""
-        if obj.acted_on_step and obj.acted_on_step.role_id:
-            return obj.acted_on_step.role_id.name
-        return obj.role or None
+        """Get role from the RoleUsers relationship"""
+        if obj.role_user and obj.role_user.role_id:
+            return obj.role_user.role_id.name
+        return None
