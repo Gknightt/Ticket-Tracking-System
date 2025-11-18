@@ -2,6 +2,7 @@ import requests
 import logging
 from django.conf import settings
 from typing import Dict, Any, Optional
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -149,6 +150,68 @@ class NotificationClient:
             ip_address=ip_address,
             user_agent=user_agent
         )
+    
+    def send_password_reset_email_v2(self, user_email: str, reset_url: str, 
+                                    reset_token: str) -> bool:
+        """
+        Send password reset email via notification service v2 API using Gmail
+        
+        Args:
+            user_email: Email of the user requesting password reset
+            reset_url: Full URL for password reset
+            reset_token: Reset token for validation
+            
+        Returns:
+            bool: True if email was sent successfully, False otherwise
+        """
+        if not self.enabled:
+            logger.info("Notifications are disabled, skipping password reset email")
+            return True
+            
+        try:
+            # Get API key from settings
+            api_key = getattr(settings, 'NOTIFICATION_SERVICE_API_KEY', os.getenv('NOTIFICATION_SERVICE_API_KEY'))
+            if not api_key:
+                logger.error("NOTIFICATION_SERVICE_API_KEY not configured")
+                return False
+            
+            payload = {
+                'user_email': user_email,
+                'user_name': user_email.split('@')[0],  # Use email prefix as fallback name
+                'notification_type': 'password_reset',
+                'context_data': {
+                    'reset_url': reset_url,
+                    'reset_token': reset_token,
+                    'user_email': user_email
+                }
+            }
+            
+            headers = {
+                'Content-Type': 'application/json',
+                'X-API-Key': api_key
+            }
+            
+            response = requests.post(
+                f"{self.base_url}/api/v2/send/",
+                json=payload,
+                headers=headers,
+                timeout=self.timeout
+            )
+            
+            if response.status_code in [200, 201]:
+                logger.info(f"Password reset email sent successfully to {user_email} via Gmail API")
+                return True
+            else:
+                logger.error(f"Failed to send password reset email to {user_email}. "
+                           f"Status: {response.status_code}, Response: {response.text}")
+                return False
+                
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Network error sending password reset email to {user_email}: {str(e)}")
+            return False
+        except Exception as e:
+            logger.error(f"Unexpected error sending password reset email to {user_email}: {str(e)}")
+            return False
     
     def get_notification_history(self, user_id: str = None, user_email: str = None, 
                                notification_type: str = None, limit: int = 50) -> Optional[Dict]:

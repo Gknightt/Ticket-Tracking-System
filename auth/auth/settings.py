@@ -256,6 +256,15 @@ DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@yourapp.com')
 # Frontend URL for invitation links
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
 
+# Notification Service Configuration
+NOTIFICATION_SERVICE_URL = config('NOTIFICATION_SERVICE_URL', default='http://localhost:8001')
+NOTIFICATION_SERVICE_API_KEY = config('NOTIFICATION_SERVICE_API_KEY', default='')
+NOTIFICATION_SERVICE_TIMEOUT = config('NOTIFICATION_SERVICE_TIMEOUT', default=10, cast=int)
+NOTIFICATIONS_ENABLED = config('NOTIFICATIONS_ENABLED', default=True, cast=bool)
+
+# Auth Service URL (used in password reset links)
+AUTH_SERVICE_URL = config('AUTH_SERVICE_URL', default='http://localhost:8000')
+
 # Cookie domain configuration
 COOKIE_DOMAIN = config('COOKIE_DOMAIN', default='localhost')
 
@@ -308,7 +317,7 @@ LOGOUT_REDIRECT_URL = '/login/'
 # System Template URLs Configuration
 # Configure URLs for different systems - can point to external deployed systems
 SYSTEM_TEMPLATE_URLS = {
-    'tts': config('TTS_SYSTEM_URL', default='http://localhost:3000/tts'),
+    'tts': config('TTS_SYSTEM_URL', default='http://0.0.0.0:8000/settings/profile/'),
     'ams': config('AMS_SYSTEM_URL', default='http://localhost:3000/ams'),
     'hdts': config('HDTS_SYSTEM_URL', default='http://localhost:3000/hdts'),
     'bms': config('BMS_SYSTEM_URL', default='http://localhost:3000/bms'),

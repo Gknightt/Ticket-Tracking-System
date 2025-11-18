@@ -607,57 +607,36 @@ Authentication Service Team
 
 
 def send_password_reset_email(user, reset_token, request=None):
-    """Send password reset email to user."""
+    """Send password reset email to user via notification service using Gmail API."""
     # Build the reset URL
     if request:
         base_url = f"{request.scheme}://{request.get_host()}"
     else:
-        base_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+        base_url = getattr(settings, 'AUTH_SERVICE_URL', 'http://localhost:8000')
     
     reset_url = f"{base_url}/api/v1/users/password/reset?token={reset_token.token}"
     
-    subject = 'Password Reset Request'
-    message = f'''
-Hello {user.get_full_name() or user.email},
-
-We received a request to reset your password. If you made this request, please click the link below to reset your password:
-
-{reset_url}
-
-This link will expire in 1 hour.
-
-If you did not request a password reset, please ignore this email. Your password will remain unchanged.
-
-Best regards,
-Authentication Service Team
-    '''
-    
     try:
-        # Send email asynchronously to avoid blocking the request
-        from threading import Thread
+        # Use notification service v2 API to send email via Gmail
+        from notification_client import notification_client
         
-        def send_async():
-            try:
-                send_mail(
-                    subject=subject,
-                    message=message.strip(),
-                    from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@example.com'),
-                    recipient_list=[user.email],
-                    fail_silently=False,
-                )
-            except Exception as e:
-                # Log the error in production
-                print(f"Failed to send password reset email to {user.email}: {str(e)}")
+        success = notification_client.send_password_reset_email_v2(
+            user_email=user.email,
+            reset_url=reset_url,
+            reset_token=reset_token.token
+        )
         
-        # Start the email sending in a separate thread
-        email_thread = Thread(target=send_async)
-        email_thread.daemon = True
-        email_thread.start()
+        if success:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"Password reset email sent to {user.email} via notification service")
         
-        return True
+        return success
+        
     except Exception as e:
-        # Log the error in production
-        print(f"Failed to initiate password reset email to {user.email}: {str(e)}")
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to send password reset email to {user.email}: {str(e)}")
         return False
 
 
