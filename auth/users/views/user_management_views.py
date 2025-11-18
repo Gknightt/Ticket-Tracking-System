@@ -116,9 +116,18 @@ class UserViewSet(viewsets.ModelViewSet):
         return filter_users_by_system_access(queryset, self.request.user)
 
     def list(self, request):
-        """List users with filtering based on permissions"""
+        """List users with filtering based on permissions and system slug"""
         queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True)
+        
+        # Filter by system slug if provided in query params
+        system_slug = request.query_params.get('system_slug')
+        if system_slug:
+            # Filter users who have a system role in the specified system
+            queryset = queryset.filter(
+                system_roles__system__slug=system_slug
+            ).distinct()
+        
+        serializer = self.get_serializer(queryset, many=True, context={'request': request})
         return Response({
             'users_count': queryset.count(),
             'users': serializer.data

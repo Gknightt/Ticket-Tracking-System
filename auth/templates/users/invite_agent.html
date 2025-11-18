@@ -10,44 +10,50 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     <style>
       .inviteAgentPage {
-        display: flex;
         min-height: 100vh;
+        background-color: #f5f5f5;
+        padding: 20px 0;
         margin-left: 250px;
-        background-color: #f8f9fa;
       }
 
       .inviteAgentContainer {
-        flex: 1;
-        padding: 50px 40px;
-        max-width: 900px;
-        margin: 0 auto;
-        width: 100%;
+        margin: 0 2.5vw;
       }
 
-      .inviteHeader {
-        margin-bottom: 40px;
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        background: white;
+        padding: 20px 30px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
       }
 
-      .inviteHeader h2 {
-        font-size: 2rem;
-        color: #2c3e50;
+      .header h2 {
         margin: 0;
-        font-weight: 700;
-        letter-spacing: -0.5px;
+        color: var(--text-color);
+        font-size: 24px;
+        font-weight: 600;
       }
 
       .inviteForm {
         background: white;
-        padding: 40px;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+      }
+
+      .formWrapper {
+        padding: 30px;
       }
 
       .formRow {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 25px;
-        margin-bottom: 25px;
+        gap: 20px;
+        margin-bottom: 20px;
       }
 
       .formRow.full {
@@ -60,21 +66,21 @@
       }
 
       .formGroup label {
-        font-weight: 600;
-        margin-bottom: 10px;
-        color: #2c3e50;
-        font-size: 0.95rem;
+        display: block;
+        margin-bottom: 5px;
+        color: var(--text-color);
+        font-weight: 500;
+        font-size: 14px;
       }
 
       .formGroup input,
       .formGroup select {
-        padding: 12px 14px;
-        border: 1px solid #ddd;
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #ced4da;
         border-radius: 6px;
-        font-size: 1rem;
-        font-family: inherit;
-        transition: border-color 0.2s, box-shadow 0.2s;
-        background-color: #fff;
+        font-size: 14px;
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
       }
 
       .formGroup input:hover,
@@ -82,14 +88,21 @@
         border-color: #bbb;
       }
 
+      .formGroup input:focus,
+      .formGroup select:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+      }
+
       .phoneInputWrapper {
         display: flex;
         align-items: center;
-        border: 1px solid #ddd;
+        border: 1px solid #ced4da;
         border-radius: 6px;
         padding: 0;
         overflow: hidden;
-        transition: border-color 0.2s, box-shadow 0.2s;
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
       }
 
       .phoneInputWrapper:hover {
@@ -97,28 +110,29 @@
       }
 
       .phoneInputWrapper:focus-within {
-        border-color: #007bff;
-        box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
       }
 
       .countryCodePrefix {
         background-color: #f8f9fa;
-        padding: 12px 14px;
-        border-right: 1px solid #ddd;
-        font-weight: 700;
-        color: #2c3e50;
+        padding: 10px 12px;
+        border-right: 1px solid #ced4da;
+        font-weight: 600;
+        color: var(--text-color);
         white-space: nowrap;
         user-select: none;
         min-width: 50px;
         text-align: center;
+        font-size: 14px;
       }
 
       .phoneInputWrapper input {
         flex: 1;
         border: none;
-        padding: 12px 14px;
+        padding: 10px 12px;
         margin: 0;
-        font-size: 1rem;
+        font-size: 14px;
       }
 
       .phoneInputWrapper input:focus {
@@ -126,33 +140,28 @@
       }
 
       .formGroup small {
-        font-size: 0.85rem;
-        color: #6c757d;
-        margin-top: 6px;
-      }
-
-      .formGroup input:focus,
-      .formGroup select:focus {
-        outline: none;
-        border-color: #007bff;
-        box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+        display: block;
+        margin-top: 5px;
+        color: var(--secondary-text-color);
+        font-size: 12px;
       }
 
       .formActions {
         display: flex;
-        gap: 12px;
-        margin-top: 35px;
-        padding-top: 20px;
-        border-top: 1px solid #eee;
+        gap: 10px;
+        padding: 20px 30px;
+        border-top: 1px solid #e9ecef;
+        background-color: #f8f9fa;
+        justify-content: flex-end;
       }
 
       .btn {
-        padding: 12px 28px;
+        padding: 10px 24px;
         border: none;
         border-radius: 6px;
-        font-size: 1rem;
+        font-size: 14px;
         cursor: pointer;
-        transition: all 0.3s ease;
+        transition: all 0.2s ease;
         font-weight: 600;
         display: inline-flex;
         align-items: center;
@@ -160,30 +169,21 @@
       }
 
       .btnPrimary {
-        background-color: #007bff;
+        background-color: var(--primary-color);
         color: white;
-        box-shadow: 0 2px 4px rgba(0, 123, 255, 0.2);
       }
 
       .btnPrimary:hover {
-        background-color: #0056b3;
-        box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
-        transform: translateY(-1px);
+        background-color: var(--primary-color-hover);
       }
 
       .btnSecondary {
-        background-color: #fff;
-        color: #333;
-        border: 1px solid #ddd;
-        text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
+        background-color: #6c757d;
+        color: white;
       }
 
       .btnSecondary:hover {
-        background-color: #f8f9fa;
-        border-color: #bbb;
+        background-color: #5a6268;
       }
 
       .btn:disabled {
@@ -195,68 +195,52 @@
         position: fixed;
         top: 20px;
         right: 20px;
-        z-index: 9999;
+        z-index: 1000;
         display: flex;
         flex-direction: column;
-        gap: 12px;
+        gap: 10px;
       }
 
       .toast {
-        padding: 16px 20px;
-        border-radius: 8px;
-        min-width: 320px;
-        animation: slideIn 0.3s ease-out;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
+        padding: 12px 20px;
+        border-radius: 6px;
+        color: white;
+        font-weight: 500;
+        min-width: 250px;
+        opacity: 0;
+        transform: translateX(100%);
+        animation: slideIn 0.3s ease forwards;
       }
 
       .toast.success {
-        background-color: #d4edda;
-        color: #155724;
-        border: 1px solid #c3e6cb;
+        background-color: #28a745;
       }
 
       .toast.error {
-        background-color: #f8d7da;
-        color: #721c24;
-        border: 1px solid #f5c6cb;
+        background-color: #dc3545;
       }
 
       .toast.warning {
-        background-color: #fff3cd;
-        color: #856404;
-        border: 1px solid #ffeaa7;
+        background-color: #ffc107;
       }
 
       .toast.info {
-        background-color: #d1ecf1;
-        color: #0c5460;
-        border: 1px solid #bee5eb;
-      }
-
-      .toast.hidden {
-        display: none;
+        background-color: var(--primary-color);
       }
 
       @keyframes slideIn {
-        from {
-          transform: translateX(400px);
-          opacity: 0;
-        }
         to {
-          transform: translateX(0);
           opacity: 1;
+          transform: translateX(0);
         }
       }
 
       .successMessage {
         background-color: #d4edda;
         color: #155724;
-        padding: 24px;
+        padding: 24px 30px;
+        margin: 30px;
         border-radius: 8px;
-        margin-top: 24px;
         display: none;
         border: 1px solid #c3e6cb;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
@@ -281,9 +265,9 @@
       .errorAlert {
         background-color: #f8d7da;
         color: #721c24;
-        padding: 24px;
+        padding: 24px 30px;
+        margin: 30px;
         border-radius: 8px;
-        margin-top: 24px;
         display: none;
         border: 1px solid #f5c6cb;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
@@ -336,32 +320,16 @@
           margin-left: 0;
         }
 
-        .inviteAgentContainer {
-          padding: 30px 20px;
-        }
-
-        .inviteHeader {
-          margin-bottom: 30px;
-        }
-
-        .inviteHeader h2 {
-          font-size: 1.5rem;
-        }
-
-        .inviteForm {
-          padding: 25px;
-        }
-
         .formRow {
           grid-template-columns: 1fr;
-          gap: 20px;
+          gap: 15px;
         }
 
         .formActions {
           flex-direction: column;
         }
 
-        .btn {
+        .formActions .btn {
           width: 100%;
         }
 
@@ -374,24 +342,32 @@
         .toast {
           min-width: unset;
         }
+
+        .header {
+          padding: 15px 20px;
+        }
+
+        .formWrapper {
+          padding: 20px;
+        }
+
+        .formActions {
+          padding: 15px 20px;
+        }
       }
 
       @media (max-width: 480px) {
         .inviteAgentContainer {
-          padding: 20px 15px;
+          padding: 0 10px;
         }
 
-        .inviteForm {
-          padding: 20px;
+        .header {
+          flex-direction: column;
+          text-align: center;
         }
 
-        .formGroup label {
-          font-size: 0.9rem;
-        }
-
-        .formGroup input,
-        .formGroup select {
-          font-size: 16px; /* Prevents zoom on iOS */
+        .header h2 {
+          font-size: 18px;
         }
       }
     </style>
@@ -400,7 +376,7 @@
     {% include "components/nav.html" %}
     <main class="inviteAgentPage">
       <div class="inviteAgentContainer">
-        <div class="inviteHeader">
+        <div class="header">
           <h2>Invite New Agent</h2>
         </div>
 
@@ -416,7 +392,8 @@
 
         <!-- Invite Form -->
         <div class="inviteForm">
-          <form id="invite-form">
+          <div class="formWrapper">
+            <form id="invite-form">
             <div class="formRow">
               <div class="formGroup">
                 <label for="first-name">First Name</label>
@@ -482,25 +459,26 @@
               </div>
             </div>
 
-            <div class="formActions">
-              <a href="{% url 'agent-management' %}" class="btn btnSecondary">
-                Cancel
-              </a>
-              <button type="submit" class="btn btnPrimary" id="submit-btn">
-                Invite Agent
-              </button>
-            </div>
-          </form>
-
-          <!-- Success Message -->
-          <div id="success-message" class="successMessage">
-            <h3>Agent Invited Successfully!</h3>
-            <p>Email: <strong id="success-email"></strong></p>
-            <p>Temporary Password: <strong id="success-password"></strong></p>
-            <p>Role: <strong id="success-role"></strong></p>
-            <p>System: <strong id="success-system"></strong></p>
-            <p style="margin-top: 15px; color: #a02622;"><strong>Please save this password securely.</strong></p>
+            </form>
           </div>
+          <div class="formActions">
+            <a href="{% url 'agent-management' %}" class="btn btnSecondary">
+              Cancel
+            </a>
+            <button type="submit" form="invite-form" class="btn btnPrimary" id="submit-btn">
+              Invite Agent
+            </button>
+          </div>
+        </div>
+
+        <!-- Success Message -->
+        <div id="success-message" class="successMessage">
+          <h3>✓ Agent Invited Successfully!</h3>
+          <p>Email: <strong id="success-email"></strong></p>
+          <p>Temporary Password: <strong id="success-password"></strong></p>
+          <p>Role: <strong id="success-role"></strong></p>
+          <p>System: <strong id="success-system"></strong></p>
+          <p style="margin-top: 15px; color: #a02622;"><strong>Please save this password securely.</strong></p>
         </div>
       </div>
     </main>

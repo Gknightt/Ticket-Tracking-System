@@ -194,6 +194,28 @@
   gap: 20px;
 }
 
+.filterSelect {
+  display: flex;
+  align-items: center;
+  background-color: #f9f9f9;
+  border-radius: 4px;
+  padding: 10px 16px;
+  border: 1px solid #cccccc;
+  cursor: pointer;
+  font-size: 14px;
+  color: #333;
+}
+
+.filterSelect:hover {
+  border-color: var(--primary-color);
+}
+
+.filterSelect:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
 .agentsSearch input {
   display: flex;
   align-items: center;
