@@ -135,7 +135,7 @@
                                 <div class="formGroup">
                                     {{ form.phone_number.label_tag }}
                                     {{ form.phone_number.errors }}
-                                    {{ form.phone_number }}
+                                    {% include "components/phone_input.html" with field_id="id_phone_number" field_name="phone_number" default_country="+63" show_label=False %}
                                 </div>
                             </div>
 
