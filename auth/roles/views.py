@@ -74,7 +74,34 @@ class SystemRolesViewset(viewsets.ModelViewSet):
             return Role.objects.all()
         
         queryset = Role.objects.all()
-        return filter_queryset_by_system_access(queryset, self.request.user)
+        
+        # Get the current system from session
+        current_system_slug = self.request.session.get('last_selected_system')
+        
+        if self.request.user.is_superuser:
+            # Superusers see all roles if no system specified, or roles in current system
+            if current_system_slug:
+                queryset = queryset.filter(system__slug=current_system_slug)
+            return queryset
+        
+        # For non-superusers, filter by systems they're admin of
+        from system_roles.models import UserSystemRole
+        admin_systems = UserSystemRole.objects.filter(
+            user=self.request.user,
+            role__name='Admin'
+        ).values_list('system_id', flat=True)
+        
+        # If current system is specified, only show roles from that system
+        if current_system_slug:
+            queryset = queryset.filter(
+                system__slug=current_system_slug,
+                system_id__in=admin_systems
+            )
+        else:
+            # Otherwise show roles from all systems they're admin of
+            queryset = queryset.filter(system__in=admin_systems)
+        
+        return queryset
 
     def get_serializer_class(self):
         """Return the appropriate serializer class"""

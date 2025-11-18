@@ -14,7 +14,10 @@
     <main class="agentManagementPage">
       <div class="agentManagementContainer">
         <div class="header">
-          <h2>Agent Management</h2>
+          <h2>Agent Management{% if current_system %} - {{ current_system.name }}{% endif %}</h2>
+          {% if current_system %}
+          <p class="systemInfo">Managing agents for: <strong>{{ current_system.name }}</strong> ({{ current_system.slug }})</p>
+          {% endif %}
         </div>
 
         <!-- Toast Messages -->

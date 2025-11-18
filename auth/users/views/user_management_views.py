@@ -113,7 +113,35 @@ class UserViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filter users based on requesting user's permissions for all operations"""
         queryset = User.objects.all()
-        return filter_users_by_system_access(queryset, self.request.user)
+        
+        # Get the current system from session
+        current_system_slug = self.request.session.get('last_selected_system')
+        
+        if self.request.user.is_superuser:
+            # Superusers see all users if no system specified, or users in current system
+            if current_system_slug:
+                queryset = queryset.filter(system_roles__system__slug=current_system_slug).distinct()
+            return queryset
+        
+        # For non-superusers, filter by systems they're admin of
+        admin_systems = UserSystemRole.objects.filter(
+            user=self.request.user,
+            role__name='Admin'
+        ).values_list('system_id', flat=True)
+        
+        # If current system is specified, only show users from that system
+        if current_system_slug:
+            queryset = queryset.filter(
+                system_roles__system__slug=current_system_slug,
+                system_roles__system_id__in=admin_systems
+            ).distinct()
+        else:
+            # Otherwise show users from all systems they're admin of
+            queryset = queryset.filter(
+                system_roles__system__in=admin_systems
+            ).distinct()
+        
+        return queryset
 
     def list(self, request):
         """List users with filtering based on permissions"""
@@ -295,20 +323,37 @@ def agent_management_view(request):
     """
     user = request.user
     
-    # Check if user has permission to manage agents
+    # Get the current system from session
+    current_system_slug = request.session.get('last_selected_system')
+    
+    if not current_system_slug:
+        messages.error(request, 'No system selected. Please select a system first.')
+        return redirect('system-welcome')
+    
+    # Get the current system object
+    from systems.models import System
+    try:
+        current_system = System.objects.get(slug=current_system_slug)
+    except System.DoesNotExist:
+        messages.error(request, 'Invalid system selected. Please select a valid system.')
+        return redirect('system-welcome')
+    
+    # Check if user has permission to manage agents in the current system
     if not user.is_superuser:
-        # Check if user is a system admin
+        # Check if user is an admin in the current system
         is_system_admin = UserSystemRole.objects.filter(
             user=user,
+            system=current_system,
             role__name='Admin'
         ).exists()
         
         if not is_system_admin:
-            messages.error(request, 'Access denied. You need admin privileges to access agent management.')
+            messages.error(request, 'Access denied. You need admin privileges in this system to access agent management.')
             return redirect('profile-settings')
     
     context = {
         'user': user,
+        'current_system': current_system,
     }
     return render(request, 'users/agent_management.html', context)
 
@@ -321,19 +366,36 @@ def invite_agent_view(request):
     """
     user = request.user
     
-    # Check if user has permission to invite agents
+    # Get the current system from session
+    current_system_slug = request.session.get('last_selected_system')
+    
+    if not current_system_slug:
+        messages.error(request, 'No system selected. Please select a system first.')
+        return redirect('system-welcome')
+    
+    # Get the current system object
+    from systems.models import System
+    try:
+        current_system = System.objects.get(slug=current_system_slug)
+    except System.DoesNotExist:
+        messages.error(request, 'Invalid system selected. Please select a valid system.')
+        return redirect('system-welcome')
+    
+    # Check if user has permission to invite agents in the current system
     if not user.is_superuser:
-        # Check if user is a system admin
+        # Check if user is an admin in the current system
         is_system_admin = UserSystemRole.objects.filter(
             user=user,
+            system=current_system,
             role__name='Admin'
         ).exists()
         
         if not is_system_admin:
-            messages.error(request, 'Access denied. You need admin privileges to invite agents.')
+            messages.error(request, 'Access denied. You need admin privileges in this system to invite agents.')
             return redirect('profile-settings')
     
     context = {
         'user': user,
+        'current_system': current_system,
     }
     return render(request, 'users/invite_agent.html', context)

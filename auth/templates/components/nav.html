@@ -310,20 +310,21 @@
     </div>
 
     <!-- Admin Settings -->
-    {% regroup user.system_roles.all by role.name as roles_by_name %}
-    {% for role_group in roles_by_name %}
-      {% if role_group.grouper == "Admin" %}
-        <div class="settingsMenuSection">
-          <div class="settingsMenuLabel">Administration</div>
-          <a href="{% url 'agent-management' %}" class="settingsLink" data-nav="agents">
-            <i class="fa fa-users"></i> Manage Agents
-          </a>
-          <a href="{% url 'invite-agent' %}" class="settingsLink" data-nav="invite-agent">
-            <i class="fa fa-user-plus"></i> Invite Agent
-          </a>
-        </div>
-      {% endif %}
-    {% endfor %}
+    {% with current_system_slug=request.session.last_selected_system %}
+      {% for system_role in user.system_roles.all %}
+        {% if system_role.role.name == "Admin" and system_role.system.slug == current_system_slug %}
+          <div class="settingsMenuSection">
+            <div class="settingsMenuLabel">Administration</div>
+            <a href="{% url 'agent-management' %}" class="settingsLink" data-nav="agents">
+              <i class="fa fa-users"></i> Manage Agents
+            </a>
+            <a href="{% url 'invite-agent' %}" class="settingsLink" data-nav="invite-agent">
+              <i class="fa fa-user-plus"></i> Invite Agent
+            </a>
+          </div>
+        {% endif %}
+      {% endfor %}
+    {% endwith %}
 
     <!-- Logout -->
     <div class="settingsMenuSection">

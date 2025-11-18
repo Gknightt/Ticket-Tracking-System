@@ -33,6 +33,17 @@
         margin: 0;
       }
 
+      .inviteHeader .systemInfo {
+        margin-top: 10px;
+        font-size: 0.95rem;
+        color: #666;
+      }
+
+      .inviteHeader .systemInfo strong {
+        color: #2563eb;
+        font-weight: 600;
+      }
+
       .inviteForm {
         background: white;
         padding: 30px;
@@ -205,7 +216,10 @@
     <main class="inviteAgentPage">
       <div class="inviteAgentContainer">
         <div class="inviteHeader">
-          <h2>Invite New Agent</h2>
+          <h2>Invite New Agent{% if current_system %} - {{ current_system.name }}{% endif %}</h2>
+          {% if current_system %}
+          <p class="systemInfo">Inviting agent to: <strong>{{ current_system.name }}</strong> ({{ current_system.slug }})</p>
+          {% endif %}
         </div>
 
         <!-- Toast Messages -->
