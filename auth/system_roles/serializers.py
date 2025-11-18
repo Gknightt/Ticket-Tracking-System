@@ -6,6 +6,7 @@ from systems.models import System
 from django.utils.crypto import get_random_string
 from django.core.mail import send_mail
 from django.conf import settings
+from django.db import IntegrityError
 
 
 def send_invitation_email(user, temp_password, system_name, role_name):
@@ -234,46 +235,118 @@ class AdminInviteUserSerializer(serializers.Serializer):
             raise serializers.ValidationError("Role does not exist.")
         return role
 
+    def validate_email(self, value):
+        """Validate that email is not already in use"""
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError(
+                "This email is already registered in the system. Please use a different email address."
+            )
+        return value
+
+    def validate_phone_number(self, value):
+        """Validate that phone number is unique if provided"""
+        if value and value.strip():
+            if User.objects.filter(phone_number=value.strip()).exists():
+                raise serializers.ValidationError(
+                    "This phone number is already registered in the system. Please use a different phone number."
+                )
+            return value.strip()
+        return None  # Return None for empty phone numbers to allow multiple users with no phone
+
     def create(self, validated_data):
         role = validated_data.pop("role_id")
-        email = validated_data.get("email")
+        email = validated_data.get("email").lower().strip()
 
         # Check if user already exists
-        try:
-            user = User.objects.get(email=email)
-            created = False
-            temp_password = None
-        except User.DoesNotExist:
-            # Create new user using the custom manager to ensure company_id is auto-generated
-            temp_password = get_random_string(length=10)
-            user = User.objects.create_user(
-                email=email,
-                password=temp_password,
-                username=email.split('@')[0],
-                first_name=validated_data.get('first_name', ''),
-                middle_name=validated_data.get('middle_name', ''),
-                last_name=validated_data.get('last_name', ''),
-                suffix=validated_data.get('suffix', None),
-                phone_number=validated_data.get('phone_number', None),
-                department=validated_data.get('department', None),
-                is_active=True,
-            )
-            created = True
+        existing_user = User.objects.filter(email=email).first()
+        
+        if existing_user:
+            # User already exists, check if they already have a role in this system
+            existing_role = UserSystemRole.objects.filter(
+                user=existing_user,
+                system=role.system
+            ).first()
             
-            # Send invitation email with temporary password
-            send_invitation_email(
-                user=user,
-                temp_password=temp_password,
-                system_name=role.system.name,
-                role_name=role.name
-            )
+            if existing_role:
+                # User already has a role in this system
+                raise serializers.ValidationError(
+                    f"User {email} already has a role in this system. Please assign them a different role or use a different email."
+                )
+            
+            # User exists but doesn't have a role in this system - just assign the role
+            temp_password = None
+            user = existing_user
+        else:
+            # Create new user
+            temp_password = get_random_string(length=10)
+            
+            # Generate unique username from email with increment if needed
+            base_username = email.split('@')[0].replace('.', '').replace('-', '')[:20]
+            username = base_username
+            counter = 1
+            max_attempts = 100
+            
+            # Ensure unique username
+            while User.objects.filter(username=username).exists() and counter < max_attempts:
+                username = f"{base_username}{counter}"
+                counter += 1
+            
+            if counter >= max_attempts:
+                raise serializers.ValidationError(
+                    "Unable to generate a unique username. Please contact support."
+                )
+            
+            try:
+                user = User.objects.create_user(
+                    email=email,
+                    password=temp_password,
+                    username=username,
+                    first_name=validated_data.get('first_name', '').strip(),
+                    middle_name=validated_data.get('middle_name', '').strip(),
+                    last_name=validated_data.get('last_name', '').strip(),
+                    suffix=validated_data.get('suffix', None) or '',
+                    phone_number=validated_data.get('phone_number') or None,  # Already validated and normalized
+                    department=validated_data.get('department', None) or '',
+                    is_active=True,
+                )
+                
+                # Send invitation email with temporary password
+                send_invitation_email(
+                    user=user,
+                    temp_password=temp_password,
+                    system_name=role.system.name,
+                    role_name=role.name
+                )
+            except IntegrityError as e:
+                error_msg = str(e).lower()
+                if 'email' in error_msg:
+                    raise serializers.ValidationError(
+                        "This email is already registered in the system."
+                    )
+                elif 'phone' in error_msg:
+                    raise serializers.ValidationError(
+                        "This phone number is already registered in the system. Please use a different phone number."
+                    )
+                elif 'username' in error_msg:
+                    raise serializers.ValidationError(
+                        "Unable to create user due to username conflict. Please contact support."
+                    )
+                else:
+                    raise serializers.ValidationError(
+                        "Unable to create user due to a database constraint violation. Please try again."
+                    )
 
-        # Assign role and system
-        usr_role, _ = UserSystemRole.objects.get_or_create(
+        # Assign role and system (get_or_create to handle edge cases)
+        usr_role, created = UserSystemRole.objects.get_or_create(
             user=user,
             system=role.system,
-            role=role
+            defaults={'role': role}
         )
+        
+        # If role assignment already existed, update it to the new role
+        if not created and usr_role.role != role:
+            usr_role.role = role
+            usr_role.save()
 
         return {
             "user": user,

@@ -181,6 +181,55 @@
         display: block;
       }
 
+      .errorAlert {
+        background-color: #f8d7da;
+        color: #721c24;
+        padding: 20px;
+        border-radius: 4px;
+        margin-top: 20px;
+        display: none;
+        border: 1px solid #f5c6cb;
+      }
+
+      .errorAlert.show {
+        display: block;
+      }
+
+      .errorAlert h3 {
+        margin: 0 0 10px 0;
+        color: #721c24;
+      }
+
+      .errorAlert ul {
+        margin: 10px 0 0 20px;
+        padding: 0;
+      }
+
+      .errorAlert li {
+        margin: 5px 0;
+      }
+
+      .toast.warning {
+        background-color: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeaa7;
+      }
+
+      .toast.info {
+        background-color: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+      }
+
+      .fieldError {
+        border-color: #dc3545 !important;
+        background-color: #fff5f5;
+      }
+
+      .fieldError + small {
+        color: #dc3545 !important;
+      }
+
       @media (max-width: 768px) {
         .inviteAgentPage {
           margin-left: 0;
@@ -210,6 +259,13 @@
 
         <!-- Toast Messages -->
         <div id="toast-container" class="toastContainer"></div>
+
+        <!-- Error Alert -->
+        <div id="error-alert" class="errorAlert">
+          <h3>⚠️ Error inviting agent</h3>
+          <p id="error-message"></p>
+          <ul id="error-details" style="display: none;"></ul>
+        </div>
 
         <!-- Invite Form -->
         <div class="inviteForm">
@@ -349,10 +405,11 @@
             });
           } else {
             console.warn('No roles found in response:', data);
+            showToast('No roles available. Please contact an administrator.', 'warning');
           }
         } catch (error) {
           console.error('Error loading roles:', error);
-          showToast('Failed to load roles', 'error');
+          showToast('Failed to load roles. Please refresh the page.', 'error');
         }
       }
 
@@ -361,33 +418,211 @@
         const container = document.getElementById('toast-container');
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
-        toast.textContent = message;
+        toast.innerHTML = `
+          <span>${message}</span>
+          <button onclick="this.parentElement.remove()" style="margin-left: 10px; background: none; border: none; color: inherit; cursor: pointer; font-weight: bold;">×</button>
+        `;
 
         container.appendChild(toast);
 
         setTimeout(() => {
-          toast.remove();
+          if (toast.parentElement) {
+            toast.remove();
+          }
         }, 5000);
+      }
+
+      // Show error alert with detailed messages
+      function showErrorAlert(message, details = null) {
+        const errorAlert = document.getElementById('error-alert');
+        const errorMsg = document.getElementById('error-message');
+        const errorDetails = document.getElementById('error-details');
+
+        errorMsg.textContent = message || 'An error occurred while inviting the agent.';
+        
+        if (details && Array.isArray(details) && details.length > 0) {
+          errorDetails.innerHTML = '';
+          details.forEach(detail => {
+            const li = document.createElement('li');
+            li.textContent = detail;
+            errorDetails.appendChild(li);
+          });
+          errorDetails.style.display = 'block';
+        } else if (details && typeof details === 'string') {
+          errorDetails.innerHTML = `<li>${details}</li>`;
+          errorDetails.style.display = 'block';
+        } else {
+          errorDetails.style.display = 'none';
+        }
+
+        errorAlert.classList.add('show');
+        errorAlert.scrollIntoView({ behavior: 'smooth' });
+      }
+
+      // Hide error alert
+      function hideErrorAlert() {
+        const errorAlert = document.getElementById('error-alert');
+        errorAlert.classList.remove('show');
+      }
+
+      // Parse API errors into user-friendly messages
+      function parseErrorResponse(errorData) {
+        const details = [];
+        let mainMessage = 'Failed to invite agent.';
+
+        if (typeof errorData === 'string') {
+          mainMessage = errorData;
+        } else if (errorData.error) {
+          mainMessage = errorData.error;
+          if (typeof errorData.error === 'object') {
+            Object.entries(errorData.error).forEach(([key, value]) => {
+              if (Array.isArray(value)) {
+                value.forEach(v => details.push(`${key}: ${v}`));
+              } else {
+                details.push(`${key}: ${value}`);
+              }
+            });
+          }
+        } else if (errorData.detail) {
+          mainMessage = errorData.detail;
+        } else if (typeof errorData === 'object') {
+          Object.entries(errorData).forEach(([key, value]) => {
+            if (key !== 'error' && key !== 'detail') {
+              if (Array.isArray(value)) {
+                value.forEach(v => details.push(`${key}: ${v}`));
+              } else if (typeof value === 'object') {
+                details.push(`${key}: ${JSON.stringify(value)}`);
+              } else {
+                details.push(`${key}: ${value}`);
+              }
+            }
+          });
+        }
+
+        return { mainMessage, details };
+      }
+
+      // Handle specific HTTP error status codes
+      async function handleErrorResponse(response) {
+        const contentType = response.headers.get('content-type');
+        let errorData = {};
+
+        try {
+          if (contentType && contentType.includes('application/json')) {
+            errorData = await response.json();
+          } else {
+            const text = await response.text();
+            errorData = { detail: text || 'Unknown error occurred' };
+          }
+        } catch (e) {
+          errorData = { detail: 'Unable to parse error response' };
+        }
+
+        const { mainMessage, details } = parseErrorResponse(errorData);
+
+        // Handle specific status codes
+        switch (response.status) {
+          case 400:
+            return {
+              message: mainMessage || 'Invalid input. Please check the form fields.',
+              details: details,
+              type: 'validation'
+            };
+          case 401:
+            return {
+              message: 'Your session has expired. Please refresh and try again.',
+              details: [],
+              type: 'auth'
+            };
+          case 403:
+            return {
+              message: 'You do not have permission to invite agents for this role/system.',
+              details: [],
+              type: 'permission'
+            };
+          case 409:
+            return {
+              message: 'This email is already registered in the system.',
+              details: ['User already exists. Try assigning a different role or contact the user.'],
+              type: 'conflict'
+            };
+          case 429:
+            return {
+              message: 'Too many requests. Please wait a moment before trying again.',
+              details: [],
+              type: 'rate_limit'
+            };
+          case 500:
+          case 502:
+          case 503:
+            return {
+              message: 'Server error. Please try again later.',
+              details: ['If the problem persists, contact support.'],
+              type: 'server'
+            };
+          default:
+            return {
+              message: mainMessage || `Error (${response.status}): Failed to invite agent.`,
+              details: details,
+              type: 'unknown'
+            };
+        }
       }
 
       // Handle form submission
       document.getElementById('invite-form').addEventListener('submit', async function(e) {
         e.preventDefault();
 
+        // Clear previous errors
+        hideErrorAlert();
+        document.querySelectorAll('.fieldError').forEach(field => {
+          field.classList.remove('fieldError');
+        });
+
         const formData = new FormData(this);
         const submitBtn = document.getElementById('submit-btn');
+        const originalBtnText = submitBtn.textContent;
+        
+        // Validate required fields
+        const email = formData.get('email')?.trim();
+        const roleId = formData.get('role_id');
+
+        if (!email) {
+          document.getElementById('email').classList.add('fieldError');
+          showErrorAlert('Email is required', ['Please enter a valid email address.']);
+          submitBtn.disabled = false;
+          return;
+        }
+
+        if (!roleId) {
+          document.getElementById('role').classList.add('fieldError');
+          showErrorAlert('Role is required', ['Please select a role and system.']);
+          submitBtn.disabled = false;
+          return;
+        }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          document.getElementById('email').classList.add('fieldError');
+          showErrorAlert('Invalid email format', ['Please enter a valid email address (e.g., user@example.com).']);
+          submitBtn.disabled = false;
+          return;
+        }
+
         submitBtn.disabled = true;
+        submitBtn.textContent = 'Inviting...';
 
         try {
           const inviteData = new FormData();
-          inviteData.append('email', formData.get('email'));
-          inviteData.append('first_name', formData.get('first_name') || '');
-          inviteData.append('middle_name', formData.get('middle_name') || '');
-          inviteData.append('last_name', formData.get('last_name') || '');
+          inviteData.append('email', email);
+          inviteData.append('first_name', formData.get('first_name')?.trim() || '');
+          inviteData.append('middle_name', formData.get('middle_name')?.trim() || '');
+          inviteData.append('last_name', formData.get('last_name')?.trim() || '');
           inviteData.append('suffix', formData.get('suffix') || '');
-          inviteData.append('phone_number', formData.get('phone_number') || '');
+          inviteData.append('phone_number', formData.get('phone_number')?.trim() || '');
           inviteData.append('department', formData.get('department') || '');
-          inviteData.append('role_id', formData.get('role_id'));
+          inviteData.append('role_id', roleId);
 
           const response = await fetch('/api/v1/system-roles/invite/', {
             method: 'POST',
@@ -399,36 +634,75 @@
           });
 
           if (!response.ok) {
-            const errorData = await response.json();
-            const errorMsg = errorData.error || errorData.detail || 'Failed to invite agent';
-            throw new Error(errorMsg);
+            const errorInfo = await handleErrorResponse(response);
+            showErrorAlert(errorInfo.message, errorInfo.details || []);
+            
+            // Highlight email field on conflict error
+            if (errorInfo.type === 'conflict') {
+              document.getElementById('email').classList.add('fieldError');
+            }
+            
+            // Log error for debugging
+            console.error(`Error (${response.status}):`, errorInfo);
+            showToast(errorInfo.message, 'error');
+            return;
           }
 
           const result = await response.json();
 
-          // Show success message with credentials
-          if (result.temporary_password) {
-            document.getElementById('success-email').textContent = result.user;
-            document.getElementById('success-password').textContent = result.temporary_password;
-            document.getElementById('success-role').textContent = result.role;
-            document.getElementById('success-system').textContent = result.system;
-            document.getElementById('success-message').classList.add('show');
+          // Validate response structure
+          if (!result.user || !result.role) {
+            console.warn('Unexpected response structure:', result);
+            showErrorAlert(
+              'Invitation sent but response incomplete',
+              ['The agent was invited but we could not display all details. Please verify the invitation.']
+            );
+            showToast('Agent invited successfully!', 'success');
+            this.reset();
+            return;
+          }
 
-            showToast(`Agent invited successfully! Temporary password: ${result.temporary_password}`, 'success');
+          // Show success message with credentials
+          document.getElementById('success-email').textContent = result.user;
+          document.getElementById('success-password').textContent = result.temporary_password || 'N/A';
+          document.getElementById('success-role').textContent = result.role;
+          document.getElementById('success-system').textContent = result.system || 'N/A';
+          document.getElementById('success-message').classList.add('show');
+
+          if (result.temporary_password) {
+            showToast(`✅ Agent invited successfully! Password: ${result.temporary_password}`, 'success');
           } else {
-            showToast(`Agent ${result.user} has been assigned to ${result.role} role`, 'success');
+            showToast(`✅ Agent ${result.user} has been invited to ${result.role} role`, 'success');
           }
 
           // Reset form
           this.reset();
           
           // Scroll to success message
-          document.getElementById('success-message').scrollIntoView({ behavior: 'smooth' });
+          setTimeout(() => {
+            document.getElementById('success-message').scrollIntoView({ behavior: 'smooth' });
+          }, 300);
+
         } catch (error) {
-          console.error('Error inviting agent:', error);
-          showToast(error.message || 'Failed to invite agent', 'error');
+          console.error('Request error:', error);
+          
+          // Handle network errors
+          if (error instanceof TypeError) {
+            showErrorAlert(
+              'Network error',
+              ['Unable to reach the server. Please check your connection and try again.']
+            );
+            showToast('Network error: ' + error.message, 'error');
+          } else {
+            showErrorAlert(
+              'An unexpected error occurred',
+              [error.message || 'Please try again or contact support.']
+            );
+            showToast(error.message || 'Failed to invite agent', 'error');
+          }
         } finally {
           submitBtn.disabled = false;
+          submitBtn.textContent = originalBtnText;
         }
       });
 

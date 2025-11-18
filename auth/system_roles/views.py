@@ -5,6 +5,8 @@ from rest_framework.decorators import action
 from drf_spectacular.utils import extend_schema_view, extend_schema, OpenApiParameter
 from drf_spectacular.openapi import OpenApiTypes
 from django.shortcuts import get_object_or_404
+from django.db import IntegrityError, transaction
+from django.core.exceptions import ValidationError as DjangoValidationError
 
 from .models import UserSystemRole
 from .serializers import (
@@ -347,7 +349,39 @@ class AdminInviteUserViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        result = serializer.save()
+        # Handle serializer.save() with error handling
+        try:
+            with transaction.atomic():
+                result = serializer.save()
+        except IntegrityError as e:
+            # Handle database constraint violations gracefully
+            error_msg = str(e).lower()
+            if 'email' in error_msg or 'unique' in error_msg:
+                return Response(
+                    {"error": "This email is already registered in the system. Please use a different email or assign the user to a different role."},
+                    status=status.HTTP_409_CONFLICT
+                )
+            elif 'username' in error_msg:
+                return Response(
+                    {"error": "Username already exists. Please contact support."},
+                    status=status.HTTP_409_CONFLICT
+                )
+            else:
+                return Response(
+                    {"error": "Unable to complete the invitation due to a data conflict. Please try again or contact support."},
+                    status=status.HTTP_409_CONFLICT
+                )
+        except Exception as e:
+            # Log the unexpected error for debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Unexpected error during user invitation: {str(e)}", exc_info=True)
+            
+            return Response(
+                {"error": "An unexpected error occurred. Please try again later or contact support."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
         return Response({
             "user": result["user"].email,
             "temporary_password": result["temporary_password"],

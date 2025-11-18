@@ -10,6 +10,7 @@ from rest_framework import serializers
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 from drf_spectacular.utils import extend_schema
 from users.views import *
+from tts.views import assign_agent_to_role_form, role_management_view
 
 def root_redirect(request):
     """Redirect root URL to login page"""
@@ -65,6 +66,12 @@ urlpatterns = [
     path('token/', CustomTokenObtainPairView.as_view(), name='root_token_obtain'),
     path('logout/', UILogoutView.as_view(), name='root_logout'),
     # path('logout/', CookieLogoutView.as_view(), name='root_logout'),
+    
+    # Shortcut: Assign role form
+    path('assign-role/', assign_agent_to_role_form, name='assign_role'),
+    
+    # Shortcut: Role management
+    path('role-management/', role_management_view, name='role_management_shortcut'),
 ]
 
 # Include API documentation URLs only in DEBUG mode

@@ -7,6 +7,7 @@ from .models import *
 from .serializers import *
 from django.contrib.auth import get_user_model
 from permissions import IsSystemAdminOrSuperUser, filter_queryset_by_system_access, CanCreateForSystem
+from systems.models import System
 User = get_user_model()
 
 @extend_schema_view(
@@ -192,4 +193,5 @@ class SystemRolesViewset(viewsets.ModelViewSet):
                 {"error": "Role not found or access denied"}, 
                 status=status.HTTP_404_NOT_FOUND
             )
-        
+
+
