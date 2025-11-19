@@ -1,0 +1,38 @@
+config:
+  target: "http://localhost:8000"
+  phases:
+    - duration: 60
+      arrivalRate: 10
+      name: "Ramp up"
+    - duration: 120
+      arrivalRate: 100
+      name: "Heavy load"
+    - duration: 180
+      arrivalRate: 200
+      name: "Stress test"
+    - duration: 60
+      arrivalRate: 300
+      name: "Peak stress"
+    - duration: 60
+      arrivalRate: 10
+      name: "Cool down"
+  
+  processor: "./stress-processor.js"
+
+scenarios:
+  - name: "High Concurrent Load"
+    weight: 100
+    flow:
+      - loop:
+        - get:
+            url: "/api/tickets"
+        - get:
+            url: "/api/tickets/{{ $randomNumber(1, 1000) }}"
+        - post:
+            url: "/api/tickets"
+            json:
+              title: "Stress Test {{ $randomNumber(1, 999999) }}"
+              description: "High load testing"
+              priority: "{{ $randomString() }}"
+        - think: 1
+        count: 5

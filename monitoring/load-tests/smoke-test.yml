@@ -1,0 +1,25 @@
+config:
+  target: "http://localhost:8000"
+  phases:
+    - duration: 30
+      arrivalRate: 5
+      name: "Smoke test - verify basic functionality"
+
+scenarios:
+  - name: "Basic Health Check"
+    flow:
+      - get:
+          url: "/api/health"
+          expect:
+            - statusCode: 200
+      
+      - get:
+          url: "/api/tickets"
+          expect:
+            - statusCode: 200
+            - contentType: json
+      
+      - get:
+          url: "/api/users"
+          expect:
+            - statusCode: 200
