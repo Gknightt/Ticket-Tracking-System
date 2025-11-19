@@ -8,7 +8,7 @@ import json
 # Status choices for tasks
 TASK_STATUS_CHOICES = [
     ('pending', 'Pending'),
-    ('in_progress', 'In Progress'),
+    ('in progress', 'In Progress'),
     ('completed', 'Completed'),
     ('on_hold', 'On Hold'),
     ('cancelled', 'Cancelled'),
@@ -17,7 +17,7 @@ TASK_STATUS_CHOICES = [
 # Status choices for task items (user assignments)
 TASK_ITEM_STATUS_CHOICES = [
     ('new', 'New'),
-    ('in_progress', 'In Progress'),
+    ('in progress', 'In Progress'),
     ('resolved', 'Resolved'),
     ('reassigned', 'Reassigned'),
     ('escalated', 'Escalated'),

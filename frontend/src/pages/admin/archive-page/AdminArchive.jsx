@@ -57,7 +57,7 @@ export default function AdminArchive() {
     const normalizedStatus = (status || "").toLowerCase().replace(" ", "_");
     const colorMap = {
       new: "status-new",
-      in_progress: "status-in-progress",
+      "in progress": "status-in-progress",
       completed: "status-completed",
       blocked: "status-blocked",
       pending: "status-pending",
@@ -111,10 +111,10 @@ export default function AdminArchive() {
     if (activeTab === "Active") {
       data = allTasks.filter(
         (t) =>
-          t.task_status === "in_progress" ||
+          t.task_status === "in progress" ||
           t.task_status === "open" ||
           t.task_status === "pending" ||
-          t.status === "in_progress" ||
+          t.status === "in progress" ||
           t.status === "open"
       );
     } else if (activeTab === "Inactive") {
@@ -245,9 +245,9 @@ export default function AdminArchive() {
       total: filtered.length,
       active: filtered.filter(
         (i) =>
-          i.task_status === "in_progress" ||
+          i.task_status === "in progress" ||
           i.task_status === "pending" ||
-          i.status === "in_progress"
+          i.status === "in progress"
       ).length,
       pending: filtered.filter(
         (i) => i.task_status === "pending" || i.status === "new"
@@ -341,7 +341,7 @@ export default function AdminArchive() {
                 >
                   <option value="all">All Status</option>
                   <option value="new">New</option>
-                  <option value="in_progress">In Progress</option>
+                  <option value="in progress">In Progress</option>
                   <option value="pending">Pending</option>
                   <option value="blocked">Blocked</option>
                   <option value="completed">Completed</option>

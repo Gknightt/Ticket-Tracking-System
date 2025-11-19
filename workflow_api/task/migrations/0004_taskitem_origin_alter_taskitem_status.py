@@ -18,6 +18,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='taskitem',
             name='status',
-            field=models.CharField(choices=[('new', 'New'), ('in_progress', 'In Progress'), ('resolved', 'Resolved'), ('reassigned', 'Reassigned'), ('escalated', 'Escalated'), ('breached', 'Breached')], default='new', help_text="Status of this user's assignment", max_length=50),
+            field=models.CharField(choices=[('new', 'New'), ('in progress', 'In Progress'), ('resolved', 'Resolved'), ('reassigned', 'Reassigned'), ('escalated', 'Escalated'), ('breached', 'Breached')], default='new', help_text="Status of this user's assignment", max_length=50),
         ),
     ]

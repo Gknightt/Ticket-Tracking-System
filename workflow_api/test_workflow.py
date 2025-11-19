@@ -206,8 +206,8 @@ def test_task_operations():
     if task_items.exists():
         first_item = task_items.first()
         user_id = first_item.role_user.user_id
-        print(f"👤 Updating user {user_id} status to 'in_progress'")
-        success = task.update_user_status(user_id, 'in_progress')
+        print(f"👤 Updating user {user_id} status to 'in progress'")
+        success = task.update_user_status(user_id, 'in progress')
         print(f"✅ User status updated: {success}")
     
     # Test task completion

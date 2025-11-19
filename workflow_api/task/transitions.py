@@ -109,20 +109,20 @@ class TaskTransitionView(CreateAPIView):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        # Validate user is assigned to this task with "new" or "in_progress" status
+        # Validate user is assigned to this task with "new" or "in progress" status
         user_assignment = None
         try:
             user_assignment = TaskItem.objects.select_related('role_user').get(
                 task=task,
                 role_user__user_id=current_user_id,
-                status__in=['new', 'in_progress']
+                status__in=['new', 'in progress']
             )
         except TaskItem.DoesNotExist:
-            # User has no "new" or "in_progress" records - either not assigned or already acted on all assignments
+            # User has no "new" or "in progress" records - either not assigned or already acted on all assignments
             user_records = TaskItem.objects.filter(task=task, role_user__user_id=current_user_id)
             return Response(
                 {
-                    'error': f'User {current_user_id} has no active "new" or "in_progress" status for task {task_id}',
+                    'error': f'User {current_user_id} has no active "new" or "in progress" status for task {task_id}',
                     'task_id': task_id,
                     'current_user_id': current_user_id,
                     'user_records': [item.to_dict() for item in user_records],
