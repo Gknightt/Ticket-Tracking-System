@@ -20,7 +20,7 @@ class Migration(migrations.Migration):
             name='Task',
             fields=[
                 ('task_id', models.AutoField(primary_key=True, serialize=False, unique=True)),
-                ('status', models.CharField(choices=[('pending', 'Pending'), ('in_progress', 'In Progress'), ('completed', 'Completed'), ('on_hold', 'On Hold'), ('cancelled', 'Cancelled')], default='pending', help_text='Current status of the task', max_length=36)),
+                ('status', models.CharField(choices=[('pending', 'Pending'), ('in progress', 'In Progress'), ('completed', 'Completed'), ('on_hold', 'On Hold'), ('cancelled', 'Cancelled')], default='pending', help_text='Current status of the task', max_length=36)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
                 ('fetched_at', models.DateTimeField(blank=True, null=True)),
@@ -36,7 +36,7 @@ class Migration(migrations.Migration):
             name='TaskItem',
             fields=[
                 ('task_item_id', models.AutoField(primary_key=True, serialize=False, unique=True)),
-                ('status', models.CharField(choices=[('assigned', 'Assigned'), ('in_progress', 'In Progress'), ('completed', 'Completed'), ('on_hold', 'On Hold'), ('acted', 'Acted'), ('escalated', 'Escalated'), ('transferred', 'Transferred')], default='assigned', help_text="Status of this user's assignment", max_length=50)),
+                ('status', models.CharField(choices=[('assigned', 'Assigned'), ('in progress', 'In Progress'), ('completed', 'Completed'), ('on_hold', 'On Hold'), ('acted', 'Acted'), ('escalated', 'Escalated'), ('transferred', 'Transferred')], default='assigned', help_text="Status of this user's assignment", max_length=50)),
                 ('notes', models.TextField(blank=True, help_text='Notes provided during action transition')),
                 ('assigned_on', models.DateTimeField(auto_now_add=True)),
                 ('status_updated_on', models.DateTimeField(blank=True, null=True)),

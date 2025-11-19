@@ -148,7 +148,7 @@ class TaskViewSet(viewsets.ModelViewSet):
         
         Request Body:
         {
-            "status": "in_progress"  # or "completed", "on_hold", "assigned"
+            "status": "in progress"  # or "completed", "on_hold", "assigned"
         }
         
         Returns updated task with user assignment details.
@@ -164,7 +164,7 @@ class TaskViewSet(viewsets.ModelViewSet):
             )
         
         # Validate status
-        valid_statuses = ['new', 'in_progress', 'resolved', 'reassigned', 'escalated', 'breached']
+        valid_statuses = ['new', 'in progress', 'resolved', 'reassigned', 'escalated', 'breached']
         if new_status not in valid_statuses:
             return Response(
                 {'error': f'status must be one of: {valid_statuses}'},
@@ -367,13 +367,13 @@ class TaskViewSet(viewsets.ModelViewSet):
         
         task = user_assignment.task
         
-        # ✅ Set task_item status to 'in_progress' only if status is 'new'
+        # ✅ Set task_item status to 'in progress' only if status is 'new'
         if user_assignment.status == 'new':
-            user_assignment.status = 'in_progress'
+            user_assignment.status = 'in progress'
             user_assignment.status_updated_on = timezone.now()
             user_assignment.save()
             logger.info(
-                f"✅ Task {task.task_id} set to 'in_progress' for user {user_id}"
+                f"✅ Task {task.task_id} set to 'in progress' for user {user_id}"
             )
         
         has_acted = user_assignment.status in ['resolved', 'escalated']
@@ -512,7 +512,7 @@ class TaskViewSet(viewsets.ModelViewSet):
                 "workflow_version": 1,
                 "ticket_id": "TX20251111322614",
                 "current_step_id": "2",
-                "task_status": "in_progress"
+                "task_status": "in progress"
             }
         }
         """
