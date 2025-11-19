@@ -82,25 +82,48 @@ The system is divided into the following services:
 
 ---
 
-### **Template for Documentation**
+### **Documentation**
 
-#### **1. Introduction**
-Provide a brief overview of the system, its purpose, and its key features.
+Comprehensive documentation is available in the [`docs/`](./docs/) directory:
 
-#### **2. System Requirements**
-List the prerequisites for running the system, such as Docker, Python, and Node.js.
+#### **Core Documentation**
+- **[Deployment & Infrastructure](./docs/deployment-infrastructure.md)** - Deployment strategy, Docker configuration, server specifications, and containerization details
+- **[Security Measures](./docs/security-measures.md)** - Authentication (JWT), authorization (RBAC), encryption, and API security
+- **[DevOps & CI/CD](./docs/devops-cicd.md)** - CI/CD pipeline, GitHub Actions workflows, automated testing, and deployment automation
+- **[Licensing & Open Source](./docs/licensing-opensource.md)** - License information, dependency list, compliance procedures
 
-#### **3. Installation**
-Step-by-step guide to set up the system locally or on a server.
+#### **Quick Links**
+- [Documentation Index](./docs/README.md) - Complete documentation overview
+- [Environment Variables](./ENVIRONMENT_STANDARDIZATION_REPORT.md) - Configuration reference
+- [Rate Limiting](./RATE_LIMITING_IMPLEMENTATION.md) - API rate limiting details
 
-#### **4. Usage**
-Explain how to use the system, including accessing the frontend, managing tickets, and using the admin panel.
+---
 
-#### **5. Architecture**
-Describe the system's architecture, including its services, technologies, and data flow.
+### **Contributing**
 
-#### **6. Troubleshooting**
-Provide solutions for common issues, such as container errors or database connection problems.
+We welcome contributions! Please follow these guidelines:
 
-#### **7. Contribution**
-Outline how developers can contribute to the project, including coding standards and pull request guidelines.
+1. **Fork the Repository**: Create your own fork of the project
+2. **Create a Branch**: `git checkout -b feature/your-feature-name`
+3. **Make Changes**: Follow existing code style and conventions
+4. **Test Thoroughly**: Ensure all tests pass
+5. **Submit a Pull Request**: Describe your changes clearly
+
+#### **Development Standards**
+- Follow PEP 8 for Python code
+- Use ESLint configuration for JavaScript/React
+- Write tests for new features
+- Update documentation as needed
+
+#### **Code Review Process**
+- All PRs require at least one approval
+- CI/CD pipeline must pass
+- Security scans must show no critical issues
+
+---
+
+### **License**
+
+This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
+
+For information about third-party dependencies and their licenses, see [Licensing & Open Source Libraries](./docs/licensing-opensource.md).

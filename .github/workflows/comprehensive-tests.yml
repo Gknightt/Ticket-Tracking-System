@@ -1,0 +1,218 @@
+name: Comprehensive Test Suite
+
+on:
+  push:
+    branches: [ main, develop, staging ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  # Auth Service Tests
+  auth-tests:
+    name: Auth Service Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: auth
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: authservice
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Run migrations
+        env:
+          DATABASE_URL: postgresql://postgres:testpass@localhost:5432/authservice
+          SECRET_KEY: test-secret-key-for-ci
+          DJANGO_SETTINGS_MODULE: auth.settings
+        run: |
+          python manage.py migrate --noinput
+      
+      - name: Run tests
+        env:
+          DATABASE_URL: postgresql://postgres:testpass@localhost:5432/authservice
+          SECRET_KEY: test-secret-key-for-ci
+          DJANGO_SETTINGS_MODULE: auth.settings
+        run: |
+          python manage.py test
+
+  # Ticket Service Tests
+  ticket-service-tests:
+    name: Ticket Service Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ticket_service
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: ticketmanagement
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Run migrations
+        env:
+          DATABASE_URL: postgresql://postgres:testpass@localhost:5432/ticketmanagement
+          SECRET_KEY: test-secret-key-for-ci
+        run: |
+          python manage.py migrate --noinput
+      
+      - name: Run tests
+        env:
+          DATABASE_URL: postgresql://postgres:testpass@localhost:5432/ticketmanagement
+          SECRET_KEY: test-secret-key-for-ci
+        run: |
+          python manage.py test
+
+  # Workflow API Tests
+  workflow-api-tests:
+    name: Workflow API Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: workflow_api
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: workflowmanagement
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Run migrations
+        env:
+          DATABASE_URL: postgresql://postgres:testpass@localhost:5432/workflowmanagement
+          SECRET_KEY: test-secret-key-for-ci
+        run: |
+          python manage.py migrate --noinput
+      
+      - name: Run tests
+        env:
+          DATABASE_URL: postgresql://postgres:testpass@localhost:5432/workflowmanagement
+          SECRET_KEY: test-secret-key-for-ci
+        run: |
+          python manage.py test
+
+  # Frontend Tests
+  frontend-tests:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run linter
+        run: npm run lint
+      
+      - name: Build frontend
+        run: npm run build
+
+  # Docker Build Test
+  docker-build-test:
+    name: Docker Build Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [auth, ticket_service, workflow_api, notification_service, messaging]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./${{ matrix.service }}
+          push: false
+          tags: ${{ matrix.service }}:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

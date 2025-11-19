@@ -1,0 +1,116 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  python-linting:
+    name: Python Linting
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [auth, ticket_service, workflow_api, notification_service, messaging]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: 'pip'
+      
+      - name: Install dependencies
+        working-directory: ${{ matrix.service }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 pylint
+          pip install -r requirements.txt
+      
+      - name: Lint with flake8
+        working-directory: ${{ matrix.service }}
+        run: |
+          # Stop the build if there are Python syntax errors or undefined names
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          # Exit-zero treats all errors as warnings
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        continue-on-error: true
+  
+  frontend-linting:
+    name: Frontend Linting
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run ESLint
+        run: npm run lint
+        continue-on-error: true
+  
+  code-formatting-check:
+    name: Code Formatting Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      
+      - name: Install black
+        run: pip install black
+      
+      - name: Check Python formatting
+        run: |
+          black --check auth/ ticket_service/ workflow_api/ notification_service/ messaging/ || echo "Formatting issues found"
+        continue-on-error: true
+  
+  docker-lint:
+    name: Dockerfile Linting
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Lint Dockerfiles
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: "auth/Dockerfile"
+          ignore: DL3008,DL3009
+        continue-on-error: true
+      
+      - name: Lint Ticket Service Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: "ticket_service/Dockerfile"
+          ignore: DL3008,DL3009
+        continue-on-error: true
+      
+      - name: Lint Workflow API Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: "workflow_api/Dockerfile"
+          ignore: DL3008,DL3009
+        continue-on-error: true
