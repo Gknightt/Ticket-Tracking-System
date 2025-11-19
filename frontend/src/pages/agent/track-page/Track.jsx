@@ -53,7 +53,7 @@ export default function Track() {
     if (match) {
       console.log("🎫 Matched Ticket JSON:", JSON.stringify(match, null, 2));
       setMatchedTicket(match);
-      setTaskId(match.task_id);
+      setTaskId(match.ticket_number || match.ticket_id || match.task_id);
       setNotFound(false);
     } else {
       setMatchedTicket(null);

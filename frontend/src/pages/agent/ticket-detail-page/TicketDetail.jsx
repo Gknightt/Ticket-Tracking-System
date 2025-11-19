@@ -38,11 +38,11 @@ export default function TicketDetail() {
     error: instanceError,
   } = useSecureStepInstance(id);
 
-  useEffect(() => {
-    if (stepInstance) {
-      console.log("🧩 StepInstance:", JSON.stringify(stepInstance, null, 2));
-    }
-  }, [stepInstance]);
+  // useEffect(() => {
+  //   if (stepInstance) {
+  //     console.log("🧩 StepInstance:", JSON.stringify(stepInstance, null, 2));
+  //   }
+  // }, [stepInstance]);
 
   // Tabs with URL sync
   const [searchParams, setSearchParams] = useSearchParams();
