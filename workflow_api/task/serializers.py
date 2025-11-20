@@ -94,6 +94,7 @@ class UserTaskListSerializer(serializers.ModelSerializer):
     ticket_subject = serializers.SerializerMethodField()
     ticket_description = serializers.SerializerMethodField()
     ticket_status = serializers.CharField(source='task.ticket_id.status', read_only=True, allow_null=True)
+    ticket_priority = serializers.CharField(source='task.ticket_id.priority', read_only=True, allow_null=True)
     
     # Workflow fields
     workflow_id = serializers.IntegerField(source='task.workflow_id.workflow_id', read_only=True)
@@ -111,6 +112,13 @@ class UserTaskListSerializer(serializers.ModelSerializer):
     # Task status
     task_status = serializers.CharField(source='task.status', read_only=True)
     
+    # Transfer and origin fields
+    transferred_to_user_id = serializers.SerializerMethodField()
+    transferred_to_user_name = serializers.SerializerMethodField()
+    transferred_by = serializers.IntegerField(allow_null=True)
+    origin = serializers.CharField()
+    resolution_time = serializers.DateTimeField(allow_null=True)
+    
     class Meta:
         model = TaskItem
         fields = [
@@ -119,12 +127,14 @@ class UserTaskListSerializer(serializers.ModelSerializer):
             'user_full_name',
             'role',
             'status',
+            'origin',
             'task_id',
             'ticket_id',
             'ticket_number',
             'ticket_subject',
             'ticket_description',
             'ticket_status',
+            'ticket_priority',
             'workflow_id',
             'workflow_name',
             'current_step_id',
@@ -137,9 +147,25 @@ class UserTaskListSerializer(serializers.ModelSerializer):
             'status_updated_on',
             'acted_on',
             'target_resolution',
+            'resolution_time',
             'notes',
+            'transferred_to_user_id',
+            'transferred_to_user_name',
+            'transferred_by',
         ]
         read_only_fields = fields
+    
+    def get_transferred_to_user_id(self, obj):
+        """Get transferred_to user ID"""
+        if obj.transferred_to:
+            return obj.transferred_to.user_id
+        return None
+    
+    def get_transferred_to_user_name(self, obj):
+        """Get transferred_to user full name"""
+        if obj.transferred_to:
+            return obj.transferred_to.user_full_name
+        return None
     
     def get_ticket_number(self, obj):
         """Get ticket number"""
