@@ -4,9 +4,9 @@ from users.models import User
 from roles.models import Role
 from systems.models import System
 from django.utils.crypto import get_random_string
-from django.core.mail import send_mail
 from django.conf import settings
 from django.db import IntegrityError
+from notification_client import notification_client
 import re
 
 
@@ -31,40 +31,33 @@ def validate_phone_number_format(phone_number):
 
 
 def send_invitation_email(user, temp_password, system_name, role_name):
-    """Send invitation email with temporary credentials to new user."""
-    subject = 'Welcome! Your Account has been Created'
-    message = f'''
-Hello {user.get_full_name() or user.email},
-
-You have been invited to join the {system_name} system with the role of "{role_name}".
-
-Your account has been created with the following details:
-
-Email: {user.email}
-Temporary Password: {temp_password}
-
-For security reasons, please log in and change your password as soon as possible.
-
-Login URL: Please contact your system administrator for the login URL.
-
-If you have any questions or need assistance, please contact your system administrator.
-
-Best regards,
-Authentication Service Team
-    '''
-    
+    """Send invitation email with temporary credentials to new user via notification service."""
     try:
-        send_mail(
-            subject=subject,
-            message=message.strip(),
-            from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@example.com'),
-            recipient_list=[user.email],
-            fail_silently=False,
+        success = notification_client.send_invitation_email_async(
+            user=user,
+            temp_password=temp_password,
+            system_name=system_name,
+            role_name=role_name
         )
-        return True
+        return success
     except Exception as e:
         # Log the error in production
         print(f"Failed to send invitation email to {user.email}: {str(e)}")
+        return False
+
+
+def send_system_addition_email(user, system_name, role_name):
+    """Send notification email to existing user being added to a new system via notification service."""
+    try:
+        success = notification_client.send_system_addition_email_async(
+            user=user,
+            system_name=system_name,
+            role_name=role_name
+        )
+        return success
+    except Exception as e:
+        # Log the error in production
+        print(f"Failed to send system addition email to {user.email}: {str(e)}")
         return False
 
 
@@ -258,12 +251,13 @@ class AdminInviteUserSerializer(serializers.Serializer):
         return role
 
     def validate_email(self, value):
-        """Validate that email is not already in use"""
-        if User.objects.filter(email=value).exists():
-            raise serializers.ValidationError(
-                "This email is already registered in the system. Please use a different email address."
-            )
-        return value
+        """
+        Validate email format and normalize it.
+        Note: We don't check if email exists here because users can be invited
+        to multiple systems with different roles. Duplicate check per system
+        happens in the create() method.
+        """
+        return value.lower().strip()
 
     def validate_phone_number(self, value):
         """Validate phone number format (E.164) and uniqueness"""
@@ -302,12 +296,20 @@ class AdminInviteUserSerializer(serializers.Serializer):
             if existing_role:
                 # User already has a role in this system
                 raise serializers.ValidationError(
-                    f"User {email} already has a role in this system. Please assign them a different role or use a different email."
+                    f"User {email} already has the role '{existing_role.role.name}' in the {role.system.name} system. "
+                    f"To change their role, please update their existing assignment instead of creating a new invitation."
                 )
             
             # User exists but doesn't have a role in this system - just assign the role
             temp_password = None
             user = existing_user
+            
+            # Send notification email to existing user about new system access
+            send_system_addition_email(
+                user=user,
+                system_name=role.system.name,
+                role_name=role.name
+            )
         else:
             # Create new user
             temp_password = get_random_string(length=10)

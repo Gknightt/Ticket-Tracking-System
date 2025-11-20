@@ -3,6 +3,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from . import views
+from .health import health_check as health_check_detailed, readiness_check, liveness_check
 
 app_name = 'notifications'
 
@@ -40,4 +41,9 @@ urlpatterns = [
     # Utility endpoints
     path('health/', views.health_check, name='health_check'),
     path('types/', views.notification_types, name='notification_types'),
+    
+    # Production health checks for Railway
+    path('healthz/', health_check_detailed, name='health_check_detailed'),
+    path('readyz/', readiness_check, name='readiness_check'),
+    path('livez/', liveness_check, name='liveness_check'),
 ]

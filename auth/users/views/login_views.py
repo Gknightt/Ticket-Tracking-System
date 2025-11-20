@@ -149,8 +149,11 @@ class LoginView(FormView):
     
     def post(self, request, *args, **kwargs):
         """Handle POST requests, including AJAX captcha checks and rate limiting"""
-        # Check rate limits first
-        rate_limit_check = check_login_rate_limits(request)
+        # Extract email from POST data or session (for OTP flow)
+        user_email = request.POST.get('email') or request.session.get('otp_email')
+        
+        # Check rate limits first (per user email)
+        rate_limit_check = check_login_rate_limits(request, user_email=user_email)
         request.rate_limit_state = rate_limit_check
         request.captcha_required_override = rate_limit_check.get('captcha_required')
         
@@ -230,8 +233,8 @@ class LoginView(FormView):
         user.lockout_time = None
         user.save(update_fields=["failed_login_attempts", "is_locked", "lockout_time"])
 
-        # Record successful login for rate limiting
-        record_successful_login(self.request)
+        # Record successful login for rate limiting (pass user email)
+        record_successful_login(self.request, user_email=user.email)
         self._clear_captcha_requirement()
 
         available_systems = System.objects.filter(
@@ -324,12 +327,15 @@ class LoginView(FormView):
         error_str = str(errors) + str(non_field_errors)
         error_codes = self._get_error_codes(form)
         
+        # Extract email for rate limiting
+        user_email = form.data.get('email') or self.request.session.get('otp_email')
+        
         # Check if this is an OTP-related error (invalid/expired/missing OTP)
         # These should NOT count as failed login attempts since credentials were already validated
         is_otp_error = bool(self.OTP_ERROR_CODES.intersection(error_codes))
         
         # Record failed login attempt (skip if OTP error since credentials were valid)
-        record_failed_login_attempt(self.request, skip_for_otp_error=is_otp_error)
+        record_failed_login_attempt(self.request, user_email=user_email, skip_for_otp_error=is_otp_error)
         
         if not is_otp_error:
             self._evaluate_captcha_requirement(form)

@@ -5,6 +5,12 @@ env/
 # Ignore all .env files
 *.env
 
+# Google Cloud/Gmail API credentials
+credentials.json
+**/credentials.json
+token.json
+**/token.json
+
 
 # Ignore test directory
 # test/

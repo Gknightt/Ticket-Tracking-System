@@ -52,25 +52,35 @@ def generate_device_fingerprint(request: HttpRequest) -> str:
     return fingerprint_hash
 
 
-def get_or_create_ip_rate_limit(ip_address: str) -> IPAddressRateLimit:
-    """Get or create IP rate limit tracker"""
+def get_or_create_ip_rate_limit(ip_address: str, user_email: str = None) -> IPAddressRateLimit:
+    """Get or create IP rate limit tracker for a specific IP and user email combination"""
+    # If no email provided, use a default placeholder for backward compatibility
+    if not user_email:
+        user_email = "unknown@system.local"
+    
     rate_limit, created = IPAddressRateLimit.objects.get_or_create(
-        ip_address=ip_address
+        ip_address=ip_address,
+        user_email=user_email
     )
     return rate_limit
 
 
-def get_or_create_device_fingerprint(fingerprint_hash: str) -> DeviceFingerprint:
-    """Get or create device fingerprint tracker"""
+def get_or_create_device_fingerprint(fingerprint_hash: str, user_email: str = None) -> DeviceFingerprint:
+    """Get or create device fingerprint tracker for a specific device and user email combination"""
+    # If no email provided, use a default placeholder for backward compatibility
+    if not user_email:
+        user_email = "unknown@system.local"
+    
     fingerprint, created = DeviceFingerprint.objects.get_or_create(
-        fingerprint_hash=fingerprint_hash
+        fingerprint_hash=fingerprint_hash,
+        user_email=user_email
     )
     return fingerprint
 
 
-def check_ip_rate_limit(request: HttpRequest) -> dict:
+def check_ip_rate_limit(request: HttpRequest, user_email: str = None) -> dict:
     """
-    Check if IP has exceeded rate limit threshold.
+    Check if IP has exceeded rate limit threshold for a specific user.
     
     Returns:
         {
@@ -82,7 +92,7 @@ def check_ip_rate_limit(request: HttpRequest) -> dict:
     """
     config = RateLimitConfig.get_config()
     ip_address = get_client_ip(request)
-    rate_limit = get_or_create_ip_rate_limit(ip_address)
+    rate_limit = get_or_create_ip_rate_limit(ip_address, user_email)
     
     # Check if IP is blocked
     if rate_limit.is_blocked():
@@ -92,6 +102,10 @@ def check_ip_rate_limit(request: HttpRequest) -> dict:
             'blocked_until': rate_limit.blocked_until,
             'attempts': rate_limit.failed_attempts
         }
+    
+    # If block has expired but attempts are still high, reset them
+    if rate_limit.blocked_until and timezone.now() >= rate_limit.blocked_until:
+        rate_limit.reset_attempts()
     
     # Check if IP has exceeded threshold
     if rate_limit.failed_attempts >= config.ip_attempt_threshold:
@@ -111,9 +125,9 @@ def check_ip_rate_limit(request: HttpRequest) -> dict:
     }
 
 
-def check_device_rate_limit(request: HttpRequest) -> dict:
+def check_device_rate_limit(request: HttpRequest, user_email: str = None) -> dict:
     """
-    Check if device has exceeded rate limit thresholds.
+    Check if device has exceeded rate limit thresholds for a specific user.
     
     Returns:
         {
@@ -125,7 +139,7 @@ def check_device_rate_limit(request: HttpRequest) -> dict:
     """
     config = RateLimitConfig.get_config()
     fingerprint_hash = generate_device_fingerprint(request)
-    device = get_or_create_device_fingerprint(fingerprint_hash)
+    device = get_or_create_device_fingerprint(fingerprint_hash, user_email)
     
     # Check if device is blocked
     if device.is_blocked():
@@ -135,6 +149,10 @@ def check_device_rate_limit(request: HttpRequest) -> dict:
             'blocked_until': device.blocked_until,
             'attempts': device.failed_attempts
         }
+    
+    # If block has expired but attempts are still high, reset them
+    if device.blocked_until and timezone.now() >= device.blocked_until:
+        device.reset_attempts()
     
     # Check if device has exceeded block threshold
     if device.failed_attempts >= config.device_captcha_threshold:
@@ -157,9 +175,9 @@ def check_device_rate_limit(request: HttpRequest) -> dict:
     }
 
 
-def check_login_rate_limits(request: HttpRequest) -> dict:
+def check_login_rate_limits(request: HttpRequest, user_email: str = None) -> dict:
     """
-    Check both IP and device rate limits.
+    Check both IP and device rate limits for a specific user.
     Returns combined result indicating if login is allowed and if captcha is required.
     
     Returns:
@@ -170,8 +188,8 @@ def check_login_rate_limits(request: HttpRequest) -> dict:
             'blocked_until': datetime or None
         }
     """
-    ip_check = check_ip_rate_limit(request)
-    device_check = check_device_rate_limit(request)
+    ip_check = check_ip_rate_limit(request, user_email)
+    device_check = check_device_rate_limit(request, user_email)
     
     # If IP is blocked, deny login completely
     if not ip_check['allowed']:
@@ -200,12 +218,13 @@ def check_login_rate_limits(request: HttpRequest) -> dict:
     }
 
 
-def record_failed_login_attempt(request: HttpRequest, skip_for_otp_error: bool = False):
+def record_failed_login_attempt(request: HttpRequest, user_email: str = None, skip_for_otp_error: bool = False):
     """
-    Record a failed login attempt for both IP and device.
+    Record a failed login attempt for both IP and device for a specific user.
     
     Args:
         request: The HTTP request object
+        user_email: The email of the user attempting to login
         skip_for_otp_error: If True, skip recording (used for invalid OTP attempts where credentials were valid)
     """
     if skip_for_otp_error:
@@ -214,35 +233,35 @@ def record_failed_login_attempt(request: HttpRequest, skip_for_otp_error: bool =
     ip_address = get_client_ip(request)
     fingerprint_hash = generate_device_fingerprint(request)
     
-    # Increment IP attempt counter
-    ip_rate_limit = get_or_create_ip_rate_limit(ip_address)
+    # Increment IP attempt counter for this user
+    ip_rate_limit = get_or_create_ip_rate_limit(ip_address, user_email)
     ip_rate_limit.increment_failed_attempts()
     
-    # Increment device attempt counter
-    device = get_or_create_device_fingerprint(fingerprint_hash)
+    # Increment device attempt counter for this user
+    device = get_or_create_device_fingerprint(fingerprint_hash, user_email)
     device.increment_failed_attempts()
     
     logger.warning(
-        f"Failed login attempt - IP: {ip_address}, Device: {fingerprint_hash[:16]}..., "
+        f"Failed login attempt - IP: {ip_address}, Email: {user_email}, Device: {fingerprint_hash[:16]}..., "
         f"IP Attempts: {ip_rate_limit.failed_attempts}, Device Attempts: {device.failed_attempts}"
     )
 
 
-def record_successful_login(request: HttpRequest):
+def record_successful_login(request: HttpRequest, user_email: str = None):
     """
-    Record a successful login and reset rate limits for the device/IP.
+    Record a successful login and reset rate limits for the device/IP and user combination.
     """
     ip_address = get_client_ip(request)
     fingerprint_hash = generate_device_fingerprint(request)
     
-    # Reset IP attempt counter
-    ip_rate_limit = get_or_create_ip_rate_limit(ip_address)
+    # Reset IP attempt counter for this user
+    ip_rate_limit = get_or_create_ip_rate_limit(ip_address, user_email)
     ip_rate_limit.reset_attempts()
     
-    # Reset device attempt counter
-    device = get_or_create_device_fingerprint(fingerprint_hash)
+    # Reset device attempt counter for this user
+    device = get_or_create_device_fingerprint(fingerprint_hash, user_email)
     device.reset_attempts()
     
     logger.info(
-        f"Successful login - IP: {ip_address}, Device: {fingerprint_hash[:16]}..."
+        f"Successful login - IP: {ip_address}, Email: {user_email}, Device: {fingerprint_hash[:16]}..."
     )

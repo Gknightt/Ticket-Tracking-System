@@ -196,14 +196,22 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 20,
 }
 
-# Email Configuration
+# Gmail API Configuration (replaces SMTP for production)
+GMAIL_CREDENTIALS_PATH = config('GMAIL_CREDENTIALS_PATH', default=os.path.join(BASE_DIR, 'credentials.json'))
+GMAIL_TOKEN_PATH = config('GMAIL_TOKEN_PATH', default=os.path.join(BASE_DIR, 'token.json'))
+GMAIL_SENDER_EMAIL = config('GMAIL_SENDER_EMAIL', default='')
+DEFAULT_FROM_EMAIL = config('DJANGO_DEFAULT_FROM_EMAIL', default='noreply@notifications.com')
+
+# For production Railway: OAuth credentials from environment variable (JSON string)
+# GMAIL_OAUTH_CREDENTIALS should contain the entire credentials.json content as a JSON string
+
+# Legacy Email Configuration (deprecated - kept for fallback)
 EMAIL_BACKEND = config('DJANGO_EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend' if not IS_PRODUCTION else 'django.core.mail.backends.smtp.EmailBackend')
 EMAIL_HOST = config('DJANGO_EMAIL_HOST', default='smtp.gmail.com')
 EMAIL_PORT = config('DJANGO_EMAIL_PORT', default=587, cast=int)
 EMAIL_USE_TLS = config('DJANGO_EMAIL_USE_TLS', default=True, cast=bool)
 EMAIL_HOST_USER = config('DJANGO_EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = config('DJANGO_EMAIL_HOST_PASSWORD', default='')
-DEFAULT_FROM_EMAIL = config('DJANGO_DEFAULT_FROM_EMAIL', default='noreply@notifications.com')
 
 # Notification Service Settings
 NOTIFICATION_SERVICE_PORT = config('DJANGO_NOTIFICATION_SERVICE_PORT', default=8001, cast=int)
@@ -248,6 +256,13 @@ CELERY_TASK_ROUTES = {
     'notifications.create_inapp_notification': {'queue': INAPP_NOTIFICATION_QUEUE},
     'notifications.mark_notification_read': {'queue': INAPP_NOTIFICATION_QUEUE},
     'notifications.bulk_create_notifications': {'queue': INAPP_NOTIFICATION_QUEUE},
+    # Gmail API email tasks (sent from auth service)
+    'notifications.send_email_via_gmail': {'queue': 'NOTIFICATION_TASKS'},
+    'notifications.send_email_with_headers': {'queue': 'NOTIFICATION_TASKS'},
+    'notifications.send_password_reset_email': {'queue': 'NOTIFICATION_TASKS'},
+    'notifications.send_invitation_email': {'queue': 'NOTIFICATION_TASKS'},
+    'notifications.send_otp_email': {'queue': 'NOTIFICATION_TASKS'},
+    'notifications.send_system_addition_email': {'queue': 'NOTIFICATION_TASKS'},
 }
 
 # CORS configuration

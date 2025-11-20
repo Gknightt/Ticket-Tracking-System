@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Manage TTS Roles</title>
+  <title>Manage {% if current_system %}{{ current_system|upper }}{% else %}System{% endif %} Roles</title>
   <link rel="stylesheet" href="{% static 'css/profile_settings.css' %}" />
   <link rel="stylesheet" href="{% static 'css/agent_management.css' %}" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
@@ -404,7 +404,7 @@
     <div class="roleManagementContainer">
       <!-- Header -->
       <div class="header">
-        <h2>Manage TTS Roles</h2>
+        <h2>Manage {% if current_system %}{{ current_system|upper }}{% else %}System{% endif %} Roles</h2>
         <p>Create new roles and manage existing role assignments</p>
       </div>
 
@@ -415,7 +415,7 @@
       <div id="view-roles" class="tabContent active">
         <div class="formSection">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h3 style="margin: 0;">TTS Roles</h3>
+            <h3 style="margin: 0;">{% if current_system %}{{ current_system|upper }}{% else %}System{% endif %} Roles</h3>
             <button onclick="openCreateModal()" class="btn btnPrimary">
               <i class="fa fa-plus"></i> Create Role
             </button>
@@ -488,7 +488,9 @@
 
   <script>
     const CSRF_TOKEN = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    const CURRENT_SYSTEM = '{{ current_system|default:"tts" }}';
     const ROLES_API_URL = "/api/v1/roles/";
+    let CURRENT_SYSTEM_ID = null;  // Will be fetched dynamically
 
     // Toast Notifications
     function showToast(message, type = 'info') {
@@ -504,6 +506,21 @@
       }, 4000);
     }
 
+    // Fetch the system ID from the slug
+    async function fetchSystemId() {
+      try {
+        const response = await fetch(`/api/v1/systems/?slug=${CURRENT_SYSTEM}`);
+        if (!response.ok) throw new Error('Failed to fetch system');
+        const systems = await response.json();
+        if (systems && systems.length > 0) {
+          CURRENT_SYSTEM_ID = systems[0].id;
+        }
+      } catch (error) {
+        console.error('Error fetching system ID:', error);
+        showToast('Failed to load system information', 'error');
+      }
+    }
+
     // Load roles from existing roles endpoint
     async function loadRoles() {
       const loadingEl = document.getElementById('roles-loading');
@@ -513,7 +530,7 @@
       errorEl.classList.add('hidden');
 
       try {
-        const response = await fetch(`${ROLES_API_URL}?system__slug=tts`, {
+        const response = await fetch(`${ROLES_API_URL}?system__slug=${CURRENT_SYSTEM}`, {
           headers: { 'Accept': 'application/json' }
         });
 
@@ -603,6 +620,11 @@
         return;
       }
 
+      if (!CURRENT_SYSTEM_ID) {
+        showToast('System information not loaded', 'error');
+        return;
+      }
+
       try {
         const response = await fetch(ROLES_API_URL, {
           method: 'POST',
@@ -613,7 +635,7 @@
           body: JSON.stringify({ 
             name: roleName, 
             description,
-            system: 1  // TTS system ID (adjust if different)
+            system: CURRENT_SYSTEM_ID  // Use dynamically fetched system ID
           })
         });
 
@@ -630,7 +652,8 @@
     });
 
     // Initialize
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
+      await fetchSystemId();  // Fetch system ID first
       loadRoles();
     });
   </script>

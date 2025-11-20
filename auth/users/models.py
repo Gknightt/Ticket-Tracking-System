@@ -313,10 +313,11 @@ class PasswordResetToken(models.Model):
 
 class IPAddressRateLimit(models.Model):
     """
-    Track login attempts per IP address for strict rate limiting.
-    Used to block automated attacks at the network level.
+    Track login attempts per IP address and user email for strict rate limiting.
+    Used to block automated attacks at the network level while allowing different user accounts.
     """
-    ip_address = models.GenericIPAddressField(unique=True)
+    ip_address = models.GenericIPAddressField()
+    user_email = models.EmailField()
     failed_attempts = models.IntegerField(default=0)
     last_attempt = models.DateTimeField(auto_now=True)
     blocked_until = models.DateTimeField(null=True, blank=True)
@@ -325,9 +326,10 @@ class IPAddressRateLimit(models.Model):
         db_table = 'auth_ip_rate_limit'
         verbose_name = 'IP Address Rate Limit'
         verbose_name_plural = 'IP Address Rate Limits'
+        unique_together = [['ip_address', 'user_email']]
     
     def __str__(self):
-        return f"IP: {self.ip_address} - Attempts: {self.failed_attempts}"
+        return f"IP: {self.ip_address} - Email: {self.user_email} - Attempts: {self.failed_attempts}"
     
     def increment_failed_attempts(self):
         """Increment failed attempts and update timestamp"""
@@ -357,8 +359,10 @@ class DeviceFingerprint(models.Model):
     """
     Track device/browser fingerprints to identify repeat offenders.
     A fingerprint is created from browser/device characteristics (User-Agent, Accept-Language, etc.)
+    Tracks per device and user email combination.
     """
-    fingerprint_hash = models.CharField(max_length=255, unique=True, db_index=True)
+    fingerprint_hash = models.CharField(max_length=255, db_index=True)
+    user_email = models.EmailField()
     failed_attempts = models.IntegerField(default=0)
     last_attempt = models.DateTimeField(auto_now=True)
     requires_captcha = models.BooleanField(default=False)
@@ -368,9 +372,10 @@ class DeviceFingerprint(models.Model):
         db_table = 'auth_device_fingerprint'
         verbose_name = 'Device Fingerprint'
         verbose_name_plural = 'Device Fingerprints'
+        unique_together = [['fingerprint_hash', 'user_email']]
     
     def __str__(self):
-        return f"Device: {self.fingerprint_hash[:16]}... - Attempts: {self.failed_attempts}"
+        return f"Device: {self.fingerprint_hash[:16]}... - Email: {self.user_email} - Attempts: {self.failed_attempts}"
     
     def increment_failed_attempts(self):
         """Increment failed attempts and update timestamp"""

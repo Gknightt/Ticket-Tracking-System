@@ -106,6 +106,12 @@ class SystemRolesViewset(viewsets.ModelViewSet):
     def list(self, request):
         """List system roles based on user permissions"""
         queryset = self.get_queryset()
+        
+        # Support filtering by system slug from query parameters
+        system_slug = request.query_params.get('system__slug')
+        if system_slug:
+            queryset = queryset.filter(system__slug=system_slug)
+        
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     

@@ -41,23 +41,44 @@ def jwt_cookie_required(view_func):
     """
     Decorator for views that require the user to be authenticated via JWT cookie.
     Redirects to login if not authenticated via JWT.
+    Clears cookies and shows session expired message if token is expired.
     """
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
         # Attempt to authenticate using JWT cookie
-        user = get_user_from_jwt_cookie(request)
+        token_str = request.COOKIES.get('access_token')
         
-        if user is None:
-            # Not authenticated via JWT, redirect to login page
-            login_url = reverse('auth_login') 
-            # Add the 'next' parameter to redirect back after login
-            return redirect(f'{login_url}?next={request.path}') 
-            
-        # Attach user to request for the view to use
-        request.user = user
-            
-        # If authenticated, proceed with the view
-        return view_func(request, *args, **kwargs)
+        if token_str:
+            try:
+                access_token = AccessToken(token_str)
+                # Verify token (checks signature and expiry)
+                access_token.verify() 
+                
+                # Get user ID from payload
+                user_id = access_token.payload.get('user_id')
+                if user_id:
+                    # Fetch user from database
+                    user = User.objects.get(id=user_id)
+                    # Attach user to request for the view to use
+                    request.user = user
+                    # If authenticated, proceed with the view
+                    return view_func(request, *args, **kwargs)
+                    
+            except (InvalidToken, TokenError, User.DoesNotExist):
+                # Token is invalid or expired - clear cookies and show message
+                messages.warning(request, 'Your session has expired. Please log in again.')
+                response = redirect(reverse('auth_login'))
+                response.delete_cookie('access_token')
+                response.delete_cookie('refresh_token')
+                return response
+            except Exception:
+                # Catch any other unexpected errors during token processing
+                pass
+        
+        # Not authenticated via JWT, redirect to login page
+        login_url = reverse('auth_login') 
+        # Add the 'next' parameter to redirect back after login
+        return redirect(f'{login_url}?next={request.path}') 
         
     return wrapper
 

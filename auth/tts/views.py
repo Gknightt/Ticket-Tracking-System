@@ -179,7 +179,7 @@ class UsersInfoBatchView(APIView):
 
 class AssignAgentToRoleView(GenericAPIView):
     """
-    API endpoint for assigning existing TTS agents to TTS roles.
+    API endpoint for assigning existing agents to roles in the current system.
     Requires JWT authentication for service-to-service communication.
     
     The browsable API provides dropdown menus for:
@@ -198,6 +198,9 @@ class AssignAgentToRoleView(GenericAPIView):
     
     def post(self, request):
         try:
+            # This feature is TTS-only
+            tts_slug = 'tts'
+            
             # Validate input using serializer
             serializer = AssignAgentToRoleSerializer(data=request.data)
             if not serializer.is_valid():
@@ -212,14 +215,14 @@ class AssignAgentToRoleView(GenericAPIView):
             
             # Get TTS system
             try:
-                tts_system = System.objects.get(slug='tts')
+                tts_system = System.objects.get(slug=tts_slug)
             except System.DoesNotExist:
                 return Response(
                     {"error": "TTS system not found in database."},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
             
-            # Check if user already has this specific role in TTS system
+            # Check if user already has this specific role in TTS
             existing_assignment = UserSystemRole.objects.filter(
                 user=user,
                 system=tts_system,
@@ -281,9 +284,12 @@ class AssignAgentToRoleView(GenericAPIView):
                     status=status.HTTP_401_UNAUTHORIZED
                 )
             
+            # This feature is TTS-only
+            tts_slug = 'tts'
+            
             # Get TTS system
             try:
-                tts_system = System.objects.get(slug='tts')
+                tts_system = System.objects.get(slug=tts_slug)
             except System.DoesNotExist:
                 return Response(
                     {"error": "TTS system not found in database."},
@@ -381,255 +387,6 @@ def assign_agent_to_role_form(request):
         'unread_count': 0,
     }
     return render(request, 'tts/assign_agent_to_role.html', context)
-
-
-class CreateRoleView(APIView):
-    """
-    API endpoint for creating new TTS roles and retrieving roles.
-    Requires JWT authentication and admin privileges.
-    """
-    authentication_classes = [CookieJWTAuthentication]
-    permission_classes = [IsAuthenticated]
-    
-    def get(self, request):
-        try:
-            user = request.user
-            
-            # Check admin privileges (any admin)
-            if not user.is_superuser:
-                is_admin = UserSystemRole.objects.filter(
-                    user=user,
-                    role__name='Admin'
-                ).exists()
-                if not is_admin:
-                    return Response(
-                        {"error": "You don't have permission to view roles"},
-                        status=status.HTTP_403_FORBIDDEN
-                    )
-            
-            # Get TTS system
-            try:
-                tts_system = System.objects.get(slug='tts')
-            except System.DoesNotExist:
-                return Response(
-                    {"error": "TTS system not found"},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
-            
-            # Get all roles in TTS system
-            all_roles = Role.objects.filter(system=tts_system).values('id', 'name', 'description', 'is_custom', 'created_at')
-            
-            return Response({
-                "roles": list(all_roles)
-            }, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response(
-                {"error": f"An error occurred: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-    
-    def post(self, request):
-        try:
-            user = request.user
-            
-            # Check admin privileges (any admin)
-            if not user.is_superuser:
-                is_admin = UserSystemRole.objects.filter(
-                    user=user,
-                    role__name='Admin'
-                ).exists()
-                if not is_admin:
-                    return Response(
-                        {"error": "You don't have permission to create roles"},
-                        status=status.HTTP_403_FORBIDDEN
-                    )
-            
-            # Get TTS system
-            try:
-                tts_system = System.objects.get(slug='tts')
-            except System.DoesNotExist:
-                return Response(
-                    {"error": "TTS system not found"},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
-            
-            # Get data from request
-            name = request.data.get('name', '').strip()
-            description = request.data.get('description', '').strip()
-            
-            if not name:
-                return Response(
-                    {"error": "Role name is required"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            # Check if role already exists in TTS
-            existing_role = Role.objects.filter(
-                system=tts_system,
-                name__iexact=name
-            ).first()
-            
-            if existing_role:
-                return Response(
-                    {
-                        "error": f"Role '{name}' already exists in TTS system",
-                        "role": {
-                            "id": existing_role.id,
-                            "name": existing_role.name
-                        }
-                    },
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            # Create new role
-            role = Role.objects.create(
-                system=tts_system,
-                name=name,
-                description=description,
-                is_custom=True
-            )
-            
-            return Response(
-                {
-                    "message": f"Role '{name}' created successfully",
-                    "role": {
-                        "id": role.id,
-                        "name": role.name,
-                        "description": role.description
-                    }
-                },
-                status=status.HTTP_201_CREATED
-            )
-            
-        except Exception as e:
-            return Response(
-                {"error": f"An error occurred: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-
-class UpdateAssignmentView(APIView):
-    """
-    API endpoint for updating role assignment settings.
-    Requires JWT authentication and admin privileges.
-    """
-    authentication_classes = [CookieJWTAuthentication]
-    permission_classes = [IsAuthenticated]
-    
-    def put(self, request, assignment_id):
-        try:
-            user = request.user
-            
-            # Check admin privileges (any admin)
-            if not user.is_superuser:
-                is_admin = UserSystemRole.objects.filter(
-                    user=user,
-                    role__name='Admin'
-                ).exists()
-                if not is_admin:
-                    return Response(
-                        {"error": "You don't have permission to update assignments"},
-                        status=status.HTTP_403_FORBIDDEN
-                    )
-            
-            # Get the assignment
-            try:
-                assignment = UserSystemRole.objects.get(id=assignment_id)
-            except UserSystemRole.DoesNotExist:
-                return Response(
-                    {"error": "Assignment not found"},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            
-            # Update is_active if provided
-            if 'is_active' in request.data:
-                assignment.is_active = request.data['is_active']
-            
-            # Update settings with is_deployed flag
-            if 'settings' in request.data:
-                settings = request.data['settings']
-                if isinstance(settings, dict):
-                    assignment.settings = settings
-            
-            assignment.save()
-            
-            return Response(
-                {
-                    "message": "Assignment updated successfully",
-                    "id": assignment.id,
-                    "is_active": assignment.is_active,
-                    "settings": assignment.settings
-                },
-                status=status.HTTP_200_OK
-            )
-            
-        except Exception as e:
-            return Response(
-                {"error": f"An error occurred: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-    
-    def delete(self, request, assignment_id):
-        try:
-            user = request.user
-            
-            # Check admin privileges
-            if not user.is_superuser:
-                is_admin = UserSystemRole.objects.filter(
-                    user=user,
-                    role__name='Admin'
-                ).exists()
-                if not is_admin:
-                    return Response(
-                        {"error": "You don't have permission to delete assignments"},
-                        status=status.HTTP_403_FORBIDDEN
-                    )
-            
-            # Get and delete the assignment
-            try:
-                assignment = UserSystemRole.objects.get(id=assignment_id)
-                assignment.delete()
-            except UserSystemRole.DoesNotExist:
-                return Response(
-                    {"error": "Assignment not found"},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            
-            return Response(
-                {"message": "Assignment deleted successfully"},
-                status=status.HTTP_200_OK
-            )
-            
-        except Exception as e:
-            return Response(
-                {"error": f"An error occurred: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-
-@jwt_cookie_required
-def role_management_view(request):
-    """
-    Render the TTS role management page for managing roles (create and view).
-    """
-    user = request.user
-    
-    # Check if user has permission to manage roles (any admin or superuser)
-    if not user.is_superuser:
-        is_admin = UserSystemRole.objects.filter(
-            user=user,
-            role__name='Admin'
-        ).exists()
-        
-        if not is_admin:
-            messages.error(request, 'Access denied. You need admin privileges to manage roles.')
-            return redirect('profile-settings')
-    
-    context = {
-        'user': user,
-        'unread_count': 0,
-    }
-    return render(request, 'tts/manage_roles.html', context)
 
 
 @jwt_cookie_required

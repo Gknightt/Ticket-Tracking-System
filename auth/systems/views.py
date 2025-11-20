@@ -57,6 +57,12 @@ class SystemViewset(viewsets.ModelViewSet):
     def list(self, request):
         """List systems based on user permissions"""
         queryset = self.get_queryset()
+        
+        # Support filtering by slug from query parameters
+        slug = request.query_params.get('slug')
+        if slug:
+            queryset = queryset.filter(slug=slug)
+        
         serializer = self.serializer_class(queryset, many=True)
         return Response(serializer.data)
     

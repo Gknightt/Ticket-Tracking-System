@@ -291,7 +291,14 @@
         <span>Settings</span>
       </p>
     </div>
-    {% if user.system_roles.0.role.name == "Admin" %}
+    {% comment %}Show admin badge only if user is admin in current system{% endcomment %}
+    {% if request.session.last_selected_system %}
+      {% for system_role in user.system_roles.all %}
+        {% if system_role.system.slug == request.session.last_selected_system and system_role.role.name == "Admin" %}
+          <span class="anAdminLogo">admin</span>
+        {% endif %}
+      {% endfor %}
+    {% elif user.is_superuser %}
       <span class="anAdminLogo">admin</span>
     {% endif %}
   </div>
@@ -309,37 +316,49 @@
       </a>
     </div>
 
-    <!-- Admin Settings -->
-    {% regroup user.system_roles.all by role.name as roles_by_name %}
-    {% for role_group in roles_by_name %}
-      {% if role_group.grouper == "Admin" %}
-        <div class="settingsMenuSection">
-          <div class="settingsMenuLabel">Administration</div>
-          <a href="{% url 'agent-management' %}" class="settingsLink" data-nav="agents">
-            <i class="fa fa-users"></i> Manage Agents
-          </a>
-          <a href="{% url 'invite-agent' %}" class="settingsLink" data-nav="invite-agent">
-            <i class="fa fa-user-plus"></i> Invite Agent
-          </a>
-          <a href="{% url 'role_management_shortcut' %}" class="settingsLink" data-nav="role-management">
-            <i class="fa fa-cogs"></i> Manage Roles
-          </a>
-          {% if user.is_superuser %}
-            <a href="{% url 'tts:manage_assignments' %}" class="settingsLink" data-nav="manage-assignments">
-              <i class="fa fa-users-cog"></i> Manage Assignments
+    <!-- Admin Settings - Only show if user is Admin in the currently selected system -->
+    {% if request.session.last_selected_system %}
+      {% for system_role in user.system_roles.all %}
+        {% if system_role.system.slug == request.session.last_selected_system and system_role.role.name == "Admin" %}
+          <div class="settingsMenuSection">
+            <div class="settingsMenuLabel">Administration</div>
+            <a href="{% url 'agent-management' %}" class="settingsLink" data-nav="agents">
+              <i class="fa fa-users"></i> Manage Agents
             </a>
-          {% else %}
-            {% for system_role in user.system_roles.all %}
-              {% if system_role.system.slug == "tts" and system_role.role.name == "Admin" %}
-                <a href="{% url 'tts:manage_assignments' %}" class="settingsLink" data-nav="manage-assignments">
-                  <i class="fa fa-users-cog"></i> Manage Assignments
-                </a>
-              {% endif %}
-            {% endfor %}
-          {% endif %}
-        </div>
-      {% endif %}
-    {% endfor %}
+            <a href="{% url 'invite-agent' %}" class="settingsLink" data-nav="invite-agent">
+              <i class="fa fa-user-plus"></i> Invite Agent
+            </a>
+            <a href="{% url 'role_management_shortcut' %}" class="settingsLink" data-nav="role-management">
+              <i class="fa fa-cogs"></i> Manage Roles
+            </a>
+            {% if system_role.system.slug == "tts" %}
+              <a href="{% url 'tts:manage_assignments' %}" class="settingsLink" data-nav="manage-assignments">
+                <i class="fa fa-users-cog"></i> Manage Assignments
+              </a>
+            {% endif %}
+          </div>
+          {% comment %}Only render once - exit loop after first match{% endcomment %}
+          {% if forloop.first %}{% endif %}
+        {% endif %}
+      {% endfor %}
+    {% elif user.is_superuser %}
+      {# Show admin menu for superusers even without a selected system #}
+      <div class="settingsMenuSection">
+        <div class="settingsMenuLabel">Administration</div>
+        <a href="{% url 'agent-management' %}" class="settingsLink" data-nav="agents">
+          <i class="fa fa-users"></i> Manage Agents
+        </a>
+        <a href="{% url 'invite-agent' %}" class="settingsLink" data-nav="invite-agent">
+          <i class="fa fa-user-plus"></i> Invite Agent
+        </a>
+        <a href="{% url 'role_management_shortcut' %}" class="settingsLink" data-nav="role-management">
+          <i class="fa fa-cogs"></i> Manage Roles
+        </a>
+        <a href="{% url 'tts:manage_assignments' %}" class="settingsLink" data-nav="manage-assignments">
+          <i class="fa fa-users-cog"></i> Manage Assignments
+        </a>
+      </div>
+    {% endif %}
 
     <!-- Logout -->
     <div class="settingsMenuSection">
@@ -357,12 +376,14 @@
   <!-- Sidebar Footer -->
   <div class="sidebarFooter">
     <div class="userInfo">
-      <img
-        class="userAvatar"
-        id="userAvatar"
-        src="{% if user.profile_picture %}{{ user.profile_picture.url }}{% else %}https://i.pinimg.com/736x/01/c2/09/01c209e18fd7a17c9c5dcc7a4e03db0e.jpg{% endif %}"
-        alt="User Avatar"
-      />
+      <a href="{% url 'profile-settings' %}" style="display: inline-block; line-height: 0;">
+        <img
+          class="userAvatar"
+          id="userAvatar"
+          src="{% if user.profile_picture %}{{ user.profile_picture.url }}{% else %}https://i.pinimg.com/736x/01/c2/09/01c209e18fd7a17c9c5dcc7a4e03db0e.jpg{% endif %}"
+          alt="User Avatar"
+        />
+      </a>
       <div class="userDetails">
         <p>{{ user.first_name }} {{ user.last_name }}</p>
       </div>

@@ -33,18 +33,11 @@
         </div>
 
         <!-- Agents List -->
-        <div id="agents-container" class="agentsContainer">
+          <div id="agents-container" class="agentsContainer">
           <div class="agentsHeader">
-            <h2 id="agents-title">System Agents</h2>
+            <h2 id="agents-title">System Agents{% if current_system %} - {{ current_system|upper }}{% endif %}</h2>
 
             <div class="agentsSearch">
-              <select id="system-filter" class="filterSelect">
-                <option value="">All Systems</option>
-                <option value="tts">TTS</option>
-                <option value="hdts">HDTS</option>
-                <option value="ams">AMS</option>
-                <option value="bms">BMS</option>
-              </select>
               <input
                 type="search"
                 id="search-input"
@@ -52,9 +45,7 @@
               />
               <button id="clear-search" class="btn btnSecondary">Clear</button>
               <a href="{% url 'invite-agent' %}" class="btn btnPrimary">+ Invite Agent</a>
-            </div>
-
-            <!--<div class="agentsStats">
+            </div>            <!--<div class="agentsStats">
               <span id="agents-count">Loading...</span>
             </div>-->
           </div>
@@ -274,12 +265,7 @@
         showLoading();
 
         try {
-          const systemFilter = document.getElementById("system-filter").value;
-          let url = "/api/v1/users/list/";
-          
-          if (systemFilter) {
-            url += `?system_slug=${systemFilter}`;
-          }
+          const url = "/api/v1/users/list/";
 
           const response = await fetch(url, {
             method: "GET",
@@ -305,7 +291,12 @@
           // Update both the H2 title and the small stats span
           const titleEl = document.getElementById("agents-title");
           const countEl = document.getElementById("agents-count");
-          if (titleEl) titleEl.textContent = `System Agents (${totalCount})`;
+          if (titleEl) {
+            const currentTitle = titleEl.textContent;
+            // Keep the system name if it exists, just update the count
+            const baseTitle = currentTitle.split('(')[0].trim();
+            titleEl.textContent = `${baseTitle} (${totalCount})`;
+          }
           if (countEl) countEl.textContent = `${totalCount} agents found`;
 
           document
@@ -360,7 +351,11 @@
           const totalCount = agents.length;
           const titleEl = document.getElementById("agents-title");
           const countEl = document.getElementById("agents-count");
-          if (titleEl) titleEl.textContent = `System Agents (${totalCount})`;
+          if (titleEl) {
+            const currentTitle = titleEl.textContent;
+            const baseTitle = currentTitle.split('(')[0].trim();
+            titleEl.textContent = `${baseTitle} (${totalCount})`;
+          }
           if (countEl) countEl.textContent = `${totalCount} agents found`;
           return;
         }
@@ -387,7 +382,11 @@
         const filteredCount = filtered.length;
         const titleEl = document.getElementById("agents-title");
         const countEl = document.getElementById("agents-count");
-        if (titleEl) titleEl.textContent = `System Agents (${filteredCount})`;
+        if (titleEl) {
+          const currentTitle = titleEl.textContent;
+          const baseTitle = currentTitle.split('(')[0].trim();
+          titleEl.textContent = `${baseTitle} (${filteredCount})`;
+        }
         if (countEl) countEl.textContent = `${filteredCount} agents found`;
       }
 
@@ -396,7 +395,6 @@
       // Attach listeners for search input and clear button
       const searchInput = document.getElementById("search-input");
       const clearButton = document.getElementById("clear-search");
-      const systemFilter = document.getElementById("system-filter");
       
       if (searchInput) {
         searchInput.addEventListener("input", debouncedApplySearch);
@@ -405,11 +403,6 @@
         clearButton.addEventListener("click", function () {
           if (searchInput) searchInput.value = "";
           applySearchFilter();
-        });
-      }
-      if (systemFilter) {
-        systemFilter.addEventListener("change", function () {
-          loadAgents();
         });
       }
 

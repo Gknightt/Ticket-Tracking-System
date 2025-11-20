@@ -9,6 +9,7 @@ This package organizes views into logical modules:
 - user_management_views: User CRUD operations and agent management
 - login_views: Login flow, OTP for login, and system welcome
 - captcha_views: CAPTCHA generation, verification, and requirement checks
+- role_management_views: Role creation, viewing, and assignment management
 """
 
 # Authentication and Token Management
@@ -69,6 +70,13 @@ from .captcha_views import (
     CaptchaVerifySerializer,
 )
 
+# Role Management
+from .role_management_views import (
+    CreateRoleView,
+    UpdateAssignmentView,
+    role_management_view,
+)
+
 __all__ = [
     # Auth
     'LogoutSerializer',
@@ -107,4 +115,8 @@ __all__ = [
     'captcha_required_view',
     'CaptchaGenerateSerializer',
     'CaptchaVerifySerializer',
+    # Role Management
+    'CreateRoleView',
+    'UpdateAssignmentView',
+    'role_management_view',
 ]
