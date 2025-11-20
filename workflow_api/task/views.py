@@ -26,14 +26,12 @@ class UserTaskListView(ListAPIView):
     View to list TaskItems assigned to the authenticated user.
     Each row represents a TaskItem with associated task and ticket data.
     """
-    
     serializer_class = UserTaskListSerializer
     authentication_classes = [JWTCookieAuthentication]
     permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['status', 'task__workflow_id']
+    filter_backends = [SearchFilter, OrderingFilter]
     search_fields = ['task__ticket_id__subject', 'task__ticket_id__description']
-    ordering_fields = ['assigned_on', 'status_updated_on', 'status']
+    ordering_fields = ['assigned_on']
     ordering = ['-assigned_on']
     
     def get_queryset(self):
@@ -42,17 +40,41 @@ class UserTaskListView(ListAPIView):
         
         queryset = TaskItem.objects.filter(
             role_user__user_id=user_id
-        ).select_related('task__ticket_id', 'task__workflow_id', 'task__current_step', 'role_user', 'acted_on_step')
+        ).select_related(
+            'task__ticket_id', 
+            'task__workflow_id', 
+            'task__current_step', 
+            'role_user', 
+            'assigned_on_step'
+        ).prefetch_related('taskitemhistory_set')
         
-        # Apply role/status filters if provided
+        # Apply role filter if provided
         role = self.request.query_params.get('role')
-        assignment_status = self.request.query_params.get('assignment_status')
-        
         if role:
             queryset = queryset.filter(role_user__role_id__name=role)
         
+        return queryset
+    
+    def filter_queryset(self, queryset):
+        """Override to filter by status from history after serialization"""
+        queryset = super().filter_queryset(queryset)
+        
+        # Handle status filter if provided (filter in Python since it's from history)
+        assignment_status = self.request.query_params.get('assignment_status')
+        workflow_id = self.request.query_params.get('task__workflow_id')
+        
+        if workflow_id:
+            queryset = queryset.filter(task__workflow_id=workflow_id)
+        
         if assignment_status:
-            queryset = queryset.filter(status=assignment_status)
+            # Filter in memory based on latest history status
+            filtered_list = []
+            for item in queryset:
+                latest_history = item.taskitemhistory_set.order_by('-created_at').first()
+                status = latest_history.status if latest_history else 'new'
+                if status == assignment_status:
+                    filtered_list.append(item.id)
+            queryset = queryset.filter(id__in=filtered_list)
         
         return queryset
 
@@ -63,31 +85,51 @@ class AllTasksListView(ListAPIView):
     Same as UserTaskListView but without user filtering.
     Each row represents a TaskItem with associated task and ticket data.
     """
-    
     serializer_class = UserTaskListSerializer
     authentication_classes = [JWTCookieAuthentication]
     permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['status', 'task__workflow_id']
+    filter_backends = [SearchFilter, OrderingFilter]
     search_fields = ['task__ticket_id__subject', 'task__ticket_id__description']
-    ordering_fields = ['assigned_on', 'status_updated_on', 'status']
+    ordering_fields = ['assigned_on']
     ordering = ['-assigned_on']
     
     def get_queryset(self):
         """Return all TaskItems without user filtering."""
         queryset = TaskItem.objects.select_related(
-            'task__ticket_id', 'task__workflow_id', 'task__current_step', 'role_user', 'acted_on_step'
-        )
+            'task__ticket_id', 
+            'task__workflow_id', 
+            'task__current_step', 
+            'role_user', 
+            'assigned_on_step'
+        ).prefetch_related('taskitemhistory_set')
         
-        # Apply role/status filters if provided
+        # Apply role filter if provided
         role = self.request.query_params.get('role')
-        assignment_status = self.request.query_params.get('assignment_status')
-        
         if role:
             queryset = queryset.filter(role_user__role_id__name=role)
         
+        return queryset
+    
+    def filter_queryset(self, queryset):
+        """Override to filter by status from history after serialization"""
+        queryset = super().filter_queryset(queryset)
+        
+        # Handle status filter if provided
+        assignment_status = self.request.query_params.get('assignment_status')
+        workflow_id = self.request.query_params.get('task__workflow_id')
+        
+        if workflow_id:
+            queryset = queryset.filter(task__workflow_id=workflow_id)
+        
         if assignment_status:
-            queryset = queryset.filter(status=assignment_status)
+            # Filter in memory based on latest history status
+            filtered_list = []
+            for item in queryset:
+                latest_history = item.taskitemhistory_set.order_by('-created_at').first()
+                status = latest_history.status if latest_history else 'new'
+                if status == assignment_status:
+                    filtered_list.append(item.id)
+            queryset = queryset.filter(id__in=filtered_list)
         
         return queryset
 
@@ -368,15 +410,18 @@ class TaskViewSet(viewsets.ModelViewSet):
         task = user_assignment.task
         
         # ✅ Set task_item status to 'in progress' only if status is 'new'
-        if user_assignment.status == 'new':
-            user_assignment.status = 'in progress'
-            user_assignment.status_updated_on = timezone.now()
-            user_assignment.save()
+        if user_assignment.taskitemhistory_set.filter(status='new').exists():
+            # Create history record for transition from 'new' to 'in progress'
+            from task.models import TaskItemHistory
+            TaskItemHistory.objects.create(
+                task_item=user_assignment,
+                status='in progress'
+            )
             logger.info(
                 f"✅ Task {task.task_id} set to 'in progress' for user {user_id}"
             )
         
-        has_acted = user_assignment.status in ['resolved', 'escalated']
+        has_acted = user_assignment.taskitemhistory_set.filter(status__in=['resolved', 'escalated']).exists()
         is_escalated = user_assignment.origin == 'Escalation'
         
         # Get step information
@@ -427,19 +472,24 @@ class TaskViewSet(viewsets.ModelViewSet):
         # Get the most recent TaskItem (current owner) for this task
         most_recent_task_item = TaskItem.objects.filter(
             task=task
-        ).select_related('role_user', 'role_user__role_id').order_by('-assigned_on').first()
+        ).select_related('role_user', 'role_user__role_id').prefetch_related('taskitemhistory_set').order_by('-assigned_on').first()
         
         current_owner = None
         if most_recent_task_item:
+            # Get latest status from history
+            latest_history = most_recent_task_item.taskitemhistory_set.order_by('-created_at').first()
+            status_value = latest_history.status if latest_history else 'new'
+            status_updated_on = latest_history.created_at if latest_history else most_recent_task_item.assigned_on
+            
             current_owner = {
                 'task_item_id': most_recent_task_item.task_item_id,
                 'user_id': most_recent_task_item.role_user.user_id,
                 'user_full_name': most_recent_task_item.role_user.user_full_name,
                 'role': most_recent_task_item.role_user.role_id.name if most_recent_task_item.role_user.role_id else None,
-                'status': most_recent_task_item.status,
+                'status': status_value,
                 'origin': most_recent_task_item.origin,
                 'assigned_on': most_recent_task_item.assigned_on.isoformat() if most_recent_task_item.assigned_on else None,
-                'status_updated_on': most_recent_task_item.status_updated_on.isoformat() if most_recent_task_item.status_updated_on else None,
+                'status_updated_on': status_updated_on.isoformat() if status_updated_on else None,
                 'acted_on': most_recent_task_item.acted_on.isoformat() if most_recent_task_item.acted_on else None,
             }
         

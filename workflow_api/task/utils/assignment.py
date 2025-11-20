@@ -5,7 +5,7 @@ These functions are used across tasks, steps, and transitions.
 
 from django.utils import timezone
 from tickets.models import RoundRobin
-from task.models import TaskItem
+from task.models import TaskItem, TaskItemHistory
 from task.utils.target_resolution import calculate_target_resolution
 from role.models import Roles, RoleUsers
 from task.tasks import send_assignment_notification as notify_task
@@ -93,14 +93,18 @@ def apply_round_robin_assignment(task, user_ids, role_name):
         task=task,
         role_user=role_users,
         defaults={
-            'status': 'new',
             'origin': 'System',
-            'assigned_on': timezone.now(),
-            'target_resolution': target_resolution
+            'target_resolution': target_resolution,
+            'assigned_on_step': task.current_step
         }
     )
     
     if created:
+        # Create initial history record with 'new' status
+        TaskItemHistory.objects.create(
+            task_item=task_item,
+            status='new'
+        )
         logger.info(f"👤 Created TaskItem: User {user_id} assigned to Task {task.task_id}")
         # Send assignment notification via Celery
         notify_task.delay(
@@ -193,11 +197,16 @@ def assign_users_for_escalation(task, escalate_to_role, reason):
     task_item = TaskItem.objects.create(
         task=task,
         role_user=selected_role_user,
-        status='new',
         origin='Escalation',
-        assigned_on=timezone.now(),
         target_resolution=original_target_resolution,
+        assigned_on_step=task.current_step,
         notes=''
+    )
+    
+    # Create initial history record with 'escalated' status
+    TaskItemHistory.objects.create(
+        task_item=task_item,
+        status='escalated'
     )
     
     logger.info(f"🚨 Escalated TaskItem created: User {selected_role_user.user_id} assigned to Task {task.task_id}")

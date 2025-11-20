@@ -105,12 +105,16 @@ class UserTaskListSerializer(serializers.ModelSerializer):
     current_step_name = serializers.CharField(source='task.current_step.name', read_only=True)
     current_step_role = serializers.CharField(source='task.current_step.role_id.name', read_only=True, allow_null=True)
     
-    # Acted on step
-    acted_on_step_id = serializers.IntegerField(source='acted_on_step.step_id', read_only=True, allow_null=True)
-    acted_on_step_name = serializers.CharField(source='acted_on_step.name', read_only=True, allow_null=True)
+    # Assigned on step
+    assigned_on_step_id = serializers.IntegerField(source='assigned_on_step.step_id', read_only=True, allow_null=True)
+    assigned_on_step_name = serializers.CharField(source='assigned_on_step.name', read_only=True, allow_null=True)
     
     # Task status
     task_status = serializers.CharField(source='task.status', read_only=True)
+    
+    # Status and history - from latest TaskItemHistory
+    status = serializers.SerializerMethodField()
+    status_updated_on = serializers.SerializerMethodField()
     
     # Transfer and origin fields
     transferred_to_user_id = serializers.SerializerMethodField()
@@ -140,8 +144,8 @@ class UserTaskListSerializer(serializers.ModelSerializer):
             'current_step_id',
             'current_step_name',
             'current_step_role',
-            'acted_on_step_id',
-            'acted_on_step_name',
+            'assigned_on_step_id',
+            'assigned_on_step_name',
             'task_status',
             'assigned_on',
             'status_updated_on',
@@ -154,6 +158,16 @@ class UserTaskListSerializer(serializers.ModelSerializer):
             'transferred_by',
         ]
         read_only_fields = fields
+    
+    def get_status(self, obj):
+        """Get latest status from TaskItemHistory"""
+        latest_history = obj.taskitemhistory_set.order_by('-created_at').first()
+        return latest_history.status if latest_history else 'new'
+    
+    def get_status_updated_on(self, obj):
+        """Get latest status update time from TaskItemHistory"""
+        latest_history = obj.taskitemhistory_set.order_by('-created_at').first()
+        return latest_history.created_at if latest_history else obj.assigned_on
     
     def get_transferred_to_user_id(self, obj):
         """Get transferred_to user ID"""

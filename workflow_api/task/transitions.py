@@ -112,11 +112,19 @@ class TaskTransitionView(CreateAPIView):
         # Validate user is assigned to this task with "new" or "in progress" status
         user_assignment = None
         try:
-            user_assignment = TaskItem.objects.select_related('role_user').get(
+            # Get TaskItem by user
+            task_item = TaskItem.objects.select_related('role_user').get(
                 task=task,
-                role_user__user_id=current_user_id,
-                status__in=['new', 'in progress']
+                role_user__user_id=current_user_id
             )
+            
+            # Check if latest history status is 'new' or 'in progress'
+            latest_history = task_item.taskitemhistory_set.order_by('-created_at').first()
+            if latest_history and latest_history.status in ['new', 'in progress']:
+                user_assignment = task_item
+            else:
+                raise TaskItem.DoesNotExist
+                
         except TaskItem.DoesNotExist:
             # User has no "new" or "in progress" records - either not assigned or already acted on all assignments
             user_records = TaskItem.objects.filter(task=task, role_user__user_id=current_user_id)
@@ -150,10 +158,16 @@ class TaskTransitionView(CreateAPIView):
         if not transition.to_step_id:
             logger.info(f"Terminal transition detected: completing task {task_id}")
             
-            # Mark the user assignment as "resolved" with the current step
-            user_assignment.status = 'resolved'
+            # Create history record for 'resolved' status
+            from task.models import TaskItemHistory
+            TaskItemHistory.objects.create(
+                task_item=user_assignment,
+                status='resolved'
+            )
+            
+            # Update other fields
             user_assignment.acted_on = timezone.now()
-            user_assignment.acted_on_step = task.current_step
+            user_assignment.assigned_on_step = task.current_step
             user_assignment.notes = notes  # Store notes
             user_assignment.save()
             logger.info(f"User {current_user_id} marked as resolved")
@@ -273,9 +287,14 @@ class TaskTransitionView(CreateAPIView):
             )
         
         # Mark the user assignment as "resolved" before moving to next step
-        user_assignment.status = 'resolved'
+        from task.models import TaskItemHistory
+        TaskItemHistory.objects.create(
+            task_item=user_assignment,
+            status='resolved'
+        )
+        
         user_assignment.acted_on = timezone.now()
-        user_assignment.acted_on_step = task.current_step
+        user_assignment.assigned_on_step = task.current_step
         user_assignment.notes = notes
         user_assignment.save()
         logger.info(f"User {current_user_id} marked as resolved")
