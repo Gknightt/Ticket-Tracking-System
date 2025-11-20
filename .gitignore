@@ -251,4 +251,11 @@ auth/auth/__pycache__/settings.cpython-313.pyc
 *.sqlite3
 *media
 
+# OAuth & API Credentials
 **/token.pickle
+**/credentials.json
+**/.env
+**/.env.local
+*.pem
+*.key
+**/secrets/
