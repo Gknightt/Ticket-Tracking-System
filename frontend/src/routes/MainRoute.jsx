@@ -36,6 +36,7 @@ import Test from "../pages/test";
 import AdminTicketDetail from "../pages/admin/ticket-detail-page/AdminTicketDetail";
 import ResetPassword from "../pages/auth/PasswordReset";
 import WorkflowEditorPage from "../pages/test/WorkflowEditorPage";
+import AuthContextTest from "../pages/test/AuthContextTest";
 
 // WebSocket test
 import WebSocketTest from "../components/WebSocketTest";
@@ -88,6 +89,7 @@ export default function MainRoute() {
 
       {/* TEST ROUTE - Consider protecting or removing in production */}
       <Route path="/test" element={<Test />} />
+      <Route path="/test/auth-context" element={<AuthContextTest />} />
 
       {/* 404 ROUTE */}
       <Route path="*" element={<NotFound />} />
