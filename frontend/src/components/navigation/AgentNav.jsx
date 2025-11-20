@@ -24,7 +24,7 @@ export default function AgentNav() {
     ? notifications.unread.length
     : 0;
 
-  console.log("User in AgentNav:", user);
+  // console.log("User in AgentNav:", user);
 
   const handleAvatarClick = () => {
     setOpenProfileModal((prev) => !prev);
@@ -91,7 +91,8 @@ export default function AgentNav() {
         {/* nav-links */}
         <div className={`${styles.navLinks} ${menuOpen ? styles.active : ""}`}>
           <NavLink
-            to="/agent/dashboard"
+            // to="/agent/dashboard"
+            to="/dashboard"
             end
             className={({ isActive }) =>
               isActive ? `${styles.navLink} ${styles.active}` : styles.navLink
@@ -100,12 +101,12 @@ export default function AgentNav() {
             Dashboard
           </NavLink>
           <NavLink
-            to="/agent/ticket"
+            to="/ticket"
             className={({ isActive }) =>
               isActive ? `${styles.navLink} ${styles.active}` : styles.navLink
             }
           >
-            Ticket
+            Task
           </NavLink>
           <NavLink
             to="/agent/track"

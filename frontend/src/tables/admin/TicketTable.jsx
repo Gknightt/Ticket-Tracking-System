@@ -20,6 +20,7 @@ const ticketHeaders = [
   "STATUS",
   "CATEGORY",
   "OPENED ON",
+  "TARGET RESOLUTION",
   "ACTION",
 ];
 
@@ -62,6 +63,7 @@ function TicketItem({ item }) {
       </td>
       <td>{item.category ? item.category : "Uncategorized"}</td>
       <td>{format(new Date(item.submit_date), "MMMM dd, yyyy")}</td>
+      <td>{format(new Date(item.target_resolution), "MMMM dd, yyyy")}</td>
       <td>
         <button
           className={general.btn}

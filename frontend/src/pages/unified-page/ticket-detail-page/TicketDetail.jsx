@@ -10,11 +10,9 @@ import styles from "./ticket-detail.module.css";
 import general from "../../../style/general.module.css";
 
 // components
-import AgentNav from "../../../components/navigation/AgentNav";
+import Nav from "../../../components/navigation/Nav";
 import WorkflowTracker2 from "../../../components/ticket/WorkflowVisualizer2";
-import DocumentViewer from "../../../components/ticket/DocumentViewer";
 import TicketComments from "../../../components/ticket/TicketComments";
-import ActionLog from "../../../components/ticket/ActionLog";
 import ActionLogList from "../../../components/ticket/ActionLogList";
 import Messaging from "../../../components/messaging";
 
@@ -190,7 +188,7 @@ export default function TicketDetail() {
   if (loading) {
     return (
       <>
-        <AgentNav />
+        <Nav />
         <main className={styles.ticketDetailPage}>
           <section className={styles.tdpHeader}>
             <button
@@ -213,7 +211,7 @@ export default function TicketDetail() {
   if (error) {
     return (
       <>
-        <AgentNav />
+        <Nav />
         <main className={styles.ticketDetailPage}>
           <section className={styles.tdpHeader}>
             <button
@@ -237,7 +235,7 @@ export default function TicketDetail() {
 
   return (
     <>
-      <AgentNav />
+      <Nav />
       <main className={styles.ticketDetailPage}>
         <section className={styles.tdpHeader}>
           <div>

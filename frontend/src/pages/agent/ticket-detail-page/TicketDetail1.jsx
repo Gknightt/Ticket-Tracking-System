@@ -1,34 +1,49 @@
 // react
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { useEffect, useState, useCallback, useReducer, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
+import { useMemo } from "react";
+import { useEffect, useState, useCallback, useReducer } from "react";
+import { useSearchParams } from "react-router-dom";
 
 // style
 import styles from "./ticket-detail.module.css";
 import general from "../../../style/general.module.css";
 
 // components
-// import AdminNav from "../../../components/navigation/AdminNav";
 import AgentNav from "../../../components/navigation/AgentNav";
 import WorkflowTracker2 from "../../../components/ticket/WorkflowVisualizer2";
 import DocumentViewer from "../../../components/ticket/DocumentViewer";
 import TicketComments from "../../../components/ticket/TicketComments";
-import Messaging from "../../../components/component/Messaging";
 import ActionLog from "../../../components/ticket/ActionLog";
+import ActionLogList from "../../../components/ticket/ActionLogList";
+import Messaging from "../../../components/messaging";
 
 // hooks
 import useFetchActionLogs from "../../../api/workflow-graph/useActionLogs";
-import ActionLogList from "../../../components/ticket/ActionLogList";
 import { useWorkflowProgress } from "../../../api/workflow-graph/useWorkflowProgress";
-import useUserTickets from "../../../api/useUserTickets";
+import useTicketDetail from "../../../api/useTicketDetail";
+import { useAuth } from "../../../context/AuthContext";
 
 // modal
 import TicketAction from "./modals/TicketAction";
+import EscalateTicket from "./modals/EscalateTicket";
 import { min } from "date-fns";
 
-export default function AdminTicketDetail() {
+export default function TicketDetail() {
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const { id } = useParams();
-  const { userTickets } = useUserTickets();
+  const { id: taskItemId } = useParams();
+  const {
+    stepInstance,
+    loading: instanceLoading,
+    error: instanceError,
+  } = useTicketDetail(taskItemId);
+
+  useEffect(() => {
+    if (stepInstance) {
+      console.log("🧩 StepInstance:", JSON.stringify(stepInstance, null, 2));
+    }
+  }, [stepInstance]);
 
   // Tabs with URL sync
   const [searchParams, setSearchParams] = useSearchParams();
@@ -42,6 +57,7 @@ export default function AdminTicketDetail() {
     instance: null,
     instruction: "",
     taskid: null,
+    currentOwner: null,
   };
 
   function reducer(state, action) {
@@ -54,6 +70,7 @@ export default function AdminTicketDetail() {
           instruction: action.payload.instruction,
           instance: action.payload.instance,
           taskid: action.payload.taskid,
+          currentOwner: action.payload.currentOwner,
         };
       case "RESET":
         return initialState;
@@ -66,6 +83,7 @@ export default function AdminTicketDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [openTicketAction, setOpenTicketAction] = useState(false);
+  const [openEscalateModal, setOpenEscalateModal] = useState(false);
   const [showTicketInfo, setShowTicketInfo] = useState(true);
 
   const toggTicketInfosVisibility = useCallback(() => {
@@ -107,41 +125,73 @@ export default function AdminTicketDetail() {
   }, [state.ticket?.created_at]);
 
   useEffect(() => {
-    if (!userTickets || userTickets.length === 0) return;
+    // Handle loading state
+    if (instanceLoading) {
+      setLoading(true);
+      return;
+    }
 
-    const matchedInstance = userTickets.find(
-      (instance) => instance.step_instance_id === id
-    );
-
-    if (!matchedInstance) {
-      setError("Ticket not found.");
+    // Handle error state
+    if (instanceError) {
+      setError(instanceError);
+      setLoading(false);
       dispatch({ type: "RESET" });
-    } else {
+      return;
+    }
+
+    // Handle successful data
+    if (stepInstance) {
+      // Map new ticket fields from the provided structure
+      const t = stepInstance.task.ticket;
       dispatch({
         type: "SET_TICKET",
         payload: {
           ticket: {
-            ...matchedInstance.task.ticket,
-            hasacted: matchedInstance.has_acted,
+            ticket_id: t.ticket_id,
+            ticket_number: t.ticket_number,
+            ticket_subject: t.subject,
+            ticket_description: t.description,
+            workflow_id: stepInstance.task.workflow_id,
+            workflow_name: stepInstance.step.name,
+            current_step: stepInstance.step.step_id,
+            current_step_name: stepInstance.step.name,
+            current_step_role: stepInstance.step.role_id,
+            status: t.status,
+            user_assignment: t.employee || { username: t.assigned_to },
+            has_acted: stepInstance.has_acted,
+            is_escalated: stepInstance.is_escalated,
+            created_at: t.created_at,
+            updated_at: t.updated_at,
+            fetched_at: t.fetched_at,
+            priority: t.priority || "Medium",
+            attachments: t.attachments || [],
+            target_resolution: t.response_time,
           },
-          action: matchedInstance.available_actions || [],
-          instruction: matchedInstance.step.instruction,
-          instance: matchedInstance.step_instance_id,
-          taskid: matchedInstance.task.task_id,
+          action: stepInstance.available_actions || [],
+          instruction: stepInstance.step.instruction || "",
+          instance: stepInstance.step_instance_id,
+          taskid: stepInstance.task.task_id,
+          currentOwner: stepInstance.current_owner,
         },
       });
       setError("");
+      setLoading(false);
+    } else if (!instanceLoading) {
+      // Only set error if not loading and no data
+      setError("Step instance not found.");
+      setLoading(false);
+      dispatch({ type: "RESET" });
     }
-    setLoading(false);
-  }, [userTickets, id]);
+  }, [stepInstance, instanceLoading, instanceError]);
+
   const { fetchActionLogs, logs } = useFetchActionLogs();
   useEffect(() => {
-    if (state.taskid) {
-      fetchActionLogs(state.taskid);
+    if (state.ticket?.ticket_id) {
+      fetchActionLogs(state.ticket.ticket_id);
     }
-  }, [state.taskid]);
+  }, [state.ticket?.ticket_id, fetchActionLogs]);
 
-  const { tracker } = useWorkflowProgress(state.taskid);
+  const { tracker } = useWorkflowProgress(state.ticket?.ticket_id);
 
   if (loading) {
     return (
@@ -230,7 +280,7 @@ export default function AdminTicketDetail() {
               </div>
               <div className={styles.tdpSection}>
                 <div className={styles.tdpTitle}>
-                  <strong>Subject: {state.ticket?.subject}</strong>
+                  <strong>Subject: {state.ticket?.ticket_subject}</strong>
                 </div>
                 <div className={styles.tdpMeta}>
                   Opened On:{" "}
@@ -252,7 +302,7 @@ export default function AdminTicketDetail() {
                   <strong>Description: </strong>
                 </div>
                 <p className={styles.tdpDescription}>
-                  {state.ticket?.description}
+                  {state.ticket?.ticket_description}
                 </p>
               </div>
               <div className={styles.tdInstructions}>
@@ -260,15 +310,35 @@ export default function AdminTicketDetail() {
                   <i className="fa-solid fa-lightbulb"></i>
                   <h3>Instructions</h3>
                 </div>
-                <p>{state.instruction || "No instructions available for this step."}</p>
+                <p>
+                  {state.instruction ||
+                    "No instructions available for this step."}
+                </p>
               </div>
               <div className={styles.tdAttachment}>
                 <h3>Attachment</h3>
                 <div className={styles.tdAttached}>
                   <i className="fa fa-upload"></i>
-                  <span className={styles.placeholderText}>
-                    <DocumentViewer attachments={state.ticket?.attachments} />
-                  </span>
+                  {state.ticket?.attachments &&
+                  state.ticket.attachments.length > 0 ? (
+                    <ul>
+                      {state.ticket.attachments.map((file, idx) => (
+                        <li key={idx}>
+                          <a
+                            href={file.url || file}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            {file.name || `Attachment ${idx + 1}`}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <span className={styles.placeholderText}>
+                      No attachments available.
+                    </span>
+                  )}
                   <input
                     type="file"
                     id="file-upload"
@@ -277,7 +347,8 @@ export default function AdminTicketDetail() {
                   />
                 </div>
               </div>
-              {/* Pass the actual ticket_id, not the step_instance_id */}
+
+              {/* Comments section under attachments */}
               <TicketComments ticketId={state.ticket?.ticket_id} />
             </div>
             {/* Right */}
@@ -287,16 +358,25 @@ export default function AdminTicketDetail() {
             >
               <button
                 className={
-                  state.ticket?.hasacted
+                  state.ticket?.has_acted
                     ? styles.actionButtonDisabled
                     : styles.actionButton
                 }
                 onClick={() => setOpenTicketAction(true)}
-                disabled={state.ticket?.hasacted}
+                disabled={state.ticket?.has_acted}
               >
-                {state.ticket?.hasacted
+                {state.ticket?.has_acted
                   ? "Action Already Taken"
                   : "Make an Action"}
+              </button>
+              <button
+                className={styles.escalateButton}
+                onClick={() => setOpenEscalateModal(true)}
+                disabled={state.ticket?.is_escalated}
+              >
+                {state.ticket?.is_escalated
+                  ? "Already Escalated"
+                  : "Escalate Ticket"}
               </button>
               <div className={styles.layoutSection}>
                 <div className={styles.tdpTabs}>
@@ -324,7 +404,7 @@ export default function AdminTicketDetail() {
                         className={
                           general[
                             `status-${state.ticket?.status
-                              .replace(/\s+/g, "-")
+                              ?.replace(/\s+/g, "-")
                               .toLowerCase()}`
                           ]
                         }
@@ -358,16 +438,59 @@ export default function AdminTicketDetail() {
                               Ticket Owner
                             </div>
                             <div className={styles.tdInfoValue}>
-                              {`${state.ticket?.employee.first_name} ${state.ticket?.employee.last_name}`}
+                              {state.ticket?.user_assignment?.first_name
+                                ? `${state.ticket.user_assignment.first_name} ${state.ticket.user_assignment.last_name}`
+                                : state.ticket?.user_assignment?.username ||
+                                  state.ticket?.user_assignment?.email ||
+                                  "N/A"}
                             </div>
                           </div>
                           <div className={styles.tdInfoLabelValue}>
-                            <div className={styles.tdInfoLabel}>Department</div>
+                            <div className={styles.tdInfoLabel}>Role</div>
                             <div className={styles.tdInfoValue}>
-                              {" "}
-                              {`${state.ticket?.employee.department}`}
+                              {state.ticket?.user_assignment?.role || "N/A"}
                             </div>
                           </div>
+                          {state.currentOwner && (
+                            <>
+                              <div className={styles.tdInfoLabelValue}>
+                                <div className={styles.tdInfoLabel}>
+                                  Current Owner
+                                </div>
+                                <div className={styles.tdInfoValue}>
+                                  {state.currentOwner.user_full_name || "N/A"}
+                                </div>
+                              </div>
+                              <div className={styles.tdInfoLabelValue}>
+                                <div className={styles.tdInfoLabel}>
+                                  Owner Role
+                                </div>
+                                <div className={styles.tdInfoValue}>
+                                  {state.currentOwner.role || "N/A"}
+                                </div>
+                              </div>
+                              <div className={styles.tdInfoLabelValue}>
+                                <div className={styles.tdInfoLabel}>
+                                  Assignment Status
+                                </div>
+                                <div className={styles.tdInfoValue}>
+                                  {state.currentOwner.status || "N/A"}
+                                </div>
+                              </div>
+                              <div className={styles.tdInfoLabelValue}>
+                                <div className={styles.tdInfoLabel}>
+                                  Assigned On
+                                </div>
+                                <div className={styles.tdInfoValue}>
+                                  {state.currentOwner.assigned_on
+                                    ? new Date(
+                                        state.currentOwner.assigned_on
+                                      ).toLocaleString()
+                                    : "N/A"}
+                                </div>
+                              </div>
+                            </>
+                          )}
                         </div>
                       )}
                     </div>
@@ -379,7 +502,7 @@ export default function AdminTicketDetail() {
                         error={error}
                       />
                     </div>
-                    <div className={styles.actionLogs}> 
+                    <div className={styles.actionLogs}>
                       {/* <ActionLog log={logs && logs.length > 0 ? logs[0] : null} /> */}
                     </div>
                   </>
@@ -388,7 +511,10 @@ export default function AdminTicketDetail() {
                 {/* Message Section */}
                 {activeTab === "Messages" && (
                   <div className={styles.messageSection}>
-                    <Messaging />
+                    <Messaging
+                      ticket_id={state.ticket?.ticket_id}
+                      ticket_owner={state.ticket?.user_assignment}
+                    />
                   </div>
                 )}
               </div>
@@ -401,7 +527,14 @@ export default function AdminTicketDetail() {
           closeTicketAction={setOpenTicketAction}
           ticket={state.ticket}
           action={state.action}
-          instance={state.instance}
+          instance={state.taskid}
+        />
+      )}
+      {openEscalateModal && (
+        <EscalateTicket
+          closeEscalateModal={setOpenEscalateModal}
+          ticket={state.ticket}
+          taskItemId={taskItemId}
         />
       )}
     </>

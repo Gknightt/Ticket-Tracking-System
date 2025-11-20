@@ -313,6 +313,19 @@ tr:hover {
   text-align: center;
 }
 
+.status-new {
+  display: inline-block;
+  color: #0EA5E9;
+  background-color: #A6CCDD;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: var(--table-font-size);
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-align: center;
+}
+
 .status-approved {
   display: inline-block;
   color: #10B981;

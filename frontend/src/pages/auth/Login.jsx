@@ -32,6 +32,8 @@ function Login() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // console.log("AUTH USER:", user);
+
   // Check if user is already logged in and redirect accordingly
   useEffect(() => {
     if (user) {
@@ -43,10 +45,10 @@ function Login() {
         navigate(from, { replace: true });
       } else if (isAdmin()) {
         // Redirect to admin dashboard if user has admin role
-        navigate("/admin/dashboard", { replace: true });
+        navigate("/dashboard", { replace: true });
       } else if (hasTtsAccess()) {
         // Redirect to agent dashboard if user has TTS access
-        navigate("/agent/dashboard", { replace: true });
+        navigate("/dashboard", { replace: true });
       } else {
         // Redirect to unauthorized page if user doesn't have appropriate role
         navigate("/unauthorized", { replace: true });
