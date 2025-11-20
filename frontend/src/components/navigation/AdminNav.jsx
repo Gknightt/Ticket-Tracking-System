@@ -94,7 +94,8 @@ export default function AdminNav() {
         {/* nav-links */}
         <div className={`${styles.navLinks} ${menuOpen ? styles.active : ""}`}>
           <NavLink
-            to="/admin/dashboard"
+            // to="/admin/dashboard"
+            to="/dashboard"
             end
             className={({ isActive }) =>
               isActive ? `${styles.navLink} ${styles.active}` : styles.navLink
@@ -103,7 +104,7 @@ export default function AdminNav() {
             Dashboard
           </NavLink>
           <NavLink
-            to="/admin/ticket"
+            to="/ticket"
             className={({ isActive }) =>
               isActive ? `${styles.navLink} ${styles.active}` : styles.navLink
             }
@@ -126,14 +127,6 @@ export default function AdminNav() {
           >
             Agent
           </NavLink>
-          {/* <NavLink
-            to="/admin/ticket"
-            className={({ isActive }) =>
-              isActive ? `${styles.navLink} ${styles.active}` : styles.navLink
-            }
-          >
-            Ticket
-          </NavLink> */}
           <NavLink
             to="/admin/archive"
             className={({ isActive }) =>

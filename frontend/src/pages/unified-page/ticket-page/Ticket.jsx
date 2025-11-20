@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import useDebounce from "../../../utils/useDebounce";
 
 // components
-import AgentNav from "../../../components/navigation/AgentNav";
+import Nav from "../../../components/navigation/Nav";
 import FilterPanel from "../../../components/component/FilterPanel";
 
 // style
@@ -12,7 +12,7 @@ import styles from "./ticket.module.css";
 import general from "../../../style/general.module.css";
 
 // table
-import TicketTable from "../../../tables/agent/TicketTable";
+import TicketTable from "../../../tables/unified-table/TicketTable";
 
 // hook
 import useUserTickets from "../../../api/useUserTickets";
@@ -23,6 +23,8 @@ export default function Ticket() {
   const [searchParams, setSearchParams] = useSearchParams();
   const urlTab = searchParams.get("tab") || "All";
   const [activeTab, setActiveTab] = useState(urlTab);
+
+  console.log("First Ticket:", JSON.stringify(userTickets?.[3], null, 2));
 
   // Filters
   const [filters, setFilters] = useState({
@@ -40,14 +42,12 @@ export default function Ticket() {
   // Extract all ticket data with step_instance_id
   const allTickets = useMemo(() => {
     return (userTickets || []).map((entry) => ({
-      // Map TaskItem fields to expected format
-      // Ensure these values are strings so callers can safely use string methods
       ticket_id: String(entry.ticket_id ?? entry.ticket_number ?? ""),
       subject: String(entry.ticket_subject ?? ""),
       description: String(entry.ticket_description ?? ""),
       status: entry.status,
-      priority: entry.priority || "Medium", // fallback if not provided
-      category: entry.category || "", // fallback if not provided
+      priority: entry.ticket_priority,
+      category: entry.category || "Uncategorized",
       submit_date: entry.assigned_on,
 
       // TaskItem core fields
@@ -64,7 +64,7 @@ export default function Ticket() {
 
       // Ticket fields
       ticket_number: entry.ticket_number,
-      
+
       // Workflow fields
       workflow_id: entry.workflow_id,
       workflow_name: entry.workflow_name,
@@ -81,7 +81,7 @@ export default function Ticket() {
 
       // Metadata
       step_instance_id: entry.task_id, // Use task_id as identifier
-      hasacted: entry.status === 'resolved' || entry.status === 'escalated',
+      hasacted: entry.status === "resolved" || entry.status === "escalated",
     }));
   }, [userTickets]);
 
@@ -166,7 +166,7 @@ export default function Ticket() {
 
   return (
     <>
-      <AgentNav />
+      <Nav />
       <main className={styles.ticketPage}>
         <section className={styles.tpHeader}>
           <h1>Tickets</h1>

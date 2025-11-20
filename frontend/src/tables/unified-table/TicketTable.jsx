@@ -42,28 +42,40 @@ function TicketItem({ item }) {
       <td>{item.hasacted ? "Has Acted" : "Not Yet"}</td>
       <td>{item.ticket_number}</td>
       <td>{item.subject}</td>
-      {/* <td className={general.descriptionCell}>{item.description}</td> */}
       <td className={general.descriptionCell} title={item.description}>
         {item.description}
-      </td>
-
-      <td>
-        <div className={general[`priority-${item.priority.toLowerCase()}`]}>
-          {item.priority}
-        </div>
       </td>
       <td>
         <div
           className={
-            general[`status-${item?.status.replace(/\s+/g, "-").toLowerCase()}`]
+            general[
+              `priority-${
+                item.priority ? item.priority.toLowerCase() : "unknown"
+              }`
+            ]
           }
         >
-          {item?.status}
+          {item.priority || "Unknown"}
         </div>
       </td>
+
+      <td>
+        <div
+          className={
+            general[
+              `status-${
+                item.status
+                  ? item.status.replace(/\s+/g, "-").toLowerCase()
+                  : "unknown"
+              }`
+            ]
+          }
+        >
+          {item.status || "Unknown"}
+        </div>
+      </td>
+
       <td>{item.category ? item.category : "Uncategorized"}</td>
-      {/* <td>{format(new Date(item.submit_date), "MMMM dd, yyyy")}</td>
-      <td>{format(new Date(item.target_resolution), "MMMM dd, yyyy")}</td> */}
       <td>
         {item.submit_date && !isNaN(new Date(item.submit_date))
           ? format(new Date(item.submit_date), "MMMM dd, yyyy")
@@ -79,7 +91,7 @@ function TicketItem({ item }) {
       <td>
         <button
           className={general.btn}
-          onClick={() => navigate(`/admin/ticket/${item.task_item_id}`)}
+          onClick={() => navigate(`/ticket/${item.task_item_id}`)}
         >
           👁
         </button>

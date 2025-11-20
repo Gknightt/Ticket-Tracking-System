@@ -10,11 +10,9 @@ import styles from "./ticket-detail.module.css";
 import general from "../../../style/general.module.css";
 
 // components
-import AgentNav from "../../../components/navigation/AgentNav";
+import Nav from "../../../components/navigation/Nav";
 import WorkflowTracker2 from "../../../components/ticket/WorkflowVisualizer2";
-import DocumentViewer from "../../../components/ticket/DocumentViewer";
 import TicketComments from "../../../components/ticket/TicketComments";
-import ActionLog from "../../../components/ticket/ActionLog";
 import ActionLogList from "../../../components/ticket/ActionLogList";
 import Messaging from "../../../components/messaging";
 
@@ -190,7 +188,7 @@ export default function TicketDetail() {
   if (loading) {
     return (
       <>
-        <AgentNav />
+        <Nav />
         <main className={styles.ticketDetailPage}>
           <section className={styles.tdpHeader}>
             <button
@@ -213,7 +211,7 @@ export default function TicketDetail() {
   if (error) {
     return (
       <>
-        <AgentNav />
+        <Nav />
         <main className={styles.ticketDetailPage}>
           <section className={styles.tdpHeader}>
             <button
@@ -237,7 +235,7 @@ export default function TicketDetail() {
 
   return (
     <>
-      <AgentNav />
+      <Nav />
       <main className={styles.ticketDetailPage}>
         <section className={styles.tdpHeader}>
           <div>
@@ -350,43 +348,38 @@ export default function TicketDetail() {
               className={styles.layoutColumn}
               style={{ flex: 1, minWidth: "300px" }}
             >
-              <button
-                className={
-                  state.ticket?.has_acted
-                    ? styles.actionButtonDisabled
-                    : styles.actionButton
-                }
-                onClick={() => setOpenTicketAction(true)}
-                disabled={state.ticket?.has_acted}
-              >
-                {state.ticket?.has_acted
-                  ? "Action Already Taken"
-                  : "Make an Action"}
-              </button>
-              {/* <button
-                className={styles.escalateButton}
-                onClick={() => setOpenEscalateModal(true)}
-                disabled={state.ticket?.is_escalated}
-              >
-                {state.ticket?.is_escalated
-                  ? "Already Escalated"
-                  : "Escalate Ticket"}
-              </button> */}
-              <button
-                className={
-                  state.ticket?.has_acted || state.ticket?.is_escalated
-                    ? styles.escalateButtonDisabled
-                    : styles.escalateButton
-                }
-                onClick={() => setOpenEscalateModal(true)}
-                disabled={state.ticket?.has_acted || state.ticket?.is_escalated}
-              >
-                {state.ticket?.is_escalated
-                  ? "Already Escalated"
-                  : state.ticket?.has_acted
-                  ? "Action Already Taken"
-                  : "Escalate Ticket"}
-              </button>
+              <div className={styles.layoutFlexButton}>
+                <button
+                  className={
+                    state.ticket?.has_acted
+                      ? styles.actionButtonDisabled
+                      : styles.actionButton
+                  }
+                  onClick={() => setOpenTicketAction(true)}
+                  disabled={state.ticket?.has_acted}
+                >
+                  {state.ticket?.has_acted
+                    ? "Action Already Taken"
+                    : "Make an Action"}
+                </button>
+                <button
+                  className={
+                    state.ticket?.has_acted || state.ticket?.is_escalated
+                      ? styles.escalateButtonDisabled
+                      : styles.escalateButton
+                  }
+                  onClick={() => setOpenEscalateModal(true)}
+                  disabled={
+                    state.ticket?.has_acted || state.ticket?.is_escalated
+                  }
+                >
+                  {state.ticket?.is_escalated
+                    ? "Already Escalated"
+                    : state.ticket?.has_acted
+                    ? "Action Already Taken"
+                    : "Escalate Ticket"}
+                </button>
+              </div>
 
               <div className={styles.layoutSection}>
                 <div className={styles.tdpTabs}>

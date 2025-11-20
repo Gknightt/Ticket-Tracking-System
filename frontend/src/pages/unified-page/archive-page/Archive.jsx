@@ -4,15 +4,15 @@ import { useSearchParams } from "react-router-dom";
 import useDebounce from "../../../utils/useDebounce";
 
 // components
-import AgentNav from "../../../components/navigation/AgentNav";
+import Nav from "../../../components/navigation/Nav";
 import FilterPanel from "../../../components/component/FilterPanel";
 
 // style
-import styles from "./ticket.module.css";
+import styles from "./archive.module.css";
 import general from "../../../style/general.module.css";
 
 // table
-import TicketTable from "../../../tables/agent/TicketTable";
+import TicketTable from "../../../tables/unified-table/TicketTable";
 
 // hook
 import useUserTickets from "../../../api/useUserTickets";
@@ -22,7 +22,7 @@ export default function Ticket() {
   // Tabs with URL sync
   const [searchParams, setSearchParams] = useSearchParams();
   const urlTab = searchParams.get("tab") || "All";
-  const [activeTab, setActiveTab] = useState(urlTab);
+  const activeTab = "Acted";
 
   // Filters
   const [filters, setFilters] = useState({
@@ -40,14 +40,12 @@ export default function Ticket() {
   // Extract all ticket data with step_instance_id
   const allTickets = useMemo(() => {
     return (userTickets || []).map((entry) => ({
-      // Map TaskItem fields to expected format
-      // Ensure these values are strings so callers can safely use string methods
       ticket_id: String(entry.ticket_id ?? entry.ticket_number ?? ""),
       subject: String(entry.ticket_subject ?? ""),
       description: String(entry.ticket_description ?? ""),
       status: entry.status,
-      priority: entry.priority || "Medium", // fallback if not provided
-      category: entry.category || "", // fallback if not provided
+      priority: entry.ticket_priority,
+      category: entry.category || "Uncategorized",
       submit_date: entry.assigned_on,
 
       // TaskItem core fields
@@ -64,7 +62,7 @@ export default function Ticket() {
 
       // Ticket fields
       ticket_number: entry.ticket_number,
-      
+
       // Workflow fields
       workflow_id: entry.workflow_id,
       workflow_name: entry.workflow_name,
@@ -81,7 +79,7 @@ export default function Ticket() {
 
       // Metadata
       step_instance_id: entry.task_id, // Use task_id as identifier
-      hasacted: entry.status === 'resolved' || entry.status === 'escalated',
+      hasacted: entry.status === "resolved" || entry.status === "escalated",
     }));
   }, [userTickets]);
 
@@ -130,24 +128,23 @@ export default function Ticket() {
   // Filter tickets
   const filteredTickets = useMemo(() => {
     return allTickets.filter((ticket) => {
-      if (activeTab === "Acted") {
-        return ticket.hasacted === true;
-      }
+      // Step 1: Only show acted tickets
+      if (!ticket.hasacted) return false;
 
-      // Exclude acted tickets from other tabs
-      if (ticket.hasacted === true) return false;
-
-      if (activeTab !== "All" && ticket.priority !== activeTab) return false;
+      // Step 2: Apply filters
       if (filters.category && ticket.category !== filters.category)
         return false;
+
       if (filters.status && ticket.status !== filters.status) return false;
 
       const openedDate = new Date(ticket.submit_date);
       const start = filters.startDate ? new Date(filters.startDate) : null;
       const end = filters.endDate ? new Date(filters.endDate) : null;
+
       if (start && openedDate < start) return false;
       if (end && openedDate > end) return false;
 
+      // Step 3: Apply search
       const search = (debouncedSearch || "").toLowerCase();
       if (
         search &&
@@ -162,11 +159,11 @@ export default function Ticket() {
 
       return true;
     });
-  }, [allTickets, filters, activeTab, debouncedSearch]);
+  }, [allTickets, filters, debouncedSearch]);
 
   return (
     <>
-      <AgentNav />
+      <Nav />
       <main className={styles.ticketPage}>
         <section className={styles.tpHeader}>
           <h1>Tickets</h1>
@@ -174,20 +171,12 @@ export default function Ticket() {
         <section className={styles.tpBody}>
           {/* Tabs */}
           <div className={styles.tpTabs}>
-            {["All", "Critical", "High", "Medium", "Low", "Acted"].map(
-              (tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`${styles.tpTabLink} ${
-                    activeTab === tab ? styles.active : ""
-                  }`}
-                  type="button"
-                >
-                  {tab}
-                </button>
-              )
-            )}
+            <button
+              className={`${styles.tpTabLink} ${styles.active}`}
+              type="button"
+            >
+              Acted
+            </button>
           </div>
 
           {/* Filters */}

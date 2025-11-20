@@ -363,7 +363,7 @@ export default function AdminTicketDetail() {
                   ? "Action Already Taken"
                   : "Make an Action"}
               </button>
-              <button
+              {/* <button
                 className={styles.escalateButton}
                 onClick={() => setOpenEscalateModal(true)}
                 disabled={state.ticket?.is_escalated}
@@ -371,7 +371,23 @@ export default function AdminTicketDetail() {
                 {state.ticket?.is_escalated
                   ? "Already Escalated"
                   : "Escalate Ticket"}
+              </button> */}
+              <button
+                className={
+                  state.ticket?.has_acted || state.ticket?.is_escalated
+                    ? styles.escalateButtonDisabled
+                    : styles.escalateButton
+                }
+                onClick={() => setOpenEscalateModal(true)}
+                disabled={state.ticket?.has_acted || state.ticket?.is_escalated}
+              >
+                {state.ticket?.is_escalated
+                  ? "Already Escalated"
+                  : state.ticket?.has_acted
+                  ? "Action Already Taken"
+                  : "Escalate Ticket"}
               </button>
+
               <div className={styles.layoutSection}>
                 <div className={styles.tdpTabs}>
                   {["Details", "Messages"].map((tab) => (
