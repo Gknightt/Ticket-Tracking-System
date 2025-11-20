@@ -72,7 +72,7 @@ class GmailAPIService:
             self.service = None
     
     def _get_credentials(self, sender_email):
-        """Get credentials with automatic refresh from database or environment"""
+        """Get credentials with automatic refresh from database, environment, or file"""
         try:
             # Try to load from database first
             from .token_storage import GmailToken
@@ -111,6 +111,29 @@ class GmailAPIService:
                     except Exception as e:
                         logger.error(f"Token refresh failed: {e}")
                         GmailToken.invalidate_token(sender_email)
+                        return None
+                
+                return creds
+            
+            # Try loading from environment variables (production fallback)
+            if os.getenv('GOOGLE_REFRESH_TOKEN'):
+                logger.info("Loading credentials from environment variables")
+                creds = Credentials(
+                    token=None,
+                    refresh_token=os.getenv('GOOGLE_REFRESH_TOKEN'),
+                    token_uri='https://oauth2.googleapis.com/token',
+                    client_id=os.getenv('GOOGLE_CLIENT_ID'),
+                    client_secret=os.getenv('GOOGLE_CLIENT_SECRET'),
+                    scopes=self.SCOPES
+                )
+                
+                # Refresh if expired
+                if creds.expired and creds.refresh_token:
+                    try:
+                        creds.refresh(Request())
+                        logger.info("Token refreshed from environment variables")
+                    except Exception as e:
+                        logger.error(f"Token refresh failed: {e}")
                         return None
                 
                 return creds
