@@ -1,88 +1,34 @@
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 
 // charts
 import PieChart from "../../../components/charts/PieChart";
 import BarChart from "../../../components/charts/BarChart";
-import LineChart from "../../../components/charts/LineChart";
 import DoughnutChart from "../../../components/charts/DoughnutChart";
 import ChartContainer from "../../../components/charts/ChartContainer";
 
 // styles
 import styles from "../report.module.css";
 
-// hooks
-import useTicketsFetcher from "../../../api/useTicketsFetcher";
+export default function AgentTab({ timeFilter, analyticsData = {}, loading, error }) {
+  const { teamPerformance, slaCompliance, assignmentAnalytics } = analyticsData;
 
-// Utility: Convert "HH:MM:SS" => hours as float
-const timeToHours = (timeStr) => {
-  const [h, m, s] = timeStr.split(":").map(Number);
-  return h + m / 60 + s / 3600;
-};
+  if (loading) return <div style={{ padding: "20px" }}>Loading analytics...</div>;
+  if (error) return <div style={{ color: "red", padding: "20px" }}>Error: {error}</div>;
+  if (!teamPerformance && !slaCompliance && !assignmentAnalytics)
+    return <div style={{ padding: "20px" }}>No agent data available</div>;
 
-// Group tickets by assigned agent and compute stats
-const groupByAgent = (tickets) => {
-  const agentMap = {};
+  // Extract data from analytics - use user_name from backend
+  const teamLabels = teamPerformance?.map(t => t.user_name || `User ${t.user_id}`) || [];
+  const teamTicketsHandled = teamPerformance?.map(t => t.total_tasks) || [];
+  const teamAvgTime = teamPerformance?.map(t => Math.round(t.avg_resolution_hours || 0)) || [];
 
-  tickets.forEach((ticket) => {
-    const agent = ticket.assigned_to || "Unassigned";
+  // SLA compliance is by priority, not by agent - use priority labels
+  const slaLabels = slaCompliance?.map(s => s.priority) || [];
+  const slaCompliances = slaCompliance?.map(s => Math.round(s.compliance_rate || 0)) || [];
 
-    if (!agentMap[agent]) {
-      agentMap[agent] = {
-        ticketsHandled: 0,
-        totalResponseTime: 0,
-        responseCount: 0,
-      };
-    }
-
-    agentMap[agent].ticketsHandled += 1;
-
-    if (ticket.response_time) {
-      agentMap[agent].totalResponseTime += timeToHours(ticket.response_time);
-      agentMap[agent].responseCount += 1;
-    }
-  });
-
-  return Object.entries(agentMap).map(([name, data]) => ({
-    name,
-    ticketsHandled: data.ticketsHandled,
-    avgResponseTime:
-      data.responseCount > 0
-        ? (data.totalResponseTime / data.responseCount).toFixed(2)
-        : 0,
-  }));
-};
-
-export default function AgentTab({ timeFilter }) {
-  const { tickets, fetchTickets, loading, error } = useTicketsFetcher();
-
-  useEffect(() => {
-    fetchTickets();
-  }, [fetchTickets]);
-
-  const filteredTickets = useMemo(() => {
-    const { startDate, endDate } = timeFilter || {};
-    if (!startDate && !endDate) return tickets;
-
-    return tickets.filter((t) => {
-      const created = new Date(t.created_at);
-      const start = startDate ? new Date(startDate) : null;
-      const end = endDate ? new Date(endDate) : null;
-
-      if (start && created < start) return false;
-      if (end && created > end) return false;
-
-      return true;
-    });
-  }, [tickets, timeFilter]);
-
-  if (loading) return <div>Loading...</div>;
-  if (error) return <div>Error: {error}</div>;
-  if (!tickets || tickets.length === 0)
-    return <div>No ticket data available.</div>;
-
-  const agents = groupByAgent(filteredTickets);
-  const departments = [...new Set(filteredTickets.map((t) => t.department))];
-  const categories = [...new Set(filteredTickets.map((t) => t.category))];
+  // Assignment analytics by role
+  const assignmentLabels = assignmentAnalytics?.map(a => a.role_name) || [];
+  const assignmentCounts = assignmentAnalytics?.map(a => a.total_assignments) || [];
 
   return (
     <div className={styles.chartsGrid}>
@@ -92,8 +38,8 @@ export default function AgentTab({ timeFilter }) {
         <div className={styles.chartRow}>
           <ChartContainer title="Tickets Handled per Agent">
             <DoughnutChart
-              labels={agents.map((a) => a.name)}
-              values={agents.map((a) => a.ticketsHandled)}
+              labels={teamLabels}
+              values={teamTicketsHandled}
               chartTitle="Tickets Handled per Agent"
               chartLabel="Tickets"
             />
@@ -101,40 +47,34 @@ export default function AgentTab({ timeFilter }) {
 
           <ChartContainer title="Average Response Time by Agent">
             <BarChart
-              labels={agents.map((a) => a.name)}
-              dataPoints={agents.map((a) => parseFloat(a.avgResponseTime))}
-              chartTitle="Avg Response Time (h)"
-              chartLabel="Response Time"
+              labels={teamLabels}
+              dataPoints={teamAvgTime}
+              chartTitle="Avg Response Time (mins)"
+              chartLabel="Minutes"
             />
           </ChartContainer>
         </div>
       </div>
 
-      {/* Department & Issue Insights */}
+      {/* SLA & Assignment Insights */}
       <div className={styles.chartSection}>
-        <h2>User & Department Insights</h2>
+        <h2>SLA & Assignment Insights</h2>
         <div className={styles.chartRow}>
-          <ChartContainer title="Tickets by Department">
-            <PieChart
-              labels={departments}
-              dataPoints={departments.map(
-                (dep) =>
-                  filteredTickets.filter((t) => t.department === dep).length
-              )}
-              chartTitle="Tickets by Department"
-              chartLabel="Tickets"
+          <ChartContainer title="SLA Compliance by Priority">
+            <BarChart
+              labels={slaLabels}
+              dataPoints={slaCompliances}
+              chartTitle="SLA Compliance (%)"
+              chartLabel="Percentage"
             />
           </ChartContainer>
 
-          <ChartContainer title="Top Recurring Issues">
-            <LineChart
-              labels={categories}
-              dataPoints={categories.map(
-                (cat) =>
-                  filteredTickets.filter((t) => t.category === cat).length
-              )}
-              chartTitle="Top Recurring Issues"
-              chartLabel="Issues"
+          <ChartContainer title="Assignment Distribution by Role">
+            <PieChart
+              labels={assignmentLabels}
+              dataPoints={assignmentCounts}
+              chartTitle="Assignment Distribution"
+              chartLabel="Assignments"
             />
           </ChartContainer>
         </div>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 // components
 import AdminNav from "../../components/navigation/AdminNav";
@@ -9,14 +9,38 @@ import WorkflowTab from "./tabs/WorkflowTab";
 import AgentTab from "./tabs/AgentTab";
 import IntegrationTab from "./tabs/IntegrationTab";
 
+// hooks
+import useReportingAnalytics from "../../api/useReportingAnalytics";
+
 // styles
 import styles from "./report.module.css";
 
 export default function Report() {
   const [activeTab, setActiveTab] = useState("ticket");
   const [timeFilter, setTimeFilter] = useState({ startDate: null, endDate: null });
+  
+  // Unified reporting analytics hook
+  const {
+    loading,
+    error,
+    dashboard,
+    statusSummary,
+    slaCompliance,
+    teamPerformance,
+    workflowMetrics,
+    stepPerformance,
+    departmentAnalytics,
+    priorityDistribution,
+    ticketAge,
+    assignmentAnalytics,
+    auditActivity,
+    fetchAllAnalytics,
+  } = useReportingAnalytics();
 
-  // Data will now be fetched in each tab via hooks
+  // Fetch all analytics on component mount
+  useEffect(() => {
+    fetchAllAnalytics();
+  }, [fetchAllAnalytics]);
 
   const handleTabClick = (e, tab) => {
     e.preventDefault();
@@ -26,19 +50,34 @@ export default function Report() {
   const renderActiveTab = () => {
     switch (activeTab) {
       case "ticket":
-        return <TicketTab timeFilter={timeFilter}/>;
+        return <TicketTab timeFilter={timeFilter} analyticsData={{ dashboard, statusSummary, priorityDistribution, ticketAge }} loading={loading} error={error} />;
       case "workflow":
-        return <WorkflowTab timeFilter={timeFilter} />;
+        return <WorkflowTab timeFilter={timeFilter} analyticsData={{ workflowMetrics, departmentAnalytics, stepPerformance }} loading={loading} error={error} />;
       case "agent":
-        return <AgentTab timeFilter={timeFilter} />;
+        return <AgentTab timeFilter={timeFilter} analyticsData={{ teamPerformance, slaCompliance, assignmentAnalytics }} loading={loading} error={error} />;
       case "integration":
-        return <IntegrationTab />;
+        return <IntegrationTab analyticsData={{ auditActivity }} loading={loading} error={error} />;
       default:
-        return <TicketTab />;
+        return <TicketTab timeFilter={timeFilter} analyticsData={{ dashboard, statusSummary, priorityDistribution, ticketAge }} loading={loading} error={error} />;
     }
   };
 
-  // Loading and error states will be handled in each tab
+  // Show loading or error at top level
+  if (error) {
+    return (
+      <>
+        <AdminNav />
+        <main className={styles.reportPage}>
+          <section className={styles.rpHeader}>
+            <h1>Reporting and Analytics</h1>
+          </section>
+          <section className={styles.rpBody}>
+            <div style={{ color: "red", padding: "20px" }}>Error: {error}</div>
+          </section>
+        </main>
+      </>
+    );
+  }
 
   return (
     <>

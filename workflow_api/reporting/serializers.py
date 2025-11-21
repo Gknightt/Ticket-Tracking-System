@@ -21,7 +21,7 @@ class SLAComplianceSerializer(serializers.Serializer):
 class TeamPerformanceSerializer(serializers.Serializer):
     """Serializer for team/user performance metrics"""
     user_id = serializers.IntegerField()
-    username = serializers.CharField(required=False)
+    user_name = serializers.CharField(required=False, allow_blank=True)
     total_tasks = serializers.IntegerField()
     completed_tasks = serializers.IntegerField()
     in_progress_tasks = serializers.IntegerField()

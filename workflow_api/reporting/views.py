@@ -106,8 +106,10 @@ class DashboardSummaryView(APIView):
                 # Convert timedelta to hours
                 avg_resolution_hours = avg_resolution['avg_hours'].total_seconds() / 3600
 
-            # Escalation rate
-            escalated_count = TaskItem.objects.filter(status='escalated').count()
+            # Escalation rate - get latest status from TaskItemHistory
+            escalated_count = TaskItem.objects.filter(
+                taskitemhistory_set__status='escalated'
+            ).distinct().count()
             total_assignments = TaskItem.objects.count()
             escalation_rate = (escalated_count / total_assignments * 100) if total_assignments > 0 else 0
 
@@ -245,6 +247,14 @@ class TeamPerformanceView(APIView):
 
             data = []
             for user_id in unique_user_ids:
+                # Get user name from RoleUsers model
+                from role.models import RoleUsers
+                try:
+                    role_user = RoleUsers.objects.filter(user_id=user_id).first()
+                    user_name = role_user.user_full_name if role_user and role_user.user_full_name else f"User {user_id}"
+                except Exception:
+                    user_name = f"User {user_id}"
+                
                 # Task counts by status
                 total_tasks = Task.objects.filter(
                     taskitem__role_user__user_id=user_id
@@ -283,14 +293,15 @@ class TeamPerformanceView(APIView):
                 if avg_res['avg_hours']:
                     avg_hours = avg_res['avg_hours'].total_seconds() / 3600
 
-                # Escalation count
+                # Escalation count - get from TaskItemHistory
                 escalations = TaskItem.objects.filter(
                     role_user__user_id=user_id,
-                    status='escalated'
-                ).count()
+                    taskitemhistory_set__status='escalated'
+                ).distinct().count()
 
                 data.append({
                     'user_id': user_id,
+                    'user_name': user_name,
                     'total_tasks': total_tasks,
                     'completed_tasks': completed,
                     'in_progress_tasks': in_progress,
@@ -401,8 +412,8 @@ class StepPerformanceView(APIView):
                 completed = tasks_at_step.filter(status='completed').count()
                 escalated = TaskItem.objects.filter(
                     task__current_step=step.step_id,
-                    status='escalated'
-                ).count()
+                    taskitemhistory_set__status='escalated'
+                ).distinct().count()
 
                 # Average time at step
                 avg_time = tasks_at_step.filter(
@@ -635,7 +646,9 @@ class AssignmentAnalyticsView(APIView):
                 )
                 
                 total_assignments = assignments.count()
-                reassignments = assignments.filter(status='reassigned').count()
+                reassignments = assignments.filter(
+                    taskitemhistory_set__status='reassigned'
+                ).distinct().count()
                 
                 # Users in role
                 users_in_role = len(set(assignments.values_list('role_user__user_id', flat=True)))
