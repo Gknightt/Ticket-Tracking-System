@@ -7,7 +7,7 @@ Run this script once to authenticate and generate token.json
 
 import os
 import sys
-import pickle
+import json
 from pathlib import Path
 
 # Add project to path
@@ -48,12 +48,12 @@ def authenticate():
         # Run the OAuth flow
         creds = flow.run_local_server(port=8080, open_browser=True)
         
-        # Save the credentials
-        with open(token_path, 'wb') as token:
-            pickle.dump(creds, token)
+        # Save the credentials in JSON format (not pickle)
+        with open(token_path, 'w') as token:
+            token.write(creds.to_json())
         
         print(f"\n✅ Authentication successful!")
-        print(f"✅ Token saved to {token_path}")
+        print(f"✅ Token saved to {token_path} (JSON format)")
         
         # Test the connection
         print("\n🧪 Testing Gmail API connection...")
