@@ -40,13 +40,13 @@ const useReportingAnalytics = () => {
         queryParams.append('end_date', dateRange.end_date);
       }
       const queryString = queryParams.toString();
-      const qPrefix = queryString ? '?' : '';
+      const queryPrefix = queryString ? `?${queryString}` : '';
 
       // Fetch all 3 endpoints in parallel
       const [ticketsRes, workflowsRes, tasksRes] = await Promise.all([
-        api.get(`analytics/reports/tickets/${qPrefix}${queryString}`),
-        api.get(`analytics/reports/workflows/${qPrefix}${queryString}`),
-        api.get(`analytics/reports/tasks/${qPrefix}${queryString}`),
+        api.get(`analytics/reports/tickets/${queryPrefix}`),
+        api.get(`analytics/reports/workflows/${queryPrefix}`),
+        api.get(`analytics/reports/tasks/${queryPrefix}`),
       ]);
 
       setTicketsReport(ticketsRes.data);
@@ -84,9 +84,9 @@ const useReportingAnalytics = () => {
         queryParams.append('end_date', dateRange.end_date);
       }
       const queryString = queryParams.toString();
-      const qPrefix = queryString ? '?' : '';
+      const queryPrefix = queryString ? `?${queryString}` : '';
 
-      const res = await api.get(`analytics/reports/tickets/${qPrefix}${queryString}`);
+      const res = await api.get(`analytics/reports/tickets/${queryPrefix}`);
       setTicketsReport(res.data);
       return res.data;
     } catch (err) {
@@ -115,9 +115,9 @@ const useReportingAnalytics = () => {
         queryParams.append('end_date', dateRange.end_date);
       }
       const queryString = queryParams.toString();
-      const qPrefix = queryString ? '?' : '';
+      const queryPrefix = queryString ? `?${queryString}` : '';
 
-      const res = await api.get(`analytics/reports/workflows/${qPrefix}${queryString}`);
+      const res = await api.get(`analytics/reports/workflows/${queryPrefix}`);
       setWorkflowsReport(res.data);
       return res.data;
     } catch (err) {
@@ -146,9 +146,9 @@ const useReportingAnalytics = () => {
         queryParams.append('end_date', dateRange.end_date);
       }
       const queryString = queryParams.toString();
-      const qPrefix = queryString ? '?' : '';
+      const queryPrefix = queryString ? `?${queryString}` : '';
 
-      const res = await api.get(`analytics/reports/tasks/${qPrefix}${queryString}`);
+      const res = await api.get(`analytics/reports/tasks/${queryPrefix}`);
       setTasksReport(res.data);
       return res.data;
     } catch (err) {

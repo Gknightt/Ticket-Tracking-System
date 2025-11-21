@@ -3,6 +3,7 @@ import AdminNav from "../../../components/navigation/AdminNav";
 
 // style
 import styles from "./admin-archive.module.css";
+import general from "../../../style/general.module.css";
 
 // react
 import React, { useEffect, useState } from "react";
@@ -54,42 +55,38 @@ export default function AdminArchive() {
 
   // Get status color based on tab and status
   const getStatusColor = (status) => {
-    const normalizedStatus = (status || "").toLowerCase().replace(" ", "_");
-    const colorMap = {
-      new: "status-new",
-      "in progress": "status-in-progress",
-      completed: "status-completed",
-      blocked: "status-blocked",
-      pending: "status-pending",
-      open: "status-open",
-      closed: "status-closed",
-      resolved: "status-resolved",
-    };
-    return colorMap[normalizedStatus] || "status-default";
+    const normalizedStatus = (status || "").toLowerCase().replace(/\s+/g, "-");
+    return `status-${normalizedStatus}`;
   };
 
   // Get priority color
   const getPriorityColor = (priority) => {
-    const colorMap = {
-      high: "priority-high",
-      medium: "priority-medium",
-      low: "priority-low",
-    };
-    return colorMap[priority?.toLowerCase()] || "priority-default";
+    return `priority-${priority?.toLowerCase() || "medium"}`;
+  };
+
+  // Get date color based on urgency
+  const getDateColor = (dateString) => {
+    if (!dateString) return "date-default";
+    const date = new Date(dateString);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const targetDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+    if (targetDate < today) return "date-red";
+    if (targetDate.getTime() === today.getTime()) return "date-red";
+    if (targetDate.getTime() === today.getTime() + 24 * 60 * 60 * 1000) return "date-yellow";
+    return "date-green";
   };
 
   // Format date with relative display
   const formatDate = (dateString) => {
     if (!dateString) return "-";
     const date = new Date(dateString);
-    const now = new Date();
-    const diffTime = date - now;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays < 0) return "Overdue";
-    if (diffDays === 0) return "Due today";
-    if (diffDays === 1) return "Due tomorrow";
-    return date.toLocaleDateString();
+    return date.toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "short",
+      day: "numeric",
+    });
   };
 
   // Format date and time
@@ -423,8 +420,8 @@ export default function AdminArchive() {
                             <th>Workflow</th>
                             <th>Current Step</th>
                             <th>Assignee</th>
-                            <th>Ticket Status</th>
-                            <th>Task Status</th>
+                            {/* <th>Ticket Status</th> */}
+                            {/* <th>Task Status</th> */}
                             <th>Priority</th>
                             <th>Target Date</th>
                             <th>Action</th>
@@ -433,7 +430,7 @@ export default function AdminArchive() {
                         <tbody>
                           {items.length === 0 ? (
                             <tr>
-                              <td colSpan="11" className={styles.noData}>
+                              <td colSpan="9" className={styles.noData}>
                                 No items in this group
                               </td>
                             </tr>
@@ -493,11 +490,11 @@ export default function AdminArchive() {
                                         </p>
                                       )}
                                     </td>
-                                    <td className={styles.status}>
+                                    {/* <td className={styles.status}>
                                       <span
-                                        className={`${styles.statusBadge} ${getStatusColor(
+                                        className={`${general.statusBadge || styles.statusBadge} ${general[getStatusColor(
                                           mainTask.ticket_status
-                                        )}`}
+                                        )]}`}
                                       >
                                         {(mainTask.ticket_status || "unknown")
                                           .replace(/_/g, " ")
@@ -506,26 +503,28 @@ export default function AdminArchive() {
                                     </td>
                                     <td className={styles.status}>
                                       <span
-                                        className={`${styles.statusBadge} ${getStatusColor(
+                                        className={`${general.statusBadge || styles.statusBadge} ${general[getStatusColor(
                                           mainTask.task_status
-                                        )}`}
+                                        )]}`}
                                       >
                                         {(mainTask.task_status || "unknown")
                                           .replace(/_/g, " ")
                                           .toUpperCase()}
                                       </span>
-                                    </td>
+                                    </td> */}
                                     <td className={styles.priority}>
                                       <span
-                                        className={`${styles.priorityBadge} ${getPriorityColor(
-                                          "medium"
-                                        )}`}
+                                        className={`${general.priorityBadge || styles.priorityBadge} ${general[getPriorityColor(
+                                          mainTask.ticket_priority
+                                        )]}`}
                                       >
-                                        MEDIUM
+                                        {mainTask.ticket_priority || "Medium"}
                                       </span>
                                     </td>
                                     <td className={styles.targetDate}>
-                                      {formatDate(mainTask.target_resolution)}
+                                      <span className={`${general.statusBadge || styles.statusBadge} ${general[getDateColor(mainTask.target_resolution)]}`}>
+                                        {formatDate(mainTask.target_resolution)}
+                                      </span>
                                     </td>
                                     <td className={styles.action}>
                                       <button 
@@ -541,7 +540,7 @@ export default function AdminArchive() {
                                   {/* Additional Tasks Row (when expanded) */}
                                   {isTicketExpanded && allTasksForTicket.length > 1 && (
                                     <tr className={styles.expandedRow}>
-                                      <td colSpan="11">
+                                      <td colSpan="9">
                                         <div className={styles.expandedContent}>
                                           <h4 className={styles.detailsTitle}>
                                             All Tasks for This Ticket ({allTasksForTicket.length})
@@ -552,15 +551,15 @@ export default function AdminArchive() {
                                                 <tr>
                                                   <th>Assigned To</th>
                                                   <th>Current Step</th>
-                                                  <th>Status</th>
+                                                  {/* <th>Status</th> */}
                                                   <th>Assigned On</th>
                                                   <th>Notes</th>
                                                 </tr>
                                               </thead>
                                               <tbody>
                                                 {allTasksForTicket.map((task, idx) => (
-                                                  <tr key={`${task.task_item_id}-${idx}`}>
-                                                    <td>
+                                                  <tr key={`${task.task_item_id}-${idx}`} className={styles.tableRow}>
+                                                    <td className={styles.assignee}>
                                                       <div>
                                                         <p className={styles.cellName}>
                                                           {task.user_full_name}
@@ -570,28 +569,30 @@ export default function AdminArchive() {
                                                         </p>
                                                       </div>
                                                     </td>
-                                                    <td>
+                                                    <td className={styles.currentStep}>
                                                       <div>
                                                         <p className={styles.cellName}>
                                                           {task.current_step_name || "-"}
                                                         </p>
                                                       </div>
                                                     </td>
-                                                    <td>
+                                                    {/* <td className={styles.status}>
                                                       <span
-                                                        className={`${styles.statusBadge} ${getStatusColor(
+                                                        className={`${general.statusBadge || styles.statusBadge} ${general[getStatusColor(
                                                           task.status || task.task_status
-                                                        )}`}
+                                                        )]}`}
                                                       >
                                                         {((task.status || task.task_status) || "unknown")
                                                           .replace(/_/g, " ")
                                                           .toUpperCase()}
                                                       </span>
+                                                    </td> */}
+                                                    <td className={styles.targetDate}>
+                                                      <span className={`${general.statusBadge || styles.statusBadge} ${general[getDateColor(task.assigned_on)]}`}>
+                                                        {formatDateTime(task.assigned_on)}
+                                                      </span>
                                                     </td>
-                                                    <td>
-                                                      {formatDateTime(task.assigned_on)}
-                                                    </td>
-                                                    <td>
+                                                    <td className={styles.ticketSubject}>
                                                       {task.notes || "-"}
                                                     </td>
                                                   </tr>

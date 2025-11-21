@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
+import { BarChart3, Grid3X3, List } from "lucide-react";
 
 // components
 import AdminNav from "../../components/navigation/AdminNav";
@@ -17,8 +19,11 @@ import useReportingAnalytics from "../../api/useReportingAnalytics";
 import styles from "./report.module.css";
 
 export default function Report() {
-  const [activeTab, setActiveTab] = useState("ticket");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get("tab") || "taskitem";
+  const [activeTab, setActiveTab] = useState(tabFromUrl);
   const [timeFilter, setTimeFilter] = useState({ startDate: null, endDate: null });
+  const [displayStyle, setDisplayStyle] = useState("charts"); // "charts", "grid", "list"
   
   // Unified reporting analytics hook
   const {
@@ -35,25 +40,49 @@ export default function Report() {
     fetchAllAnalytics();
   }, [fetchAllAnalytics]);
 
+  // Sync activeTab with URL query parameters
+  useEffect(() => {
+    const tabFromUrl = searchParams.get("tab") || "taskitem";
+    setActiveTab(tabFromUrl);
+  }, [searchParams]);
+
+  // Refetch analytics when time filter changes
+  useEffect(() => {
+    if (timeFilter.startDate || timeFilter.endDate) {
+      // Convert dates to ISO format (YYYY-MM-DD)
+      const dateRange = {
+        start_date: timeFilter.startDate ? timeFilter.startDate.toISOString().split('T')[0] : null,
+        end_date: timeFilter.endDate ? timeFilter.endDate.toISOString().split('T')[0] : null,
+      };
+      fetchAllAnalytics(dateRange);
+    }
+  }, [timeFilter, fetchAllAnalytics]);
+
   const handleTabClick = (e, tab) => {
     e.preventDefault();
     setActiveTab(tab);
+    setSearchParams({ tab });
   };
 
   const renderActiveTab = () => {
+    const agentData = {
+      ...ticketsReport,
+      task_performance: tasksReport,
+    };
+
     switch (activeTab) {
-      case "ticket":
-        return <TicketTab timeFilter={timeFilter} analyticsData={ticketsReport} loading={loading} error={error} />;
-      case "workflow":
-        return <WorkflowTab timeFilter={timeFilter} analyticsData={workflowsReport} loading={loading} error={error} />;
-      case "agent":
-        return <AgentTab timeFilter={timeFilter} analyticsData={ticketsReport} loading={loading} error={error} />;
       case "taskitem":
-        return <TaskItemTab timeFilter={timeFilter} analyticsData={tasksReport} loading={loading} error={error} />;
+        return <TaskItemTab displayStyle={displayStyle} timeFilter={timeFilter} analyticsData={tasksReport} loading={loading} error={error} />;
+      case "agent":
+        return <AgentTab displayStyle={displayStyle} timeFilter={timeFilter} analyticsData={agentData} loading={loading} error={error} />;
+      case "ticket":
+        return <TicketTab displayStyle={displayStyle} timeFilter={timeFilter} analyticsData={ticketsReport} loading={loading} error={error} />;
+      case "workflow":
+        return <WorkflowTab displayStyle={displayStyle} timeFilter={timeFilter} analyticsData={workflowsReport} loading={loading} error={error} />;
       case "integration":
-        return <IntegrationTab analyticsData={ticketsReport} loading={loading} error={error} />;
+        return <IntegrationTab displayStyle={displayStyle} analyticsData={ticketsReport} loading={loading} error={error} />;
       default:
-        return <TicketTab timeFilter={timeFilter} analyticsData={ticketsReport} loading={loading} error={error} />;
+        return <TaskItemTab displayStyle={displayStyle} timeFilter={timeFilter} analyticsData={tasksReport} loading={loading} error={error} />;
     }
   };
 
@@ -83,20 +112,61 @@ export default function Report() {
         </section>
 
         <section className={styles.rpBody}>
-          {/* Tabs */}
-          <div className={styles.rpTabs}>
-            {["ticket", "workflow", "agent", "taskitem", "integration"].map((tab) => (
-              <a
-                key={tab}
-                href="#"
-                onClick={(e) => handleTabClick(e, tab)}
-                className={`${styles.rpTabLink} ${
-                  activeTab === tab ? styles.active : ""
-                }`}
+          {/* Controls Row - Tabs and Display Styles */}
+          <div className={styles.controlsRow}>
+            {/* Tabs */}
+            <div className={styles.rpTabs}>
+              {["taskitem", "agent", "ticket", "workflow", "integration"].map((tab) => {
+                const tabLabels = {
+                  taskitem: "Tasks",
+                  agent: "Agent",
+                  ticket: "Ticket",
+                  workflow: "Workflow",
+                  integration: "Integration"
+                };
+                return (
+                  <a
+                    key={tab}
+                    href="#"
+                    onClick={(e) => handleTabClick(e, tab)}
+                    className={`${styles.rpTabLink} ${
+                      activeTab === tab ? styles.active : ""
+                    }`}
+                  >
+                    {tabLabels[tab]}
+                  </a>
+                );
+              })}
+            </div>
+
+            {/* Display Style Controls */}
+            <div className={styles.displayControls}>
+              <span className={styles.displayLabel}>Display:</span>
+              <button
+                onClick={() => setDisplayStyle("charts")}
+                className={`${styles.displayBtn} ${displayStyle === "charts" ? styles.active : ""}`}
+                title="Charts View"
               >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
-              </a>
-            ))}
+                <BarChart3 size={18} />
+                Charts
+              </button>
+              <button
+                onClick={() => setDisplayStyle("grid")}
+                className={`${styles.displayBtn} ${displayStyle === "grid" ? styles.active : ""}`}
+                title="Grid View"
+              >
+                <Grid3X3 size={18} />
+                Grid
+              </button>
+              <button
+                onClick={() => setDisplayStyle("list")}
+                className={`${styles.displayBtn} ${displayStyle === "list" ? styles.active : ""}`}
+                title="List View"
+              >
+                <List size={18} />
+                List
+              </button>
+            </div>
           </div>
 
           {/* Time Filter */}

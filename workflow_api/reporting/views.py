@@ -1,7 +1,7 @@
 from django.db.models import Count, Q, F, Case, When, DecimalField, IntegerField, Avg, Sum, Max, Min, DurationField, OuterRef, Subquery, Value
 from django.db.models.functions import TruncDate, Coalesce
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta, datetime
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
@@ -1077,15 +1077,30 @@ class AggregatedTicketsReportView(APIView):
     def get(self, request):
         try:
             # Parse date filters
-            start_date = request.query_params.get('start_date')
-            end_date = request.query_params.get('end_date')
+            start_date_str = request.query_params.get('start_date')
+            end_date_str = request.query_params.get('end_date')
+            start_date = start_date_str or 'all time'
+            end_date = end_date_str or 'all time'
             
             # Build queryset with date filtering
             queryset = Task.objects.all()
-            if start_date:
-                queryset = queryset.filter(created_at__gte=start_date)
-            if end_date:
-                queryset = queryset.filter(created_at__lte=end_date)
+            if start_date_str:
+                try:
+                    # Parse ISO format date and make timezone-aware (start of day)
+                    start_dt = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                    start_aware = timezone.make_aware(datetime.combine(start_dt, datetime.min.time()))
+                    queryset = queryset.filter(created_at__gte=start_aware)
+                except ValueError:
+                    pass
+            
+            if end_date_str:
+                try:
+                    # Parse ISO format date and make timezone-aware (end of day)
+                    end_dt = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+                    end_aware = timezone.make_aware(datetime.combine(end_dt, datetime.max.time()))
+                    queryset = queryset.filter(created_at__lte=end_aware)
+                except ValueError:
+                    pass
             
             # Dashboard metrics
             total_tickets = queryset.count()
@@ -1196,15 +1211,30 @@ class AggregatedWorkflowsReportView(APIView):
     def get(self, request):
         try:
             # Parse date filters
-            start_date = request.query_params.get('start_date')
-            end_date = request.query_params.get('end_date')
+            start_date_str = request.query_params.get('start_date')
+            end_date_str = request.query_params.get('end_date')
+            start_date = start_date_str or 'all time'
+            end_date = end_date_str or 'all time'
             
             # Build queryset with date filtering
             queryset = Task.objects.all()
-            if start_date:
-                queryset = queryset.filter(created_at__gte=start_date)
-            if end_date:
-                queryset = queryset.filter(created_at__lte=end_date)
+            if start_date_str:
+                try:
+                    # Parse ISO format date and make timezone-aware (start of day)
+                    start_dt = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                    start_aware = timezone.make_aware(datetime.combine(start_dt, datetime.min.time()))
+                    queryset = queryset.filter(created_at__gte=start_aware)
+                except ValueError:
+                    pass
+            
+            if end_date_str:
+                try:
+                    # Parse ISO format date and make timezone-aware (end of day)
+                    end_dt = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+                    end_aware = timezone.make_aware(datetime.combine(end_dt, datetime.max.time()))
+                    queryset = queryset.filter(created_at__lte=end_aware)
+                except ValueError:
+                    pass
             
             # Workflow metrics
             workflows = queryset.values('workflow_id', 'workflow_id__name').annotate(
@@ -1284,15 +1314,30 @@ class AggregatedTasksReportView(APIView):
     def get(self, request):
         try:
             # Parse date filters
-            start_date = request.query_params.get('start_date')
-            end_date = request.query_params.get('end_date')
+            start_date_str = request.query_params.get('start_date')
+            end_date_str = request.query_params.get('end_date')
+            start_date = start_date_str or 'all time'
+            end_date = end_date_str or 'all time'
             
             # Build queryset with date filtering
             queryset = TaskItem.objects.all()
-            if start_date:
-                queryset = queryset.filter(created_at__gte=start_date)
-            if end_date:
-                queryset = queryset.filter(created_at__lte=end_date)
+            if start_date_str:
+                try:
+                    # Parse ISO format date and make timezone-aware (start of day)
+                    start_dt = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                    start_aware = timezone.make_aware(datetime.combine(start_dt, datetime.min.time()))
+                    queryset = queryset.filter(assigned_on__gte=start_aware)
+                except ValueError:
+                    pass
+            
+            if end_date_str:
+                try:
+                    # Parse ISO format date and make timezone-aware (end of day)
+                    end_dt = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+                    end_aware = timezone.make_aware(datetime.combine(end_dt, datetime.max.time()))
+                    queryset = queryset.filter(assigned_on__lte=end_aware)
+                except ValueError:
+                    pass
             
             # Task Item Status Distribution - get LATEST status from taskitemhistory_set only
             # Use Subquery to get only the most recent status for each task item

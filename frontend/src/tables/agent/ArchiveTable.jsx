@@ -16,6 +16,8 @@ const ticketHeaders = [
   "TITLE",
   "DESCRIPTION",
   "PRIORITY",
+  "TICKET STATUS",
+  "TASK STATUS",
   "HAS ACTED",
   "OPENED ON",
   "ACTION",
@@ -46,7 +48,29 @@ function ArchiveItem({ item }) {
           {item.priority}
         </div>
       </td>
-      <td>{item.hasacted ? "Has Acted" : "Not Yet"}</td>
+      <td>
+        <div
+          className={
+            general[`status-${item?.status.replace(/\s+/g, "-").toLowerCase()}`]
+          }
+        >
+          {item?.status}
+        </div>
+      </td>
+      <td>
+        <div
+          className={
+            general[`status-${item?.task_status?.replace(/\s+/g, "-").toLowerCase() || "pending"}`]
+          }
+        >
+          {item?.task_status || "Pending"}
+        </div>
+      </td>
+      <td>
+        <div className={general[`status-${item.hasacted ? "resolved" : "pending"}`]}>
+          {item.hasacted ? "Has Acted" : "Not Yet"}
+        </div>
+      </td>
       <td>{format(new Date(item.submit_date), "MMMM dd, yyyy")}</td>
       <td>
         <button

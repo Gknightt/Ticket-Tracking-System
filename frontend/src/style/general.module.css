@@ -178,7 +178,7 @@
 .ticketTable th {
   padding: 15px;
   text-align: left;
-  font-size: var(--table-font-size);
+  font-size: var(--default-font-size);
   font-weight: 600;
   color: var(--table-color);
   border-top: var(--border-very-light-gray);
@@ -238,7 +238,7 @@ tr:hover {
   background-color: var(--critical-bg-color);
   padding: 2px 10px;
   border-radius: 12px;
-  font-size: var(--table-font-size);
+  font-size: var(--default-font-size);
   font-weight: 600;
   text-transform: uppercase;
   white-space: nowrap;
@@ -251,7 +251,7 @@ tr:hover {
   background-color: var(--high-bg-color);
   padding: 2px 10px;
   border-radius: 12px;
-  font-size: var(--table-font-size);
+  font-size: var(--default-font-size);
   font-weight: 600;
   text-transform: uppercase;
   white-space: nowrap;
@@ -264,7 +264,7 @@ tr:hover {
   background-color: var(--medium-bg-color);
   padding: 2px 10px;
   border-radius: 12px;
-  font-size: var(--table-font-size);
+  font-size: var(--default-font-size);
   font-weight: 600;
   text-transform: uppercase;
   white-space: nowrap;
@@ -277,7 +277,7 @@ tr:hover {
   background-color: var(--low-bg-color);
   padding: 2px 10px;
   border-radius: 12px;
-  font-size: var(--table-font-size);
+  font-size: var(--default-font-size);
   font-weight: 600;
   text-transform: uppercase;
   white-space: nowrap;
@@ -306,7 +306,7 @@ tr:hover {
   background-color: #A6CCDD;
   padding: 2px 10px;
   border-radius: 12px;
-  font-size: var(--table-font-size);
+  font-size: var(--default-font-size);
   font-weight: 600;
   text-transform: uppercase;
   white-space: nowrap;
@@ -319,7 +319,7 @@ tr:hover {
   background-color: #A6CCDD;
   padding: 2px 10px;
   border-radius: 12px;
-  font-size: var(--table-font-size);
+  font-size: var(--default-font-size);
   font-weight: 600;
   text-transform: uppercase;
   white-space: nowrap;
@@ -332,7 +332,7 @@ tr:hover {
   background-color: #A7D1C3;
   padding: 2px 10px;
   border-radius: 12px;
-  font-size: var(--table-font-size);
+  font-size: var(--default-font-size);
   font-weight: 600;
   text-transform: uppercase;
   white-space: nowrap;
@@ -345,7 +345,7 @@ tr:hover {
   background-color: #F3D5A2;
   padding: 2px 10px;
   border-radius: 12px;
-  font-size: var(--table-font-size);
+  font-size: var(--default-font-size);
   font-weight: 600;
   text-transform: uppercase;
   white-space: nowrap;
@@ -358,9 +358,149 @@ tr:hover {
   background-color: #BCBCDF;
   padding: 2px 10px;
   border-radius: 12px;
-  font-size: var(--table-font-size);
+  font-size: var(--default-font-size);
   font-weight: 600;
   text-transform: uppercase;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.status-completed {
+  display: inline-block;
+  color: #10B981;
+  background-color: #A7D1C3;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: var(--default-font-size);
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.status-reassigned {
+  display: inline-block;
+  color: #8B5CF6;
+  background-color: #D4BFFF;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: var(--default-font-size);
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.status-escalated {
+  display: inline-block;
+  color: #DC2626;
+  background-color: #F4A1A1;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: var(--default-font-size);
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.status-resolved {
+  display: inline-block;
+  color: #059669;
+  background-color: #A7D1C3;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: var(--default-font-size);
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.date-overdue {
+  display: inline-block;
+  color: #DC2626;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: var(--default-font-size);
+  font-weight: 600;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.date-urgent {
+  display: inline-block;
+  color: #F59E0B;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: var(--default-font-size);
+  font-weight: 600;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.date-warning {
+  display: inline-block;
+  color: #D97706;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: var(--default-font-size);
+  font-weight: 600;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.date-normal {
+  display: inline-block;
+  color: #10B981;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: var(--default-font-size);
+  font-weight: 600;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.date-default {
+  display: inline-block;
+  color: #6B7280;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: var(--default-font-size);
+  font-weight: 600;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.date-green {
+  display: inline-block;
+  color: #10B981;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: var(--default-font-size);
+  font-weight: 600;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.date-yellow {
+  display: inline-block;
+  color: #F59E0B;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: var(--default-font-size);
+  font-weight: 600;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.date-red {
+  display: inline-block;
+  color: #DC2626;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: var(--default-font-size);
+  font-weight: 600;
   white-space: nowrap;
   text-align: center;
 }

@@ -11,6 +11,7 @@ import { AlertTriangle, GitBranch, Clock, Users, TrendingUp } from "lucide-react
 import styles from "../report.module.css";
 
 export default function TaskItemTab({
+  displayStyle = "charts",
   timeFilter,
   analyticsData = {},
   loading,
@@ -41,7 +42,7 @@ export default function TaskItemTab({
 
   // Performance KPIs
   const timeToActionAvg = perf.time_to_action_hours?.average || 0;
-  const slaCompliance = perf.sla_compliance?.compliance_rate || 0;
+  const slaCompliance = perf.sla_compliance?.summary?.current_compliance_rate_percent || 0;
   const activeItems = perf.active_items || 0;
   const overdueItems = perf.overdue_items || 0;
 
@@ -95,6 +96,172 @@ export default function TaskItemTab({
     },
   ];
 
+  // Render different views based on displayStyle
+  if (displayStyle === "list") {
+    return (
+      <div className={styles.rpTicketTabSection}>
+        <div className={styles.chartSection}>
+          <h2>Task Item KPI</h2>
+          <div className={styles.listView}>
+            {kpiData.map((card, idx) => (
+              <div key={idx} className={styles.listItem}>
+                <div className={styles.listItemContent}>
+                  <span className={styles.listLabel}>{card.title}</span>
+                  <span className={styles.listValue}>{card.value}</span>
+                </div>
+                <div className={styles.listIcon}>{card.icon}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className={styles.chartSection}>
+          <h2>Status & Origin Distribution</h2>
+          <div className={styles.listView}>
+            <div className={styles.analyticsSection}>
+              <h3>Task Status</h3>
+              {statusLabels.map((label, idx) => (
+                <div key={idx} className={styles.listItem}>
+                  <span className={styles.listLabel}>{label}</span>
+                  <span className={styles.listValue}>{statusCounts[idx]}</span>
+                </div>
+              ))}
+            </div>
+            <div className={styles.analyticsSection}>
+              <h3>Origin Distribution</h3>
+              {originLabels.map((label, idx) => (
+                <div key={idx} className={styles.listItem}>
+                  <span className={styles.listLabel}>{label}</span>
+                  <span className={styles.listValue}>{originCounts[idx]}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className={styles.chartSection}>
+          <h2>User Performance</h2>
+          <div className={styles.listView}>
+            {userLabels.map((label, idx) => (
+              <div key={idx} className={styles.analyticsSection}>
+                <h3>{label}</h3>
+                <div className={styles.listItem}>
+                  <span className={styles.listLabel}>Resolved</span>
+                  <span className={styles.listValue}>{userResolved[idx]}</span>
+                </div>
+                <div className={styles.listItem}>
+                  <span className={styles.listLabel}>Escalated</span>
+                  <span className={styles.listValue}>{userEscalated[idx]}</span>
+                </div>
+                <div className={styles.listItem}>
+                  <span className={styles.listLabel}>Breached</span>
+                  <span className={styles.listValue}>{userBreached[idx]}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className={styles.chartSection}>
+          <h2>User Performance</h2>
+          <div className={styles.listView}>
+            {userLabels.map((label, idx) => (
+              <div key={idx} className={styles.analyticsSection}>
+                <h3>{label}</h3>
+                <div className={styles.listItem}>
+                  <span className={styles.listLabel}>Resolved</span>
+                  <span className={styles.listValue}>{userResolved[idx]}</span>
+                </div>
+                <div className={styles.listItem}>
+                  <span className={styles.listLabel}>Escalated</span>
+                  <span className={styles.listValue}>{userEscalated[idx]}</span>
+                </div>
+                <div className={styles.listItem}>
+                  <span className={styles.listLabel}>Breached</span>
+                  <span className={styles.listValue}>{userBreached[idx]}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (displayStyle === "grid") {
+    return (
+      <div className={styles.rpTicketTabSection}>
+        <div className={styles.chartSection}>
+          <h2>Task Item KPI</h2>
+          <div className={styles.gridTable}>
+            <div className={styles.gridHeader}>
+              <div>Metric</div>
+              <div>Value</div>
+            </div>
+            {kpiData.map((card, idx) => (
+              <div key={idx} className={styles.gridRow}>
+                <div>{card.title}</div>
+                <div>{card.value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className={styles.chartSection}>
+          <h2>Task Status Distribution</h2>
+          <div className={styles.gridTable}>
+            <div className={styles.gridHeader}>
+              <div>Status</div>
+              <div>Count</div>
+            </div>
+            {statusLabels.map((label, idx) => (
+              <div key={idx} className={styles.gridRow}>
+                <div>{label}</div>
+                <div>{statusCounts[idx]}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className={styles.chartSection}>
+          <h2>Assignment Origin Distribution</h2>
+          <div className={styles.gridTable}>
+            <div className={styles.gridHeader}>
+              <div>Origin</div>
+              <div>Count</div>
+            </div>
+            {originLabels.map((label, idx) => (
+              <div key={idx} className={styles.gridRow}>
+                <div>{label}</div>
+                <div>{originCounts[idx]}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className={styles.chartSection}>
+          <h2>User Performance Details</h2>
+          <div className={styles.gridTable}>
+            <div className={styles.gridHeader}>
+              <div>User</div>
+              <div>Resolved</div>
+              <div>Escalated</div>
+              <div>Breached</div>
+            </div>
+            {userLabels.map((label, idx) => (
+              <div key={idx} className={styles.gridRow}>
+                <div>{label}</div>
+                <div>{userResolved[idx]}</div>
+                <div>{userEscalated[idx]}</div>
+                <div>{userBreached[idx]}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.rpTicketTabSection}>
       {/* KPI */}
@@ -134,41 +301,6 @@ export default function TaskItemTab({
                 labels={originLabels}
                 values={originCounts}
                 chartTitle="Assignment Origin"
-                chartLabel="Count"
-              />
-            </ChartContainer>
-          </div>
-        </div>
-      </div>
-
-      {/* User Performance */}
-      <div className={styles.chartsGrid}>
-        <div className={styles.chartSection}>
-          <h2>Per-User Task Item Performance</h2>
-          <div className={styles.chartRow}>
-            <ChartContainer title="Resolved Items per User">
-              <BarChart
-                labels={userLabels}
-                dataPoints={userResolved}
-                chartTitle="Resolved Items"
-                chartLabel="Count"
-              />
-            </ChartContainer>
-
-            <ChartContainer title="Escalated Items per User">
-              <BarChart
-                labels={userLabels}
-                dataPoints={userEscalated}
-                chartTitle="Escalated Items"
-                chartLabel="Count"
-              />
-            </ChartContainer>
-
-            <ChartContainer title="Breached Items per User">
-              <BarChart
-                labels={userLabels}
-                dataPoints={userBreached}
-                chartTitle="Breached Items"
                 chartLabel="Count"
               />
             </ChartContainer>

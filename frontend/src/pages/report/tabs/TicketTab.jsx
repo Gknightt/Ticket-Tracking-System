@@ -15,7 +15,7 @@ import {
 // styles
 import styles from "../report.module.css";
 
-export default function TicketTab({ timeFilter, analyticsData = {}, loading, error }) {
+export default function TicketTab({ displayStyle = "charts", timeFilter, analyticsData = {}, loading, error }) {
   const ticketsReport = analyticsData || {};
 
   if (loading) return <div style={{ padding: "20px" }}>Loading analytics...</div>;
@@ -76,6 +76,135 @@ export default function TicketTab({ timeFilter, analyticsData = {}, loading, err
   // Ticket age data - backend returns age_bucket not age_range
   const ageLabels = ticketAge?.map(t => t.age_bucket) || [];
   const ageDataPoints = ticketAge?.map(t => t.count) || [];
+
+  // Render different views based on displayStyle
+  if (displayStyle === "list") {
+    return (
+      <div className={styles.rpTicketTabSection}>
+        {/* KPI as List */}
+        <div className={styles.chartSection}>
+          <h2>Ticket KPI</h2>
+          <div className={styles.listView}>
+            {kpiCardData.map((card, index) => (
+              <div key={index} className={styles.listItem}>
+                <div className={styles.listItemContent}>
+                  <span className={styles.listLabel}>{card.title}</span>
+                  <span className={styles.listValue}>{card.value}</span>
+                </div>
+                <div className={styles.listIcon}>{card.icon}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Analytics as List */}
+        <div className={styles.chartSection}>
+          <h2>Ticket Analytics</h2>
+          <div className={styles.listView}>
+            <div className={styles.analyticsSection}>
+              <h3>By Status</h3>
+              {statusLabels.map((label, idx) => (
+                <div key={idx} className={styles.listItem}>
+                  <span className={styles.listLabel}>{label}</span>
+                  <span className={styles.listValue}>{statusDataPoints[idx]}</span>
+                </div>
+              ))}
+            </div>
+            <div className={styles.analyticsSection}>
+              <h3>By Priority</h3>
+              {priorityLabels.map((label, idx) => (
+                <div key={idx} className={styles.listItem}>
+                  <span className={styles.listLabel}>{label}</span>
+                  <span className={styles.listValue}>{priorityDataPoints[idx]}</span>
+                </div>
+              ))}
+            </div>
+            <div className={styles.analyticsSection}>
+              <h3>By Age</h3>
+              {ageLabels.map((label, idx) => (
+                <div key={idx} className={styles.listItem}>
+                  <span className={styles.listLabel}>{label}</span>
+                  <span className={styles.listValue}>{ageDataPoints[idx]}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (displayStyle === "grid") {
+    return (
+      <div className={styles.rpTicketTabSection}>
+        {/* KPI as Grid Table */}
+        <div className={styles.chartSection}>
+          <h2>Ticket KPI</h2>
+          <div className={styles.gridTable}>
+            <div className={styles.gridHeader}>
+              <div>Metric</div>
+              <div>Value</div>
+            </div>
+            {kpiCardData.map((card, index) => (
+              <div key={index} className={styles.gridRow}>
+                <div>{card.title}</div>
+                <div>{card.value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Analytics as Grid Tables */}
+        <div className={styles.chartSection}>
+          <h2>Ticket Analytics - Status</h2>
+          <div className={styles.gridTable}>
+            <div className={styles.gridHeader}>
+              <div>Status</div>
+              <div>Count</div>
+            </div>
+            {statusLabels.map((label, idx) => (
+              <div key={idx} className={styles.gridRow}>
+                <div>{label}</div>
+                <div>{statusDataPoints[idx]}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className={styles.chartSection}>
+          <h2>Ticket Analytics - Priority</h2>
+          <div className={styles.gridTable}>
+            <div className={styles.gridHeader}>
+              <div>Priority</div>
+              <div>Count</div>
+            </div>
+            {priorityLabels.map((label, idx) => (
+              <div key={idx} className={styles.gridRow}>
+                <div>{label}</div>
+                <div>{priorityDataPoints[idx]}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className={styles.chartSection}>
+          <h2>Ticket Analytics - Age</h2>
+          <div className={styles.gridTable}>
+            <div className={styles.gridHeader}>
+              <div>Age Bucket</div>
+              <div>Count</div>
+            </div>
+            {ageLabels.map((label, idx) => (
+              <div key={idx} className={styles.gridRow}>
+                <div>{label}</div>
+                <div>{ageDataPoints[idx]}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.rpTicketTabSection}>
