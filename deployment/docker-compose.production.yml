@@ -1,0 +1,526 @@
+version: '3.8'
+
+services:
+  # Traefik Reverse Proxy with Let's Encrypt
+  traefik:
+    image: traefik:v2.10
+    container_name: traefik
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - traefik-public
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - CF_API_EMAIL=${CF_API_EMAIL}
+      - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/traefik.yml:ro
+      - ./traefik/acme.json:/acme.json
+      - ./traefik/config.yml:/config.yml:ro
+      - traefik-certificates:/certificates
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.entrypoints=http"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.mapactive.tech`)"
+      - "traefik.http.middlewares.traefik-auth.basicauth.users=${TRAEFIK_DASHBOARD_USER}:${TRAEFIK_DASHBOARD_PASSWORD}"
+      - "traefik.http.middlewares.traefik-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.sslheader.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.routers.traefik.middlewares=traefik-https-redirect"
+      - "traefik.http.routers.traefik-secure.entrypoints=https"
+      - "traefik.http.routers.traefik-secure.rule=Host(`traefik.mapactive.tech`)"
+      - "traefik.http.routers.traefik-secure.middlewares=traefik-auth"
+      - "traefik.http.routers.traefik-secure.tls=true"
+      - "traefik.http.routers.traefik-secure.tls.certresolver=cloudflare"
+      - "traefik.http.routers.traefik-secure.tls.domains[0].main=mapactive.tech"
+      - "traefik.http.routers.traefik-secure.tls.domains[0].sans=*.mapactive.tech"
+      - "traefik.http.routers.traefik-secure.service=api@internal"
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    container_name: postgres_db
+    restart: unless-stopped
+    networks:
+      - traefik-public
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # RabbitMQ Message Broker
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: rabbitmq
+    restart: unless-stopped
+    networks:
+      - traefik-public
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+      RABBITMQ_DEFAULT_VHOST: /
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.rabbitmq.entrypoints=http"
+      - "traefik.http.routers.rabbitmq.rule=Host(`rabbitmq.mapactive.tech`)"
+      - "traefik.http.middlewares.rabbitmq-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.rabbitmq.middlewares=rabbitmq-https-redirect"
+      - "traefik.http.routers.rabbitmq-secure.entrypoints=https"
+      - "traefik.http.routers.rabbitmq-secure.rule=Host(`rabbitmq.mapactive.tech`)"
+      - "traefik.http.routers.rabbitmq-secure.tls=true"
+      - "traefik.http.routers.rabbitmq-secure.tls.certresolver=cloudflare"
+      - "traefik.http.routers.rabbitmq-secure.service=rabbitmq"
+      - "traefik.http.services.rabbitmq.loadbalancer.server.port=15672"
+
+  # Auth Service
+  auth-service:
+    build:
+      context: ../auth
+      dockerfile: Dockerfile
+    container_name: auth-service
+    restart: unless-stopped
+    networks:
+      - traefik-public
+    env_file:
+      - .env
+    environment:
+      DJANGO_ENV: production
+      DJANGO_DEBUG: "False"
+      DJANGO_SECRET_KEY: ${AUTH_SECRET_KEY}
+      DJANGO_JWT_SIGNING_KEY: ${JWT_SIGNING_KEY}
+      DJANGO_ALLOWED_HOSTS: auth.mapactive.tech,auth-service
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/auth_db
+      PGHOST: postgres
+      PGPORT: 5432
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DJANGO_EMAIL_BACKEND: django.core.mail.backends.smtp.EmailBackend
+      DJANGO_EMAIL_HOST: ${EMAIL_HOST}
+      DJANGO_EMAIL_PORT: ${EMAIL_PORT}
+      DJANGO_EMAIL_HOST_USER: ${EMAIL_HOST_USER}
+      DJANGO_EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD}
+      DJANGO_EMAIL_USE_TLS: "True"
+      DJANGO_DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL}
+      FRONTEND_URL: https://mapactive.tech
+      COOKIE_DOMAIN: .mapactive.tech
+      DJANGO_SESSION_COOKIE_SECURE: "True"
+      DJANGO_CSRF_COOKIE_SECURE: "True"
+      DJANGO_SESSION_COOKIE_SAMESITE: None
+      DJANGO_CSRF_COOKIE_SAMESITE: None
+      DJANGO_CORS_ALLOWED_ORIGINS: https://mapactive.tech,https://auth.mapactive.tech,https://workflow.mapactive.tech,https://ticket.mapactive.tech,https://messaging.mapactive.tech,https://notification.mapactive.tech
+      DJANGO_CSRF_TRUSTED_ORIGINS: https://mapactive.tech,https://auth.mapactive.tech,https://workflow.mapactive.tech,https://ticket.mapactive.tech,https://messaging.mapactive.tech,https://notification.mapactive.tech
+      DJANGO_CORS_ALLOW_CREDENTIALS: "True"
+      TTS_SYSTEM_URL: https://mapactive.tech/
+      AMS_SYSTEM_URL: https://mapactive.tech/ams
+      HDTS_SYSTEM_URL: https://mapactive.tech/hdts
+      BMS_SYSTEM_URL: https://mapactive.tech/bms
+      DEFAULT_SYSTEM_URL: https://mapactive.tech/dashboard
+      CELERY_BROKER_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+    volumes:
+      - auth_media:/app/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.auth.entrypoints=http"
+      - "traefik.http.routers.auth.rule=Host(`auth.mapactive.tech`)"
+      - "traefik.http.middlewares.auth-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.auth.middlewares=auth-https-redirect"
+      - "traefik.http.routers.auth-secure.entrypoints=https"
+      - "traefik.http.routers.auth-secure.rule=Host(`auth.mapactive.tech`)"
+      - "traefik.http.routers.auth-secure.tls=true"
+      - "traefik.http.routers.auth-secure.tls.certresolver=cloudflare"
+      - "traefik.http.routers.auth-secure.service=auth"
+      - "traefik.http.services.auth.loadbalancer.server.port=8000"
+    command: sh -c "sleep 15 && ./entrypoint.sh"
+
+  # Workflow API Service
+  workflow-api:
+    build:
+      context: ../workflow_api
+      dockerfile: Dockerfile
+    container_name: workflow-api
+    restart: unless-stopped
+    networks:
+      - traefik-public
+    env_file:
+      - .env
+    environment:
+      DJANGO_ENV: production
+      DJANGO_DEBUG: "False"
+      DJANGO_SECRET_KEY: ${WORKFLOW_SECRET_KEY}
+      DJANGO_JWT_SIGNING_KEY: ${JWT_SIGNING_KEY}
+      DJANGO_ALLOWED_HOSTS: workflow.mapactive.tech,workflow-api
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/workflowmanagement
+      PGHOST: postgres
+      PGPORT: 5432
+      POSTGRES_DB: workflow_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DJANGO_SESSION_COOKIE_SECURE: "True"
+      DJANGO_CSRF_COOKIE_SECURE: "True"
+      DJANGO_SESSION_COOKIE_SAMESITE: None
+      DJANGO_CSRF_COOKIE_SAMESITE: None
+      DJANGO_CORS_ALLOWED_ORIGINS: https://mapactive.tech,https://auth.mapactive.tech,https://workflow.mapactive.tech,https://ticket.mapactive.tech,https://messaging.mapactive.tech,https://notification.mapactive.tech
+      DJANGO_CSRF_TRUSTED_ORIGINS: https://mapactive.tech,https://auth.mapactive.tech,https://workflow.mapactive.tech,https://ticket.mapactive.tech,https://messaging.mapactive.tech,https://notification.mapactive.tech
+      DJANGO_CORS_ALLOW_CREDENTIALS: "True"
+      DJANGO_CELERY_BROKER_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+      DJANGO_NOTIFICATION_SERVICE_BROKER_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+      DJANGO_NOTIFICATION_QUEUE: notification-queue-default
+      DJANGO_TICKET_STATUS_QUEUE: ticket_status-default
+      DJANGO_INAPP_NOTIFICATION_QUEUE: inapp-notification-queue
+      DJANGO_AUTH_SERVICE_URL: http://auth-service:8000
+      DJANGO_NOTIFICATION_SERVICE_URL: http://notification-service:8001
+      DJANGO_TTS_SERVICE_URL: https://workflow.mapactive.tech
+      DJANGO_USER_SERVICE_URL: https://mapactive.tech
+      DJANGO_BASE_URL: https://workflow.mapactive.tech
+      DJANGO_FRONTEND_URL: https://mapactive.tech/register
+    volumes:
+      - workflow_media:/app/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.workflow.entrypoints=http"
+      - "traefik.http.routers.workflow.rule=Host(`workflow.mapactive.tech`)"
+      - "traefik.http.middlewares.workflow-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.workflow.middlewares=workflow-https-redirect"
+      - "traefik.http.routers.workflow-secure.entrypoints=https"
+      - "traefik.http.routers.workflow-secure.rule=Host(`workflow.mapactive.tech`)"
+      - "traefik.http.routers.workflow-secure.tls=true"
+      - "traefik.http.routers.workflow-secure.tls.certresolver=cloudflare"
+      - "traefik.http.routers.workflow-secure.service=workflow"
+      - "traefik.http.services.workflow.loadbalancer.server.port=8000"
+    command: sh -c "sleep 15 && ./start.sh"
+
+  # Workflow Worker
+  workflow-worker:
+    build:
+      context: ../workflow_api
+      dockerfile: Dockerfile
+    container_name: workflow-worker
+    restart: unless-stopped
+    networks:
+      - traefik-public
+    env_file:
+      - .env
+    environment:
+      DJANGO_ENV: production
+      DJANGO_DEBUG: "False"
+      DJANGO_SECRET_KEY: ${WORKFLOW_SECRET_KEY}
+      DJANGO_JWT_SIGNING_KEY: ${JWT_SIGNING_KEY}
+      DJANGO_ALLOWED_HOSTS: workflow-worker
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/workflowmanagement
+      PGHOST: postgres
+      PGPORT: 5432
+      POSTGRES_DB: workflow_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DJANGO_CELERY_BROKER_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+      DJANGO_NOTIFICATION_SERVICE_BROKER_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+      DJANGO_AUTH_SERVICE_URL: http://auth-service:8000
+      DJANGO_NOTIFICATION_SERVICE_URL: http://notification-service:8001
+      C_FORCE_ROOT: "false"
+    volumes:
+      - workflow_media:/app/media
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    command: >
+      sh -c "sleep 25 && 
+             celery -A workflow_api worker --pool=solo --loglevel=info -Q role_send-default,TICKET_TASKS_PRODUCTION,tts.role.sync,tts.user_system_role.sync,workflow_seed_queue,workflow_seed"
+
+  # Ticket Service
+  ticket-service:
+    build:
+      context: ../ticket_service
+      dockerfile: Dockerfile
+    container_name: ticket-service
+    restart: unless-stopped
+    networks:
+      - traefik-public
+    env_file:
+      - .env
+    environment:
+      DJANGO_ENV: production
+      DJANGO_DEBUG: "False"
+      DJANGO_SECRET_KEY: ${TICKET_SECRET_KEY}
+      DJANGO_ALLOWED_HOSTS: ticket.mapactive.tech,ticket-service
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/ticket_db
+      PGHOST: postgres
+      PGPORT: 5432
+      POSTGRES_DB: ticket_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DJANGO_SESSION_COOKIE_SECURE: "True"
+      DJANGO_CSRF_COOKIE_SECURE: "True"
+      DJANGO_SESSION_COOKIE_SAMESITE: None
+      DJANGO_CSRF_COOKIE_SAMESITE: None
+      DJANGO_CORS_ALLOWED_ORIGINS: https://mapactive.tech,https://auth.mapactive.tech,https://workflow.mapactive.tech,https://ticket.mapactive.tech,https://messaging.mapactive.tech,https://notification.mapactive.tech
+      DJANGO_CSRF_TRUSTED_ORIGINS: https://mapactive.tech,https://auth.mapactive.tech,https://workflow.mapactive.tech,https://ticket.mapactive.tech,https://messaging.mapactive.tech,https://notification.mapactive.tech
+      DJANGO_CORS_ALLOW_CREDENTIALS: "True"
+      CELERY_BROKER_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+      CELERY_TASK_DEFAULT_QUEUE: TICKET_TASKS_PRODUCTION
+    volumes:
+      - ticket_media:/app/media
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ticket.entrypoints=http"
+      - "traefik.http.routers.ticket.rule=Host(`ticket.mapactive.tech`)"
+      - "traefik.http.middlewares.ticket-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.ticket.middlewares=ticket-https-redirect"
+      - "traefik.http.routers.ticket-secure.entrypoints=https"
+      - "traefik.http.routers.ticket-secure.rule=Host(`ticket.mapactive.tech`)"
+      - "traefik.http.routers.ticket-secure.tls=true"
+      - "traefik.http.routers.ticket-secure.tls.certresolver=cloudflare"
+      - "traefik.http.routers.ticket-secure.service=ticket"
+      - "traefik.http.services.ticket.loadbalancer.server.port=7000"
+    command: sh -c "sleep 25 && ./start.sh"
+
+  # Messaging Service
+  messaging-service:
+    build:
+      context: ../messaging
+      dockerfile: Dockerfile
+    container_name: messaging-service
+    restart: unless-stopped
+    networks:
+      - traefik-public
+    env_file:
+      - .env
+    environment:
+      DJANGO_ENV: production
+      DJANGO_DEBUG: "False"
+      DJANGO_SECRET_KEY: ${MESSAGING_SECRET_KEY}
+      DJANGO_JWT_SIGNING_KEY: ${JWT_SIGNING_KEY}
+      DJANGO_ALLOWED_HOSTS: messaging.mapactive.tech,messaging-service
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/messaging_db
+      PGHOST: postgres
+      PGPORT: 5432
+      POSTGRES_DB: messaging_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DJANGO_SESSION_COOKIE_SECURE: "True"
+      DJANGO_CSRF_COOKIE_SECURE: "True"
+      DJANGO_SESSION_COOKIE_SAMESITE: None
+      DJANGO_CSRF_COOKIE_SAMESITE: None
+      DJANGO_CORS_ALLOWED_ORIGINS: https://mapactive.tech,https://auth.mapactive.tech,https://workflow.mapactive.tech,https://ticket.mapactive.tech,https://messaging.mapactive.tech,https://notification.mapactive.tech
+      DJANGO_CSRF_TRUSTED_ORIGINS: https://mapactive.tech,https://auth.mapactive.tech,https://workflow.mapactive.tech,https://ticket.mapactive.tech,https://messaging.mapactive.tech,https://notification.mapactive.tech
+      DJANGO_CORS_ALLOW_CREDENTIALS: "True"
+      DJANGO_MEDIA_BASE_URL: https://messaging.mapactive.tech
+    volumes:
+      - messaging_media:/app/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.messaging.entrypoints=http"
+      - "traefik.http.routers.messaging.rule=Host(`messaging.mapactive.tech`)"
+      - "traefik.http.middlewares.messaging-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.messaging.middlewares=messaging-https-redirect"
+      - "traefik.http.routers.messaging-secure.entrypoints=https"
+      - "traefik.http.routers.messaging-secure.rule=Host(`messaging.mapactive.tech`)"
+      - "traefik.http.routers.messaging-secure.tls=true"
+      - "traefik.http.routers.messaging-secure.tls.certresolver=cloudflare"
+      - "traefik.http.routers.messaging-secure.service=messaging"
+      - "traefik.http.services.messaging.loadbalancer.server.port=8001"
+    command: sh -c "sleep 15 && ./entrypoint.sh"
+
+  # Notification Service
+  notification-service:
+    build:
+      context: ../notification_service
+      dockerfile: Dockerfile
+    container_name: notification-service
+    restart: unless-stopped
+    networks:
+      - traefik-public
+    env_file:
+      - .env
+    environment:
+      DJANGO_ENV: production
+      DJANGO_DEBUG: "False"
+      DJANGO_SECRET_KEY: ${NOTIFICATION_SECRET_KEY}
+      DJANGO_JWT_SIGNING_KEY: ${JWT_SIGNING_KEY}
+      DJANGO_ALLOWED_HOSTS: notification.mapactive.tech,notification-service
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/notificationservice
+      PGHOST: postgres
+      PGPORT: 5432
+      POSTGRES_DB: notification_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DJANGO_SESSION_COOKIE_SECURE: "True"
+      DJANGO_CSRF_COOKIE_SECURE: "True"
+      DJANGO_SESSION_COOKIE_SAMESITE: None
+      DJANGO_CSRF_COOKIE_SAMESITE: None
+      DJANGO_EMAIL_BACKEND: django.core.mail.backends.smtp.EmailBackend
+      DJANGO_EMAIL_HOST: ${EMAIL_HOST}
+      DJANGO_EMAIL_PORT: ${EMAIL_PORT}
+      DJANGO_EMAIL_HOST_USER: ${EMAIL_HOST_USER}
+      DJANGO_EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD}
+      DJANGO_EMAIL_USE_TLS: "True"
+      DJANGO_DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL}
+      DJANGO_CORS_ALLOWED_ORIGINS: https://mapactive.tech,https://notification.mapactive.tech
+      DJANGO_CSRF_TRUSTED_ORIGINS: https://mapactive.tech,https://notification.mapactive.tech
+      DJANGO_CORS_ALLOW_CREDENTIALS: "True"
+      DJANGO_NOTIFICATION_SERVICE_PORT: 8001
+      DJANGO_AUTH_SERVICE_URL: http://auth-service:8000
+      DJANGO_NOTIFICATION_API_KEYS: ${NOTIFICATION_API_KEYS}
+      DJANGO_API_KEY: ${NOTIFICATION_INTERNAL_API_KEY}
+      DJANGO_CELERY_BROKER_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+      DJANGO_NOTIFICATION_QUEUE: notification-queue
+      DJANGO_INAPP_NOTIFICATION_QUEUE: inapp-notification-queue
+    volumes:
+      - notification_media:/app/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.notification.entrypoints=http"
+      - "traefik.http.routers.notification.rule=Host(`notification.mapactive.tech`)"
+      - "traefik.http.middlewares.notification-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.notification.middlewares=notification-https-redirect"
+      - "traefik.http.routers.notification-secure.entrypoints=https"
+      - "traefik.http.routers.notification-secure.rule=Host(`notification.mapactive.tech`)"
+      - "traefik.http.routers.notification-secure.tls=true"
+      - "traefik.http.routers.notification-secure.tls.certresolver=cloudflare"
+      - "traefik.http.routers.notification-secure.service=notification"
+      - "traefik.http.services.notification.loadbalancer.server.port=8001"
+    command: sh -c "sleep 15 && ./entrypoint.sh"
+
+  # Notification Worker
+  notification-worker:
+    build:
+      context: ../notification_service
+      dockerfile: Dockerfile
+    container_name: notification-worker
+    restart: unless-stopped
+    networks:
+      - traefik-public
+    env_file:
+      - .env
+    environment:
+      DJANGO_ENV: production
+      DJANGO_DEBUG: "False"
+      DJANGO_SECRET_KEY: ${NOTIFICATION_SECRET_KEY}
+      DJANGO_JWT_SIGNING_KEY: ${JWT_SIGNING_KEY}
+      DJANGO_ALLOWED_HOSTS: notification-worker
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/notificationservice
+      PGHOST: postgres
+      PGPORT: 5432
+      POSTGRES_DB: notification_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DJANGO_EMAIL_BACKEND: django.core.mail.backends.smtp.EmailBackend
+      DJANGO_EMAIL_HOST: ${EMAIL_HOST}
+      DJANGO_EMAIL_PORT: ${EMAIL_PORT}
+      DJANGO_EMAIL_HOST_USER: ${EMAIL_HOST_USER}
+      DJANGO_EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD}
+      DJANGO_EMAIL_USE_TLS: "True"
+      DJANGO_DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL}
+      DJANGO_AUTH_SERVICE_URL: http://auth-service:8000
+      DJANGO_NOTIFICATION_API_KEYS: ${NOTIFICATION_API_KEYS}
+      DJANGO_API_KEY: ${NOTIFICATION_INTERNAL_API_KEY}
+      DJANGO_CELERY_BROKER_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+      DJANGO_NOTIFICATION_QUEUE: notification-queue
+      DJANGO_INAPP_NOTIFICATION_QUEUE: inapp-notification-queue
+    volumes:
+      - notification_media:/app/media
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      notification-service:
+        condition: service_started
+    command: >
+      sh -c "sleep 20 && 
+             celery -A notification_service worker --loglevel=info -Q notification-queue-default,inapp-notification-queue"
+
+  # Frontend React Application
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_AUTH_URL: https://auth.mapactive.tech
+        VITE_WORKFLOW_API: https://workflow.mapactive.tech/workflow
+        VITE_BACKEND_API: https://workflow.mapactive.tech/
+        VITE_TICKET_API: https://ticket.mapactive.tech/tickets
+        VITE_MESSAGING_API: https://messaging.mapactive.tech
+        VITE_NOTIFICATION_API: https://notification.mapactive.tech
+        VITE_USER_SERVER_API: https://auth.mapactive.tech
+    container_name: frontend
+    restart: unless-stopped
+    networks:
+      - traefik-public
+    depends_on:
+      - auth-service
+      - workflow-api
+      - ticket-service
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.entrypoints=http"
+      - "traefik.http.routers.frontend.rule=Host(`mapactive.tech`) || Host(`www.mapactive.tech`)"
+      - "traefik.http.middlewares.frontend-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.frontend.middlewares=frontend-https-redirect"
+      - "traefik.http.routers.frontend-secure.entrypoints=https"
+      - "traefik.http.routers.frontend-secure.rule=Host(`mapactive.tech`) || Host(`www.mapactive.tech`)"
+      - "traefik.http.routers.frontend-secure.tls=true"
+      - "traefik.http.routers.frontend-secure.tls.certresolver=cloudflare"
+      - "traefik.http.routers.frontend-secure.service=frontend"
+      - "traefik.http.services.frontend.loadbalancer.server.port=1000"
+
+networks:
+  traefik-public:
+    name: traefik-public
+    driver: bridge
+
+volumes:
+  traefik-certificates:
+  postgres_data:
+  rabbitmq_data:
+  auth_media:
+  workflow_media:
+  ticket_media:
+  messaging_media:
+  notification_media:

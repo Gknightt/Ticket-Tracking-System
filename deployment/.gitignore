@@ -1,0 +1,36 @@
+# Environment files with secrets
+.env
+*.env
+
+# SSL certificates
+traefik/acme.json
+
+# Backup files
+backups/
+*.sql
+*.sql.gz
+*.tar.gz
+*.backup
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Docker volumes (these are managed by Docker)
+*_data/
+
+# System files
+.directory
