@@ -2,7 +2,8 @@ from django.urls import path
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
-from .views import UserIDsByRoleView, UserInfoByIDView, UsersInfoBatchView, AssignAgentToRoleView, assign_agent_to_role_form, CreateRoleView, UpdateAssignmentView, role_management_view, role_assignments_view
+from .views import UserIDsByRoleView, UserInfoByIDView, UsersInfoBatchView, AssignAgentToRoleView, assign_agent_to_role_form, role_assignments_view
+from users.views import CreateRoleView, UpdateAssignmentView, role_management_view
 
 app_name = 'tts'
 

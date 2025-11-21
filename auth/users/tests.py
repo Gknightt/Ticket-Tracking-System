@@ -269,5 +269,5 @@ class InviteAgentViewTests(TestCase):
 		mock_get_user.return_value = self.superuser
 		response = self.client.get(reverse('invite-agent'))
 		self.assertEqual(response.status_code, 200)
-		self.assertTemplateUsed(response, 'users/invite_agent.html')
+		self.assertTemplateUsed(response, 'admins/invite_agent.html')
 		self.assertEqual(response.context['user'], self.superuser)

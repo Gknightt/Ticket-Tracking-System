@@ -144,8 +144,16 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return None
     
     def get_system_roles(self, obj):
-        """Get system roles for the user."""
+        """Get system roles for the user, filtered by current system from session."""
+        request = self.context.get('request')
         system_roles = UserSystemRole.objects.filter(user=obj).select_related('system', 'role')
+        
+        # Filter by current system if available in session
+        if request:
+            current_system_slug = request.session.get('last_selected_system')
+            if current_system_slug:
+                system_roles = system_roles.filter(system__slug=current_system_slug)
+        
         return [
             {
                 'id': assignment.id,  # Include the UserSystemRole ID for updates
@@ -620,30 +628,12 @@ class ResetPasswordSerializer(serializers.Serializer):
 
 
 def send_otp_email(user, otp_code):
-    """Send OTP code to user's email."""
-    subject = 'Your Authentication Code'
-    message = f'''
-Hello {user.get_full_name() or user.email},
-
-Your authentication code is: {otp_code}
-
-This code will expire in 5 minutes. Please do not share this code with anyone.
-
-If you did not request this code, please ignore this email.
-
-Best regards,
-Authentication Service Team
-    '''
+    """Send OTP code to user's email via notification service."""
+    from notification_client import notification_client
     
     try:
-        send_mail(
-            subject=subject,
-            message=message.strip(),
-            from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@example.com'),
-            recipient_list=[user.email],
-            fail_silently=False,
-        )
-        return True
+        success = notification_client.send_otp_email_async(user, otp_code)
+        return success
     except Exception as e:
         # Log the error in production
         print(f"Failed to send OTP email to {user.email}: {str(e)}")
@@ -651,54 +641,12 @@ Authentication Service Team
 
 
 def send_password_reset_email(user, reset_token, request=None):
-    """Send password reset email to user."""
-    # Build the reset URL
-    if request:
-        base_url = f"{request.scheme}://{request.get_host()}"
-    else:
-        base_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
-    
-    reset_url = f"{base_url}/api/v1/users/password/reset?token={reset_token.token}"
-    
-    subject = 'Password Reset Request'
-    message = f'''
-Hello {user.get_full_name() or user.email},
-
-We received a request to reset your password. If you made this request, please click the link below to reset your password:
-
-{reset_url}
-
-This link will expire in 1 hour.
-
-If you did not request a password reset, please ignore this email. Your password will remain unchanged.
-
-Best regards,
-Authentication Service Team
-    '''
+    """Send password reset email to user via notification service."""
+    from notification_client import notification_client
     
     try:
-        # Send email asynchronously to avoid blocking the request
-        from threading import Thread
-        
-        def send_async():
-            try:
-                send_mail(
-                    subject=subject,
-                    message=message.strip(),
-                    from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@example.com'),
-                    recipient_list=[user.email],
-                    fail_silently=False,
-                )
-            except Exception as e:
-                # Log the error in production
-                print(f"Failed to send password reset email to {user.email}: {str(e)}")
-        
-        # Start the email sending in a separate thread
-        email_thread = Thread(target=send_async)
-        email_thread.daemon = True
-        email_thread.start()
-        
-        return True
+        success = notification_client.send_password_reset_email_async(user, reset_token, request)
+        return success
     except Exception as e:
         # Log the error in production
         print(f"Failed to initiate password reset email to {user.email}: {str(e)}")

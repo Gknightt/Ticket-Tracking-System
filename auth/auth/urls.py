@@ -10,7 +10,7 @@ from rest_framework import serializers
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 from drf_spectacular.utils import extend_schema
 from users.views import *
-from tts.views import assign_agent_to_role_form, role_management_view
+from tts.views import assign_agent_to_role_form
 from hdts import views as hdts_views
 
 def root_redirect(request):

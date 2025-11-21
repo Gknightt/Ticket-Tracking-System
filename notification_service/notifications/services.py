@@ -1,8 +1,8 @@
-from django.core.mail import send_mail
 from django.conf import settings
 from django.utils import timezone
 from django.template import Template, Context
 from .models import NotificationTemplate, NotificationLog, NotificationRequest
+from .gmail_service import get_gmail_service
 import logging
 
 logger = logging.getLogger(__name__)
@@ -128,22 +128,30 @@ class NotificationService:
             )
             
             try:
-                # Send the email
-                send_mail(
+                # Send the email using Gmail API
+                gmail_service = get_gmail_service()
+                success, message_id, error = gmail_service.send_email(
+                    to_email=user_email,
                     subject=rendered_subject,
-                    message=rendered_body,
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[user_email],
-                    fail_silently=False,
+                    body_text=rendered_body,
+                    body_html=template.body_html if template.body_html else None
                 )
                 
-                # Update log status
-                notification_log.status = 'sent'
-                notification_log.sent_at = timezone.now()
-                notification_log.save()
-                
-                logger.info(f"Notification '{notification_type}' sent successfully to {user_email}")
-                return True
+                if success:
+                    # Update log status
+                    notification_log.status = 'sent'
+                    notification_log.sent_at = timezone.now()
+                    notification_log.save()
+                    
+                    logger.info(f"Notification '{notification_type}' sent successfully to {user_email}. Message ID: {message_id}")
+                    return True
+                else:
+                    # Update log with error
+                    notification_log.status = 'failed'
+                    notification_log.error_message = error
+                    notification_log.save()
+                    logger.error(f"Failed to send notification '{notification_type}' to {user_email}: {error}")
+                    return False
                 
             except Exception as e:
                 # Update log with error

@@ -3,6 +3,10 @@ import uuid
 from django.utils import timezone
 
 
+# Import token storage model
+from .token_storage import GmailToken  # noqa
+
+
 class NotificationTemplate(models.Model):
     """
     Template for different types of notifications
@@ -45,7 +49,7 @@ class NotificationLog(models.Model):
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user_id = models.UUIDField(help_text="User ID from auth service", null=True, blank=True)
+    user_id = models.CharField(max_length=255, help_text="User ID from auth service (can be UUID or integer)", null=True, blank=True)
     user_email = models.EmailField()
     notification_type = models.CharField(max_length=50)
     recipient_email = models.EmailField()
@@ -74,7 +78,7 @@ class NotificationRequest(models.Model):
     Incoming notification requests from other services
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user_id = models.UUIDField(null=True, blank=True, help_text="User ID from requesting service (optional)")
+    user_id = models.CharField(max_length=255, null=True, blank=True, help_text="User ID from requesting service (can be UUID or integer)")
     user_email = models.EmailField()
     user_name = models.CharField(max_length=255, blank=True)
     notification_type = models.CharField(max_length=50)

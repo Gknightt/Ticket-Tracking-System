@@ -116,16 +116,20 @@ class UserViewSet(viewsets.ModelViewSet):
         return filter_users_by_system_access(queryset, self.request.user)
 
     def list(self, request):
-        """List users with filtering based on permissions and system slug"""
+        """List users with filtering based on permissions and current system from session"""
         queryset = self.get_queryset()
         
-        # Filter by system slug if provided in query params
-        system_slug = request.query_params.get('system_slug')
-        if system_slug:
-            # Filter users who have a system role in the specified system
+        # Get current system from session
+        current_system_slug = request.session.get('last_selected_system')
+        
+        if current_system_slug:
+            # Filter users who have a system role in the current system
             queryset = queryset.filter(
-                system_roles__system__slug=system_slug
+                system_roles__system__slug=current_system_slug
             ).distinct()
+        elif not request.user.is_superuser:
+            # If no system in session and not superuser, return empty queryset
+            queryset = queryset.none()
         
         serializer = self.get_serializer(queryset, many=True, context={'request': request})
         return Response({
@@ -316,10 +320,14 @@ def agent_management_view(request):
             messages.error(request, 'Access denied. You need admin privileges to access agent management.')
             return redirect('profile-settings')
     
+    # Get current system from session
+    current_system_slug = request.session.get('last_selected_system', '')
+    
     context = {
         'user': user,
+        'current_system': current_system_slug,
     }
-    return render(request, 'users/agent_management.html', context)
+    return render(request, 'admins/agent_management.html', context)
 
 
 @jwt_cookie_required
@@ -345,4 +353,4 @@ def invite_agent_view(request):
     context = {
         'user': user,
     }
-    return render(request, 'users/invite_agent.html', context)
+    return render(request, 'admins/invite_agent.html', context)
