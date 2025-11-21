@@ -316,8 +316,8 @@ class TaskTransitionView(CreateAPIView):
             'current_user_id': current_user_id,
             'user_action_status': 'acted',
             'acted_on_step': {
-                'step_id': user_assignment.acted_on_step.step_id,
-                'name': user_assignment.acted_on_step.name
+                'step_id': user_assignment.assigned_on_step.step_id,
+                'name': user_assignment.assigned_on_step.name
             },
             'previous_step': {
                 'step_id': previous_step.step_id,
