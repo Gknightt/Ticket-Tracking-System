@@ -143,6 +143,7 @@ services:
       DJANGO_ENV: "development"
       DJANGO_DEBUG: "True"
       DJANGO_SECRET_KEY: "your-auth-service-secret-key-here"
+      SECRET_KEY: "your-auth-service-secret-key-here"
       DJANGO_JWT_SIGNING_KEY: "signing-key-1234"
       DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1,auth-service"
       DJANGO_EMAIL_BACKEND: "django.core.mail.backends.console.EmailBackend"

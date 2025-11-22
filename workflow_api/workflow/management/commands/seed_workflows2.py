@@ -242,6 +242,7 @@ class Command(BaseCommand):
                         'sub_category': wf_data["sub_category"],
                         'end_logic': end_logic,
                         'department': wf_data["department"],
+                        'is_published': True,
                         'urgent_sla': timedelta(hours=4),
                         'high_sla': timedelta(hours=8),
                         'medium_sla': timedelta(days=2),
