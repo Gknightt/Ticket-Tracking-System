@@ -60,7 +60,16 @@ jobs:
 
       - name: Run auth service tests
         run: |
-          python manage.py test users.tests --verbosity=2 || true
+          python manage.py test --verbosity=2
+        continue-on-error: false
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-service-test-results
+          path: auth/test-results/
+          retention-days: 7
 
   workflow-api-tests:
     name: Workflow API Tests
@@ -94,13 +103,60 @@ jobs:
         run: |
           python manage.py collectstatic --noinput --clear || true
 
-      - name: Run workflow audit logging tests
+      - name: Run Roles Management Tests
         run: |
-          python manage.py shell < test_audit_logging.py 2>&1 || true
+          python manage.py test tests.test_roles_management --verbosity=2
+        continue-on-error: false
 
-      - name: Run workflow tests
+      - name: Run Workflow Creation Tests
         run: |
-          python manage.py test || true
+          python manage.py test tests.test_workflow_creation --verbosity=2
+        continue-on-error: false
+
+      - name: Run Workflow Editing Tests
+        run: |
+          python manage.py test tests.test_workflow_editing --verbosity=2
+        continue-on-error: false
+
+      - name: Run Workflow Graph Tests
+        run: |
+          python manage.py test tests.test_workflow_graph --verbosity=2
+        continue-on-error: false
+
+      - name: Run Steps & Transitions Tests
+        run: |
+          python manage.py test tests.test_steps_transitions --verbosity=2
+        continue-on-error: false
+
+      - name: Run Ticket Generation Tests
+        run: |
+          python manage.py test tests.test_ticket_generation --verbosity=2
+        continue-on-error: false
+
+      - name: Run Task Assignment Tests
+        run: |
+          python manage.py test tests.test_task_assignment --verbosity=2
+        continue-on-error: false
+
+      - name: Run API Endpoints Tests
+        run: |
+          python manage.py test tests.test_api_endpoints --verbosity=2
+        continue-on-error: false
+
+      - name: Run workflow audit logging tests
+        # Note: This test uses Django shell and may have external dependencies
+        # Set to continue-on-error to not block the build
+        run: |
+          python manage.py shell < test_audit_logging.py 2>&1
+        continue-on-error: true
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-api-test-results
+          path: workflow_api/test-results/
+          retention-days: 7
 
   ticket-service-tests:
     name: Ticket Service Tests
@@ -136,7 +192,16 @@ jobs:
 
       - name: Run ticket service tests
         run: |
-          python manage.py test || true
+          python manage.py test --verbosity=2
+        continue-on-error: false
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ticket-service-test-results
+          path: ticket_service/test-results/
+          retention-days: 7
 
   messaging-service-tests:
     name: Messaging Service Tests
@@ -168,7 +233,21 @@ jobs:
 
       - name: Run websocket tests
         run: |
-          python test_websocket_comments.py 2>&1 || true
+          python test_websocket_comments.py 2>&1
+        continue-on-error: true
+
+      - name: Run messaging tests
+        run: |
+          python manage.py test --verbosity=2
+        continue-on-error: false
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: messaging-service-test-results
+          path: messaging/test-results/
+          retention-days: 7
 
   notification-service-tests:
     name: Notification Service Tests
@@ -200,7 +279,21 @@ jobs:
 
       - name: Run notification queue tests
         run: |
-          python test_notification_queue.py 2>&1 || true
+          python test_notification_queue.py 2>&1
+        continue-on-error: true
+
+      - name: Run notification service tests
+        run: |
+          python manage.py test --verbosity=2
+        continue-on-error: false
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notification-service-test-results
+          path: notification_service/test-results/
+          retention-days: 7
 
   frontend-build:
     name: Frontend Build
@@ -223,7 +316,8 @@ jobs:
         run: npm install
 
       - name: Run ESLint
-        run: npm run lint || true
+        run: npm run lint
+        continue-on-error: false
 
       - name: Build frontend
         run: npm run build
@@ -237,6 +331,14 @@ jobs:
             echo "Build failed - dist directory not found"
             exit 1
           fi
+
+      - name: Upload build artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+          retention-days: 7
 
   integration-test:
     name: Docker Compose Integration Test
@@ -332,3 +434,19 @@ jobs:
           echo "Notification Service Tests: ${{ needs.notification-service-tests.result }}"
           echo "Frontend Build: ${{ needs.frontend-build.result }}"
           echo "Integration Test: ${{ needs.integration-test.result }}"
+
+      - name: Check for failures
+        run: |
+          if [[ "${{ needs.build-docker.result }}" == "failure" ]] || \
+             [[ "${{ needs.auth-service-tests.result }}" == "failure" ]] || \
+             [[ "${{ needs.workflow-api-tests.result }}" == "failure" ]] || \
+             [[ "${{ needs.ticket-service-tests.result }}" == "failure" ]] || \
+             [[ "${{ needs.messaging-service-tests.result }}" == "failure" ]] || \
+             [[ "${{ needs.notification-service-tests.result }}" == "failure" ]] || \
+             [[ "${{ needs.frontend-build.result }}" == "failure" ]] || \
+             [[ "${{ needs.integration-test.result }}" == "failure" ]]; then
+            echo "❌ One or more test jobs failed!"
+            exit 1
+          else
+            echo "✅ All tests passed successfully!"
+          fi
