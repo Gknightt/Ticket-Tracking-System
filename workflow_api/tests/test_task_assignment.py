@@ -204,6 +204,7 @@ class TaskAssignmentTestCase(TestCase):
     
     def test_task_item_unique_assignment(self):
         """Test that a user can't be assigned to the same task twice"""
+        from django.db import IntegrityError
         task = Task.objects.create(
             ticket_id=self.ticket,
             workflow_id=self.workflow,
@@ -218,15 +219,17 @@ class TaskAssignmentTestCase(TestCase):
         )
         
         # Try to create duplicate assignment
+        # Note: If no unique constraint exists, this documents the behavior
         try:
             TaskItem.objects.create(
                 task=task,
                 role_user=self.user1,
                 status="pending"
             )
-            # If no unique constraint exists, this test documents the behavior
-        except Exception:
-            pass  # Expected if there's a unique constraint
+            # If successful, no constraint exists (documented behavior)
+        except IntegrityError:
+            # Expected if there's a unique constraint
+            pass
     
     def test_inactive_user_filtering(self):
         """Test that inactive users are not assigned tasks"""

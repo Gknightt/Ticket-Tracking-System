@@ -94,16 +94,14 @@ class RolesManagementTestCase(TestCase):
     
     def test_role_unique_name(self):
         """Test that role names must be unique"""
+        from django.db import IntegrityError
         data = {
             "role_id": 99,
             "name": "Test Admin",  # Duplicate name
             "system": "tts"
         }
-        try:
+        with self.assertRaises(IntegrityError):
             Roles.objects.create(**data)
-            self.fail("Should have raised an error for duplicate role name")
-        except Exception:
-            pass  # Expected to fail
     
     def test_role_user_assignment(self):
         """Test assigning users to roles"""
@@ -118,6 +116,7 @@ class RolesManagementTestCase(TestCase):
     
     def test_role_user_unique_constraint(self):
         """Test unique constraint on role-user assignment"""
+        from django.db import IntegrityError
         RoleUsers.objects.create(
             role_id=self.role1,
             user_id=1,
@@ -125,12 +124,9 @@ class RolesManagementTestCase(TestCase):
         )
         
         # Try to create duplicate assignment
-        try:
+        with self.assertRaises(IntegrityError):
             RoleUsers.objects.create(
                 role_id=self.role1,
                 user_id=1,
                 user_full_name="Test User 2"
             )
-            self.fail("Should have raised an error for duplicate role-user assignment")
-        except Exception:
-            pass  # Expected to fail

@@ -146,6 +146,7 @@ class WorkflowGraphTestCase(TestCase):
     
     def test_transition_same_workflow_constraint(self):
         """Test that transitions can only connect steps from the same workflow"""
+        from django.core.exceptions import ValidationError
         workflow2 = Workflows.objects.create(
             user_id=1,
             name="Second Workflow",
@@ -168,17 +169,15 @@ class WorkflowGraphTestCase(TestCase):
         )
         
         # Try to create transition between steps from different workflows
-        try:
+        with self.assertRaises(ValidationError):
             StepTransition.objects.create(
                 from_step_id=step1,
                 to_step_id=step2
             )
-            self.fail("Should have raised ValidationError for cross-workflow transition")
-        except Exception:
-            pass  # Expected to fail
     
     def test_transition_no_self_loop(self):
         """Test that a step cannot transition to itself"""
+        from django.core.exceptions import ValidationError
         step = Steps.objects.create(
             workflow_id=self.workflow,
             role_id=self.role,
@@ -187,14 +186,11 @@ class WorkflowGraphTestCase(TestCase):
         )
         
         # Try to create self-loop transition
-        try:
+        with self.assertRaises(ValidationError):
             StepTransition.objects.create(
                 from_step_id=step,
                 to_step_id=step
             )
-            self.fail("Should have raised ValidationError for self-loop transition")
-        except Exception:
-            pass  # Expected to fail
     
     def test_step_start_and_end_flags(self):
         """Test step start and end flags"""

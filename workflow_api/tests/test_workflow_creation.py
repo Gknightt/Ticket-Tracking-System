@@ -56,6 +56,7 @@ class WorkflowCreationTestCase(TestCase):
     
     def test_workflow_unique_name(self):
         """Test that workflow names must be unique"""
+        from django.db import IntegrityError
         Workflows.objects.create(
             user_id=1,
             name="Unique Workflow",
@@ -65,7 +66,7 @@ class WorkflowCreationTestCase(TestCase):
         )
         
         # Try to create duplicate
-        try:
+        with self.assertRaises(IntegrityError):
             Workflows.objects.create(
                 user_id=1,
                 name="Unique Workflow",  # Duplicate name
@@ -73,9 +74,6 @@ class WorkflowCreationTestCase(TestCase):
                 sub_category="Recruitment",
                 department="HR Department"
             )
-            self.fail("Should have raised an error for duplicate workflow name")
-        except Exception:
-            pass  # Expected to fail
     
     def test_workflow_category_validation(self):
         """Test workflow category validation"""
@@ -107,8 +105,9 @@ class WorkflowCreationTestCase(TestCase):
     
     def test_workflow_invalid_sla_ordering(self):
         """Test that invalid SLA ordering is rejected"""
-        try:
-            # Invalid: urgent > high
+        from django.core.exceptions import ValidationError
+        # Invalid: urgent > high
+        with self.assertRaises(ValidationError):
             Workflows.objects.create(
                 user_id=1,
                 name="Invalid SLA Workflow",
@@ -120,9 +119,6 @@ class WorkflowCreationTestCase(TestCase):
                 medium_sla=timedelta(hours=48),
                 low_sla=timedelta(hours=96)
             )
-            self.fail("Should have raised ValidationError for invalid SLA ordering")
-        except Exception:
-            pass  # Expected to fail
     
     def test_workflow_status_choices(self):
         """Test workflow status field with valid choices"""
@@ -152,6 +148,7 @@ class WorkflowCreationTestCase(TestCase):
     
     def test_workflow_unique_category_subcategory_per_user(self):
         """Test unique constraint on category+subcategory per user"""
+        from django.db import IntegrityError
         Workflows.objects.create(
             user_id=1,
             name="First Workflow",
@@ -161,7 +158,7 @@ class WorkflowCreationTestCase(TestCase):
         )
         
         # Try to create another workflow with same user+category+subcategory
-        try:
+        with self.assertRaises(IntegrityError):
             Workflows.objects.create(
                 user_id=1,
                 name="Second Workflow",
@@ -169,9 +166,6 @@ class WorkflowCreationTestCase(TestCase):
                 sub_category="Hardware",
                 department="IT Department"
             )
-            self.fail("Should have raised an error for duplicate category/subcategory per user")
-        except Exception:
-            pass  # Expected to fail
     
     def test_workflow_different_users_same_category(self):
         """Test that different users can have workflows with same category/subcategory"""

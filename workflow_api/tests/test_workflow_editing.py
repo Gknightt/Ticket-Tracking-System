@@ -85,15 +85,14 @@ class WorkflowEditingTestCase(TestCase):
     
     def test_update_workflow_invalid_sla(self):
         """Test that invalid SLA updates are rejected"""
-        try:
+        from django.core.exceptions import ValidationError
+        with self.assertRaises(ValidationError):
             self.workflow.urgent_sla = timedelta(hours=100)  # Invalid: larger than others
             self.workflow.save()
-            self.fail("Should have raised ValidationError for invalid SLA")
-        except Exception:
-            pass  # Expected to fail
     
     def test_update_workflow_name_unique(self):
         """Test that workflow name must remain unique on update"""
+        from django.db import IntegrityError
         # Create another workflow
         Workflows.objects.create(
             user_id=1,
@@ -104,12 +103,9 @@ class WorkflowEditingTestCase(TestCase):
         )
         
         # Try to rename first workflow to duplicate name
-        try:
+        with self.assertRaises(IntegrityError):
             self.workflow.name = "Another Workflow"
             self.workflow.save()
-            self.fail("Should have raised an error for duplicate workflow name")
-        except Exception:
-            pass  # Expected to fail
     
     def test_update_workflow_timestamps(self):
         """Test that updated_at changes on save"""

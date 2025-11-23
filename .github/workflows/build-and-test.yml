@@ -144,6 +144,8 @@ jobs:
         continue-on-error: false
 
       - name: Run workflow audit logging tests
+        # Note: This test uses Django shell and may have external dependencies
+        # Set to continue-on-error to not block the build
         run: |
           python manage.py shell < test_audit_logging.py 2>&1
         continue-on-error: true
