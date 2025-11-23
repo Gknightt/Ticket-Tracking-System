@@ -20,7 +20,7 @@ jobs:
       - name: Build all Docker services
         working-directory: Docker
         run: |
-          docker-compose build --no-cache
+          docker compose build --no-cache
 
       - name: Verify Docker images were created
         run: |
@@ -252,12 +252,12 @@ jobs:
       - name: Build Docker images
         working-directory: Docker
         run: |
-          docker-compose build
+          docker compose build
 
       - name: Start services
         working-directory: Docker
         run: |
-          docker-compose up -d
+          docker compose up -d
           sleep 30
 
       - name: Check service health
@@ -303,7 +303,7 @@ jobs:
         if: always()
         working-directory: Docker
         run: |
-          docker-compose down -v
+          docker compose down -v
 
   test-summary:
     name: Test Summary
