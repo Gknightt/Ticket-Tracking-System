@@ -1,24 +1,34 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import (
+from .dashboard_views import (
     AnalyticsRootView,
     DashboardSummaryView,
     StatusSummaryView,
+)
+from .ticket_views import (
     SLAComplianceView,
-    TeamPerformanceView,
+    PriorityDistributionView,
+    TicketAgeAnalyticsView,
+)
+from .workflow_views import (
     WorkflowMetricsView,
     StepPerformanceView,
     DepartmentAnalyticsView,
-    PriorityDistributionView,
-    TicketAgeAnalyticsView,
+)
+from .team_views import (
+    TeamPerformanceView,
     AssignmentAnalyticsView,
     AuditActivityView,
+)
+from .task_item_views import (
     TaskItemStatusAnalyticsView,
     TaskItemAssignmentOriginAnalyticsView,
     TaskItemPerformanceAnalyticsView,
     TaskItemUserPerformanceAnalyticsView,
     TaskItemHistoryTrendAnalyticsView,
     TaskItemTransferAnalyticsView,
+)
+from .report_views import (
     AggregatedTicketsReportView,
     AggregatedWorkflowsReportView,
     AggregatedTasksReportView,

@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'bmscheckout',
     'workflowmanager',
     'audit',
+    'analytics',
     'reporting',
 
     # Third-party apps

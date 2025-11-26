@@ -38,10 +38,22 @@ def receive_ticket(ticket_data):
         # ✅ Extract status from incoming ticket data
         status = ticket_data.get('status')
         
-        # ✅ Create or update ticket with raw ticket_data, priority, and status
+        # ✅ Extract category and subcategory from ticket data
+        category = ticket_data.get('category')
+        subcategory = ticket_data.get('subcategory') or ticket_data.get('sub_category')
+        department = ticket_data.get('department')
+        
+        # ✅ Create or update ticket with raw ticket_data, priority, status, category, subcategory, and department
         ticket, created = WorkflowTicket.objects.update_or_create(
             ticket_number=ticket_number,
-            defaults={'ticket_data': ticket_data, 'priority': priority, 'status': status}
+            defaults={
+                'ticket_data': ticket_data, 
+                'priority': priority, 
+                'status': status,
+                'category': category,
+                'subcategory': subcategory,
+                'department': department
+            }
         )
         
         action = "created" if created else "updated"

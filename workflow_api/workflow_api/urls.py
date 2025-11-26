@@ -36,6 +36,7 @@ class APIRootSerializer(serializers.Serializer):
     bms_checkout = serializers.URLField()
     workflow_manager = serializers.URLField()
     analytics = serializers.URLField()
+    analytics_v2 = serializers.URLField()
     schema = serializers.URLField()
     docs = serializers.URLField()
     admin = serializers.URLField()
@@ -62,6 +63,7 @@ def api_root(request, format=None):
         'bms-checkout': request.build_absolute_uri('bms-checkout/'),
         'workflow-manager': request.build_absolute_uri('workflow-manager/'),
         'analytics': request.build_absolute_uri('analytics/'),
+        'analytics-v2': request.build_absolute_uri('analytics-v2/'),
         'schema': reverse('schema', request=request, format=format),
         'docs': reverse('swagger-ui', request=request, format=format),
         'admin': reverse('admin:index', request=request, format=format),
@@ -85,6 +87,7 @@ urlpatterns = [
     path('bms-checkout/', include('bmscheckout.urls')),
     path('workflow-manager/', include('workflowmanager.urls')),
     path('audit/', include('audit.urls')),
+    path('analytics-v2/', include('analytics.urls')),
     path('analytics/', include('reporting.urls')),
 
     # Documentation
