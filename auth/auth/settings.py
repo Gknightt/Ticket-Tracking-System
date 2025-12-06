@@ -44,7 +44,6 @@ INSTALLED_APPS = [
     'drf_spectacular', 
     'rest_framework_api_key',
     'corsheaders',  # Add CORS headers support
-    'captcha',  # Django simple captcha
     # Your apps
     'users',
     'roles',
@@ -328,10 +327,19 @@ CELERY_RESULT_BACKEND = None  # Disable result backend to avoid dependencies
 
 # Celery Task Routes
 CELERY_TASK_ROUTES = {
+    # TTS routes
     'tts.tasks.sync_role_to_workflow_api': {'queue': 'tts.role.sync'},
     'tts.tasks.sync_user_system_role_to_workflow_api': {'queue': 'tts.user_system_role.sync'},
     'tts.tasks.sync_user_system_role_delete': {'queue': 'tts.user_system_role.sync'},
+    # HDTS routes
+    'hdts.tasks.sync_user': {'queue': 'hdts.user.sync'},
+    'hdts.tasks.sync_user_system_role': {'queue': 'hdts.user_system_role.sync'},
 }
 
-CELERY_TASK_DEFAULT_QUEUE = 'tts'
+CELERY_TASK_DEFAULT_QUEUE = 'default'
+
+# Google reCAPTCHA v3 Configuration
+RECAPTCHA_SITE_KEY = config('RECAPTCHA_SITE_KEY', default='6LdbGyMsAAAAAKv5tivNNE-g-fVz1a5Pc7EueLZT')
+RECAPTCHA_SECRET_KEY = config('RECAPTCHA_SECRET_KEY', default='6LdbGyMsAAAAAMcf9a4PKGAWL0E4NtF9cdjInlth')
+RECAPTCHA_VERSION = '2'  # v2 uses checkbox verification
 
