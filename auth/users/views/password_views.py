@@ -57,13 +57,22 @@ class ForgotPasswordView(generics.CreateAPIView):
                 reset_token = PasswordResetToken.generate_for_user(user)
                 
                 # Send password reset email
-                if send_password_reset_email(user, reset_token, request):
-                    message = 'If an account with that email exists, a password reset link has been sent.'
+                email_sent = send_password_reset_email(user, reset_token, request)
+                if email_sent:
+                    print(f"✅ Password reset email sent successfully to {email}")
                 else:
-                    message = 'If an account with that email exists, a password reset link has been sent.'
+                    print(f"❌ Failed to send password reset email to {email}")
+                
+                message = 'If an account with that email exists, a password reset link has been sent.'
                     
             except User.DoesNotExist:
                 # For security, don't reveal that the email doesn't exist
+                print(f"⚠️  User with email {email} not found")
+                message = 'If an account with that email exists, a password reset link has been sent.'
+            except Exception as e:
+                print(f"❌ Error in forgot password: {str(e)}")
+                import traceback
+                traceback.print_exc()
                 message = 'If an account with that email exists, a password reset link has been sent.'
             
             return Response({'message': message}, status=status.HTTP_200_OK)

@@ -1,225 +1,41 @@
-import requests
+"""
+Simple email notification client using local SendGrid service
+No database logging, pure template-based email sending
+"""
+
 import logging
 from django.conf import settings
-from typing import Dict, Any, Optional
-from celery import Celery
 
 logger = logging.getLogger(__name__)
-
-# Initialize Celery app for task sending
-celery_app = Celery('auth')
-celery_app.config_from_object('django.conf:settings', namespace='CELERY')
 
 
 class NotificationClient:
     """
-    HTTP client for communicating with the notification microservice
+    Simple notification client using local SendGrid email service
+    No Celery, no external service - direct email sending
     """
     
     def __init__(self):
-        # Use lazy evaluation to avoid settings access during import
-        self._base_url = None
-        self._timeout = None
-        self._enabled = None
+        self.email_service = None
     
-    @property
-    def base_url(self):
-        if self._base_url is None:
-            self._base_url = getattr(settings, 'NOTIFICATION_SERVICE_URL', 'http://localhost:8001')
-        return self._base_url
+    def _get_email_service(self):
+        """Get the SendGrid email service (lazy loading)"""
+        if self.email_service is None:
+            from emails.services import get_email_service
+            self.email_service = get_email_service()
+        return self.email_service
     
-    @property
-    def timeout(self):
-        if self._timeout is None:
-            self._timeout = getattr(settings, 'NOTIFICATION_SERVICE_TIMEOUT', 10)
-        return self._timeout
-    
-    @property
-    def enabled(self):
-        if self._enabled is None:
-            self._enabled = getattr(settings, 'NOTIFICATIONS_ENABLED', True)
-        return self._enabled
-    
-    def send_notification(self, user_id: str, user_email: str, user_name: str, 
-                         notification_type: str, context_data: Optional[Dict[str, Any]] = None,
-                         ip_address: Optional[str] = None, user_agent: Optional[str] = None) -> bool:
+    def send_password_reset_email_async(self, user, reset_token, request=None):
         """
-        Send a notification request to the notification service
+        Send password reset email directly using SendGrid
         
         Args:
-            user_id: UUID of the user
-            user_email: Email of the user
-            user_name: Name of the user
-            notification_type: Type of notification to send
-            context_data: Additional context data for the notification
-            ip_address: IP address of the user
-            user_agent: User agent string
-            
-        Returns:
-            bool: True if notification was sent successfully, False otherwise
-        """
-        if not self.enabled:
-            logger.info("Notifications are disabled, skipping notification send")
-            return True
-            
-        try:
-            payload = {
-                'user_id': str(user_id),
-                'user_email': user_email,
-                'user_name': user_name or '',
-                'notification_type': notification_type,
-                'context_data': context_data or {},
-                'ip_address': ip_address,
-                'user_agent': user_agent or '',
-            }
-            
-            response = requests.post(
-                f"{self.base_url}/api/v1/send/",
-                json=payload,
-                timeout=self.timeout,
-                headers={'Content-Type': 'application/json'}
-            )
-            
-            if response.status_code == 200:
-                logger.info(f"Notification '{notification_type}' sent successfully to {user_email}")
-                return True
-            else:
-                logger.error(f"Failed to send notification '{notification_type}' to {user_email}. "
-                           f"Status: {response.status_code}, Response: {response.text}")
-                return False
-                
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Network error sending notification '{notification_type}' to {user_email}: {str(e)}")
-            return False
-        except Exception as e:
-            logger.error(f"Unexpected error sending notification '{notification_type}' to {user_email}: {str(e)}")
-            return False
-    
-    def send_account_locked_notification(self, user, failed_attempts: int = None, 
-                                       lockout_duration: str = "15 minutes", 
-                                       ip_address: str = None, user_agent: str = None) -> bool:
-        """Send account locked notification"""
-        context_data = {
-            'failed_attempts': failed_attempts or 'multiple',
-            'lockout_duration': lockout_duration,
-        }
-        
-        return self.send_notification(
-            user_id=user.id,
-            user_email=user.email,
-            user_name=user.get_full_name() or user.username or user.email.split('@')[0],
-            notification_type='account_locked',
-            context_data=context_data,
-            ip_address=ip_address,
-            user_agent=user_agent
-        )
-    
-    def send_account_unlocked_notification(self, user, ip_address: str = None, 
-                                         user_agent: str = None) -> bool:
-        """Send account unlocked notification"""
-        return self.send_notification(
-            user_id=user.id,
-            user_email=user.email,
-            user_name=user.get_full_name() or user.username or user.email.split('@')[0],
-            notification_type='account_unlocked',
-            ip_address=ip_address,
-            user_agent=user_agent
-        )
-    
-    def send_failed_login_notification(self, user, ip_address: str = None, 
-                                     user_agent: str = None) -> bool:
-        """Send failed login attempt notification"""
-        context_data = {
-            'ip_address': ip_address or 'Unknown',
-        }
-        
-        return self.send_notification(
-            user_id=user.id,
-            user_email=user.email,
-            user_name=user.get_full_name() or user.username or user.email.split('@')[0],
-            notification_type='failed_login_attempt',
-            context_data=context_data,
-            ip_address=ip_address,
-            user_agent=user_agent
-        )
-    
-    def send_password_reset_notification(self, user, ip_address: str = None, 
-                                       user_agent: str = None) -> bool:
-        """Send password reset notification"""
-        return self.send_notification(
-            user_id=user.id,
-            user_email=user.email,
-            user_name=user.get_full_name() or user.username or user.email.split('@')[0],
-            notification_type='password_reset',
-            ip_address=ip_address,
-            user_agent=user_agent
-        )
-    
-    def get_notification_history(self, user_id: str = None, user_email: str = None, 
-                               notification_type: str = None, limit: int = 50) -> Optional[Dict]:
-        """
-        Get notification history for a user
-        """
-        if not self.enabled:
-            return None
-            
-        try:
-            params = {}
-            if user_id:
-                params['user_id'] = user_id
-            if user_email:
-                params['user_email'] = user_email
-            if notification_type:
-                params['notification_type'] = notification_type
-            if limit:
-                params['limit'] = limit
-            
-            response = requests.get(
-                f"{self.base_url}/api/v1/history/",
-                params=params,
-                timeout=self.timeout
-            )
-            
-            if response.status_code == 200:
-                return response.json()
-            else:
-                logger.error(f"Failed to get notification history. Status: {response.status_code}")
-                return None
-                
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Network error getting notification history: {str(e)}")
-            return None
-        except Exception as e:
-            logger.error(f"Unexpected error getting notification history: {str(e)}")
-            return None
-    
-    def health_check(self) -> bool:
-        """
-        Check if the notification service is healthy
-        """
-        try:
-            response = requests.get(
-                f"{self.base_url}/api/v1/health/",
-                timeout=5
-            )
-            return response.status_code == 200
-        except:
-            return False
-    
-    def send_password_reset_email_async(self, user, reset_token, request=None) -> bool:
-        """
-        Send password reset email via notification service Celery task
-        
-        Args:
-            user: User instance
+            user: User model instance
             reset_token: PasswordResetToken instance
-            request: HTTP request object (optional)
-        
-        Returns:
-            bool: True if task was enqueued successfully
+            request: Optional Django request object for building URLs
         """
         try:
-            # Build the reset URL
+            # Build reset URL
             if request:
                 base_url = f"{request.scheme}://{request.get_host()}"
             else:
@@ -227,122 +43,145 @@ class NotificationClient:
             
             reset_url = f"{base_url}/api/v1/users/password/reset?token={reset_token.token}"
             
-            # Send task to notification service queue
-            celery_app.send_task(
-                'notifications.send_password_reset_email',
-                kwargs={
-                    'user_email': user.email,
-                    'user_name': user.get_full_name() or user.username or user.email.split('@')[0],
-                    'reset_token': reset_token.token,
-                    'reset_url': reset_url,
-                    'user_id': str(user.id)
-                },
-                queue='NOTIFICATION_TASKS'
+            # Send email
+            email_service = self._get_email_service()
+            success, message_id, error = email_service.send_password_reset_email(
+                user_email=user.email,
+                user_name=user.get_full_name() or user.username,
+                reset_url=reset_url,
+                reset_token=reset_token.token
             )
             
-            logger.info(f"Password reset email task enqueued for {user.email}")
-            return True
+            if success:
+                logger.info(f"Password reset email sent to {user.email}")
+            else:
+                logger.error(f"Failed to send password reset email to {user.email}: {error}")
+            
+            return success
             
         except Exception as e:
-            logger.error(f"Failed to enqueue password reset email task for {user.email}: {str(e)}")
+            logger.error(f"Error sending password reset email: {str(e)}", exc_info=True)
             return False
     
-    def send_invitation_email_async(self, user, temp_password, system_name, role_name) -> bool:
+    def send_otp_email_async(self, user, otp_code):
         """
-        Send invitation email via notification service Celery task
-        
-        Args:
-            user: User instance
-            temp_password: Temporary password
-            system_name: Name of the system
-            role_name: Name of the role
-        
-        Returns:
-            bool: True if task was enqueued successfully
+        Send OTP verification email
         """
         try:
-            celery_app.send_task(
-                'notifications.send_invitation_email',
-                kwargs={
-                    'user_email': user.email,
-                    'user_name': user.get_full_name() or user.username or user.email.split('@')[0],
-                    'temp_password': temp_password,
-                    'system_name': system_name,
-                    'role_name': role_name,
-                    'user_id': str(user.id)
-                },
-                queue='NOTIFICATION_TASKS'
+            email_service = self._get_email_service()
+            success, message_id, error = email_service.send_otp_email(
+                user_email=user.email,
+                user_name=user.get_full_name() or user.username,
+                otp_code=otp_code
             )
             
-            logger.info(f"Invitation email task enqueued for {user.email}")
-            return True
+            if success:
+                logger.info(f"OTP email sent to {user.email}")
+            else:
+                logger.error(f"Failed to send OTP email to {user.email}: {error}")
+            
+            return success
             
         except Exception as e:
-            logger.error(f"Failed to enqueue invitation email task for {user.email}: {str(e)}")
+            logger.error(f"Error sending OTP email: {str(e)}", exc_info=True)
             return False
     
-    def send_otp_email_async(self, user, otp_code) -> bool:
+    def send_account_locked_notification(self, user, failed_attempts=None, lockout_duration="15 minutes", ip_address=None, user_agent=None):
         """
-        Send OTP email via notification service Celery task
-        
-        Args:
-            user: User instance
-            otp_code: OTP code
-        
-        Returns:
-            bool: True if task was enqueued successfully
+        Send account locked notification
         """
         try:
-            celery_app.send_task(
-                'notifications.send_otp_email',
-                kwargs={
-                    'user_email': user.email,
-                    'user_name': user.get_full_name() or user.username or user.email.split('@')[0],
-                    'otp_code': otp_code,
-                    'user_id': str(user.id)
-                },
-                queue='NOTIFICATION_TASKS'
+            from django.utils import timezone
+            locked_until = timezone.now() + timezone.timedelta(minutes=15)
+            
+            email_service = self._get_email_service()
+            success, message_id, error = email_service.send_account_locked_email(
+                user_email=user.email,
+                user_name=user.get_full_name() or user.username,
+                locked_until=locked_until,
+                failed_attempts=failed_attempts,
+                lockout_duration=lockout_duration,
+                ip_address=ip_address
             )
             
-            logger.info(f"OTP email task enqueued for {user.email}")
-            return True
+            if success:
+                logger.info(f"Account locked email sent to {user.email}")
+            else:
+                logger.error(f"Failed to send account locked email to {user.email}: {error}")
+            
+            return success
             
         except Exception as e:
-            logger.error(f"Failed to enqueue OTP email task for {user.email}: {str(e)}")
+            logger.error(f"Error sending account locked email: {str(e)}", exc_info=True)
             return False
     
-    def send_system_addition_email_async(self, user, system_name, role_name) -> bool:
+    def send_account_unlocked_notification(self, user, ip_address=None, user_agent=None):
         """
-        Send system addition email via notification service Celery task
-        
-        Args:
-            user: User instance
-            system_name: Name of the system
-            role_name: Name of the role
-        
-        Returns:
-            bool: True if task was enqueued successfully
+        Send account unlocked notification
         """
         try:
-            celery_app.send_task(
-                'notifications.send_system_addition_email',
-                kwargs={
-                    'user_email': user.email,
-                    'user_name': user.get_full_name() or user.username or user.email.split('@')[0],
-                    'system_name': system_name,
-                    'role_name': role_name,
-                    'user_id': str(user.id)
-                },
-                queue='NOTIFICATION_TASKS'
+            email_service = self._get_email_service()
+            success, message_id, error = email_service.send_account_unlocked_email(
+                user_email=user.email,
+                user_name=user.get_full_name() or user.username,
+                ip_address=ip_address
             )
             
-            logger.info(f"System addition email task enqueued for {user.email}")
-            return True
+            if success:
+                logger.info(f"Account unlocked email sent to {user.email}")
+            else:
+                logger.error(f"Failed to send account unlocked email to {user.email}: {error}")
+            
+            return success
             
         except Exception as e:
-            logger.error(f"Failed to enqueue system addition email task for {user.email}: {str(e)}")
+            logger.error(f"Error sending account unlocked email: {str(e)}", exc_info=True)
+            return False
+    
+    def send_failed_login_notification(self, user, ip_address=None, user_agent=None):
+        """
+        Send failed login attempt notification
+        """
+        try:
+            from django.utils import timezone
+            
+            email_service = self._get_email_service()
+            success, message_id, error = email_service.send_failed_login_email(
+                user_email=user.email,
+                user_name=user.get_full_name() or user.username,
+                ip_address=ip_address,
+                attempt_time=timezone.now()
+            )
+            
+            if success:
+                logger.info(f"Failed login email sent to {user.email}")
+            else:
+                logger.error(f"Failed to send failed login email to {user.email}: {error}")
+            
+            return success
+            
+        except Exception as e:
+            logger.error(f"Error sending failed login email: {str(e)}", exc_info=True)
             return False
 
 
-# Global instance
-notification_client = NotificationClient()
+# Singleton instance
+_notification_client = None
+
+def get_notification_client():
+    """Get or create the notification client singleton"""
+    global _notification_client
+    if _notification_client is None:
+        _notification_client = NotificationClient()
+    return _notification_client
+
+
+# Global instance for backward compatibility
+notification_client = get_notification_client()
+
+
+# Convenience function for backward compatibility
+def send_password_reset_email(user, reset_token, request=None):
+    """Send password reset email - convenience function"""
+    client = get_notification_client()
+    return client.send_password_reset_email_async(user, reset_token, request)

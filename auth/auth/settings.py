@@ -51,6 +51,8 @@ INSTALLED_APPS = [
     'system_roles',
     'tts',  # Make sure TTS app is included
     'hdts',  # Make sure HDTS app is included
+    'emails',  # Email service with SendGrid
+    'keys',  # API keys management
 ]
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',  # Add CORS middleware at the top
@@ -342,4 +344,16 @@ CELERY_TASK_DEFAULT_QUEUE = 'default'
 RECAPTCHA_SITE_KEY = config('RECAPTCHA_SITE_KEY', default='6LdbGyMsAAAAAKv5tivNNE-g-fVz1a5Pc7EueLZT')
 RECAPTCHA_SECRET_KEY = config('RECAPTCHA_SECRET_KEY', default='6LdbGyMsAAAAAMcf9a4PKGAWL0E4NtF9cdjInlth')
 RECAPTCHA_VERSION = '2'  # v2 uses checkbox verification
+
+# SendGrid Email Configuration
+SENDGRID_API_KEY = config('SENDGRID_API_KEY', default='')
+SENDGRID_FROM_EMAIL = config('SENDGRID_FROM_EMAIL', default=DEFAULT_FROM_EMAIL)
+SENDGRID_FROM_NAME = config('SENDGRID_FROM_NAME', default='TicketFlow')
+SENDGRID_ENABLED = config('SENDGRID_ENABLED', default='True', cast=lambda x: x.lower() in ('true', '1', 'yes'))
+SUPPORT_EMAIL = config('SUPPORT_EMAIL', default='support@ticketflow.com')
+
+# If SendGrid is not configured, fall back to console email backend for development
+if not SENDGRID_API_KEY and DEBUG:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
 

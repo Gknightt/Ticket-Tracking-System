@@ -6,7 +6,7 @@ from sendgrid.helpers.mail import Mail
 
 message = Mail(
     from_email='notification@noreply.mapactive.tech',  # sender
-    to_emails='recipient@example.com',  # recipient
+    to_emails='rivovebayo@gmail.com',  # recipient
     subject='Reset Your MapActive Password',
     html_content="""
     <p>Hello,</p>

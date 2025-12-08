@@ -800,6 +800,13 @@ class LoginWithRecaptchaSerializer(serializers.Serializer):
     
     def validate(self, attrs):
         """Authenticate user with email and password after reCAPTCHA v2 verification."""
+        from datetime import timedelta
+        from django.utils import timezone
+        from notification_client import notification_client
+        
+        LOCKOUT_THRESHOLD = 10  # Number of allowed failed attempts
+        LOCKOUT_TIME = timedelta(minutes=15)  # Lockout duration
+        
         email = attrs.get('email')
         password = attrs.get('password')
         recaptcha_response = attrs.get('g_recaptcha_response')
@@ -831,10 +838,63 @@ class LoginWithRecaptchaSerializer(serializers.Serializer):
         
         # Authenticate user after reCAPTCHA passes
         if email and password:
-            user = authenticate(username=email, password=password)
-            if not user:
+            # Check if user exists first
+            try:
+                user = User.objects.get(email=email)
+            except User.DoesNotExist:
+                user = None
+            
+            # If user exists, check lockout status
+            if user:
+                if user.is_locked:
+                    # Check if lockout period has expired
+                    if user.lockout_time and timezone.now() >= user.lockout_time + LOCKOUT_TIME:
+                        user.is_locked = False
+                        user.failed_login_attempts = 0
+                        user.lockout_time = None
+                        user.save(update_fields=["is_locked", "failed_login_attempts", "lockout_time"])
+                        # Send account unlocked notification
+                        notification_client.send_account_unlocked_notification(
+                            user=user,
+                            ip_address=self.context.get('request').META.get('REMOTE_ADDR') if self.context.get('request') else None,
+                            user_agent=self.context.get('request').META.get('HTTP_USER_AGENT') if self.context.get('request') else None
+                        )
+                    else:
+                        raise serializers.ValidationError(
+                            "Account is locked due to too many failed login attempts. Please try again later.",
+                            code="account_locked"
+                        )
+            
+            # Authenticate user
+            user_auth = authenticate(username=email, password=password)
+            
+            if not user_auth:
+                # Increment failed attempts if user exists
+                if user:
+                    user.failed_login_attempts += 1
+                    if user.failed_login_attempts >= LOCKOUT_THRESHOLD:
+                        user.is_locked = True
+                        user.lockout_time = timezone.now()
+                        # Send account locked notification
+                        notification_client.send_account_locked_notification(
+                            user=user,
+                            failed_attempts=user.failed_login_attempts,
+                            ip_address=self.context.get('request').META.get('REMOTE_ADDR') if self.context.get('request') else None,
+                            user_agent=self.context.get('request').META.get('HTTP_USER_AGENT') if self.context.get('request') else None
+                        )
+                    else:
+                        # Send failed login attempt notification for multiple attempts (but not locked yet)
+                        if user.failed_login_attempts >= 5:  # Start notifying after 5 attempts
+                            notification_client.send_failed_login_notification(
+                                user=user,
+                                ip_address=self.context.get('request').META.get('REMOTE_ADDR') if self.context.get('request') else None,
+                                user_agent=self.context.get('request').META.get('HTTP_USER_AGENT') if self.context.get('request') else None
+                            )
+                    user.save(update_fields=["failed_login_attempts", "is_locked", "lockout_time"])
+                
                 raise serializers.ValidationError('Invalid email or password.')
-            attrs['user'] = user
+            
+            attrs['user'] = user_auth
         else:
             raise serializers.ValidationError('Email and password are required.')
         
