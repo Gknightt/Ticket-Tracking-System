@@ -235,6 +235,33 @@
                         </button>
                     </div>
                 </div>
+
+                <!-- Forgot Password Mode -->
+                <div id="forgotPasswordMode" class="formMode">
+                    <!-- Reset Password Info -->
+                    <div class="infoBox">
+                        <i class="fa-solid fa-info-circle"></i> Enter your email address and we'll send you a link to reset your password.
+                    </div>
+
+                    <!-- Email for Reset -->
+                    <fieldset>
+                        <label for="resetEmail">Email Address:</label>
+                        <input type="email" id="resetEmail" name="reset_email" placeholder="Enter your registered email">
+                    </fieldset>
+
+                    <!-- Reset Submit Button -->
+                    <button type="button" class="logInButton" id="resetButton" style="margin-top: 10px;">
+                        <span class="buttonText">Send Reset Link</span>
+                        <span class="spinner" style="display:none;"></span>
+                    </button>
+
+                    <!-- Back to Login Toggle -->
+                    <div class="forgotLink">
+                        <button type="button" id="backToLoginFromForgot">
+                            <i class="fa-solid fa-arrow-left"></i> Back to Login
+                        </button>
+                    </div>
+                </div>
             </form>
 
             <!-- Register & Navigation -->
@@ -340,6 +367,80 @@
                 loginMode.classList.add('active');
                 emailInput.focus();
             });
+
+            // Back to Login from Forgot Password
+            const backToLoginFromForgotBtn = document.getElementById('backToLoginFromForgot');
+            if (backToLoginFromForgotBtn) {
+                backToLoginFromForgotBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    document.getElementById('resetEmail').value = '';
+                    document.getElementById('forgotPasswordMode').classList.remove('active');
+                    loginMode.classList.add('active');
+                });
+            }
+
+            // Toggle Forgot Password
+            const toggleForgotPasswordBtn = document.getElementById('toggleForgotPassword');
+            if (toggleForgotPasswordBtn) {
+                toggleForgotPasswordBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    loginMode.classList.remove('active');
+                    document.getElementById('forgotPasswordMode').classList.add('active');
+                });
+            }
+
+            // Handle Forgot Password Submit
+            const resetButton = document.getElementById('resetButton');
+            if (resetButton) {
+                resetButton.addEventListener('click', async function(e) {
+                    e.preventDefault();
+                    const resetEmailInput = document.getElementById('resetEmail');
+                    const email = resetEmailInput.value.trim();
+                    const btn = this;
+                    const btnText = btn.querySelector('.buttonText');
+                    const spinner = btn.querySelector('.spinner');
+
+                    if (!email) {
+                        ToastNotification.error('Invalid Input', 'Please enter your email address.');
+                        return;
+                    }
+
+                    btn.disabled = true;
+                    btnText.textContent = 'Sending...';
+                    spinner.style.display = 'inline-block';
+
+                    try {
+                        const response = await fetch('/api/v1/users/password/forgot/', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': document.querySelector('[name="csrfmiddlewaretoken"]')?.value || ''
+                            },
+                            body: JSON.stringify({ email: email })
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (response.ok) {
+                            ToastNotification.success('Email Sent', 'If an account exists with this email, you will receive password reset instructions.');
+                            resetEmailInput.value = '';
+                            setTimeout(() => {
+                                document.getElementById('forgotPasswordMode').classList.remove('active');
+                                loginMode.classList.add('active');
+                            }, 2000);
+                        } else {
+                            ToastNotification.error('Error', data.detail || data.error || 'Failed to send reset email.');
+                        }
+                    } catch (error) {
+                        console.error('Forgot password error:', error);
+                        ToastNotification.error('Error', 'An error occurred. Please try again.');
+                    } finally {
+                        btn.disabled = false;
+                        btnText.textContent = 'Send Reset Link';
+                        spinner.style.display = 'none';
+                    }
+                });
+            }
 
             // Form submission handler
             loginForm.addEventListener('submit', function (e) {

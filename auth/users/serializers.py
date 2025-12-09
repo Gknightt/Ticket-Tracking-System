@@ -191,8 +191,11 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(required=False)
     username = serializers.CharField(max_length=150, required=False)
     first_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    middle_name = serializers.CharField(max_length=100, required=False, allow_blank=True, allow_null=True)
     last_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    suffix = serializers.CharField(max_length=10, required=False, allow_blank=True, allow_null=True)
     phone_number = serializers.CharField(max_length=20, required=False, allow_blank=True, allow_null=True)
+    otp_enabled = serializers.BooleanField(required=False)
     profile_picture = serializers.ImageField(
         required=False,
         allow_null=True,
@@ -201,7 +204,7 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('email', 'username', 'first_name', 'last_name', 'phone_number', 'profile_picture')
+        fields = ('email', 'username', 'first_name', 'middle_name', 'last_name', 'suffix', 'phone_number', 'profile_picture', 'otp_enabled')
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
