@@ -3,6 +3,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.shortcuts import redirect
+from django.views import View
 from django.views.generic import TemplateView
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
@@ -68,16 +69,45 @@ class StaffNotAuthenticatedLoginView(StaffNotAuthenticatedMixin, LoginView):
     pass
 
 
-class StaffProfileSettingsProtectedView(StaffLoginRequiredMixin, TemplateView):
+class JWTCookieAuthMixin:
+    """
+    Mixin to authenticate user via JWT cookie before other middleware runs.
+    This allows StaffLoginRequiredMixin to check request.user properly.
+    """
+    
+    def dispatch(self, request, *args, **kwargs):
+        # Try to authenticate via JWT cookie
+        from rest_framework_simplejwt.tokens import AccessToken
+        from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+        from users.models import User
+        
+        token_str = request.COOKIES.get('access_token')
+        if token_str:
+            try:
+                access_token = AccessToken(token_str)
+                access_token.verify()
+                user_id = access_token.payload.get('user_id')
+                if user_id:
+                    user = User.objects.get(id=user_id)
+                    request.user = user
+            except (InvalidToken, TokenError, User.DoesNotExist, Exception):
+                pass
+        
+        return super().dispatch(request, *args, **kwargs)
+
+
+class StaffProfileSettingsProtectedView(JWTCookieAuthMixin, StaffLoginRequiredMixin, View):
     """
     Wrap profile settings view with authentication requirement.
+    - Authenticates via JWT cookie first
     - If not authenticated: redirect to /staff/login/
     - If authenticated: show profile settings
     """
-    template_name = 'users/profile_settings.html'
     
     def get(self, request, *args, **kwargs):
-        # Delegate to original profile_settings_view
+        return profile_settings_view(request)
+    
+    def post(self, request, *args, **kwargs):
         return profile_settings_view(request)
 
 
@@ -123,7 +153,7 @@ urlpatterns = [
     path('staff/request-otp/', request_otp_for_login, name='auth_request_otp'),
 
     # Protected staff pages (require staff authentication)
-    path('staff/settings/profile/', profile_settings_view, name='profile-settings'),
+    path('staff/settings/profile/', StaffProfileSettingsProtectedView.as_view(), name='profile-settings'),
     path('staff/agent-management/', agent_management_view, name='agent-management'),
     path('staff/invite-agent/', invite_agent_view, name='invite-agent'),
     path('staff/password-change/', ChangePasswordUIView.as_view(), name='password-change-shortcut'),

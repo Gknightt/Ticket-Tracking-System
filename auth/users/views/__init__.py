@@ -60,6 +60,7 @@ from .login_views import (
     LoginView,
     request_otp_for_login,
     SystemWelcomeView,
+    VerifyOTPLoginView,
 )
 
 # CAPTCHA
@@ -119,6 +120,7 @@ __all__ = [
     'LoginView',
     'request_otp_for_login',
     'SystemWelcomeView',
+    'VerifyOTPLoginView',
     # CAPTCHA
     'CaptchaGenerateView',
     'CaptchaVerifyView',

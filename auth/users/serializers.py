@@ -793,6 +793,7 @@ class LoginWithRecaptchaSerializer(serializers.Serializer):
     """
     Serializer for API-based login with reCAPTCHA v2 verification.
     Handles email/password authentication and validates reCAPTCHA response server-side.
+    Does NOT handle OTP - that is checked after initial auth passes.
     """
     email = serializers.EmailField(required=True)
     password = serializers.CharField(write_only=True, required=True)

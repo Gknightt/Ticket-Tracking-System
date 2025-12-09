@@ -20,27 +20,30 @@
         .formMode {
             display: none;
             width: 100%;
+            flex-direction: column;
+            gap: 20px;
         }
         .formMode.active {
             display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            width: 100%;
-            gap: 20px;
         }
         .infoBox {
             background-color: #e7f3ff;
             border: 1px solid #b3d9ff;
             border-radius: 4px;
             padding: 12px;
-            margin-bottom: 15px;
             font-size: 13px;
             color: #004085;
             width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .infoBox i {
+            flex-shrink: 0;
         }
         .forgotLink {
             text-align: center;
+            width: 100%;
         }
         .forgotLink button {
             background: none;
@@ -51,12 +54,21 @@
             cursor: pointer;
             padding: 0;
             transition: color 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            margin: 0 auto;
         }
         .forgotLink button:hover {
             color: #0056b3;
             text-decoration: underline;
         }
+        .logInButton {
+            width: 100%;
+        }
         #loginMode fieldset,
+        #otpMode fieldset,
         #forgotPasswordMode fieldset {
             display: flex;
             flex-direction: column;
@@ -64,8 +76,21 @@
             align-items: start;
             width: 100%;
             gap: 8px;
+            border: none;
+            padding: 0;
+            margin: 0;
+        }
+        #loginMode fieldset label,
+        #otpMode fieldset label,
+        #forgotPasswordMode fieldset label {
+            font-size: 14px;
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 8px;
+            width: 100%;
         }
         #loginMode fieldset input,
+        #otpMode fieldset input,
         #forgotPasswordMode fieldset input {
             display: flex;
             width: 100%;
@@ -74,11 +99,22 @@
             border-radius: 40px;
             border: 1px solid #d3d3d3;
             background-color: #fcfcfc;
+            font-size: 14px;
+        }
+        #loginMode fieldset input::placeholder,
+        #otpMode fieldset input::placeholder,
+        #forgotPasswordMode fieldset input::placeholder {
+            color: #999;
         }
         .form-footer {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            width: 100%;
+            gap: 20px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
         }
     </style>
 </head>
@@ -148,6 +184,33 @@
                     {% endif %}
                 </div>
 
+                <!-- OTP Mode -->
+                <div id="otpMode" class="formMode">
+                    <!-- OTP Info Box -->
+                    <div class="infoBox">
+                        <i class="fa-solid fa-info-circle"></i> Enter the 6-digit code sent to your email address.
+                    </div>
+
+                    <!-- OTP Code Input -->
+                    <fieldset>
+                        <label for="id_otp_code">OTP Code:</label>
+                        <input type="text" id="id_otp_code" name="otp_code" maxlength="6" placeholder="Enter 6-digit code" pattern="[0-9]{6}" inputmode="numeric" {% if two_factor_required %}required{% endif %}>
+                    </fieldset>
+
+                    <!-- OTP Submit Button - Use form submit for traditional form flow -->
+                    <button type="submit" class="logInButton" id="otpButton" style="margin-top: 10px;">
+                        <span class="buttonText">Verify OTP</span>
+                        <span class="spinner" style="display:none;"></span>
+                    </button>
+
+                    <!-- Back to Login Toggle -->
+                    <div class="forgotLink">
+                        <button type="button" class="backToLogin">
+                            <i class="fa-solid fa-arrow-left"></i> Back to Login
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Forgot Password Mode -->
                 <div id="forgotPasswordMode" class="formMode">
                     <!-- Reset Password Info -->
@@ -213,6 +276,29 @@
                 }
             }
             
+            // Handle form-based OTP mode display
+            const twoFactorRequired = '{{ two_factor_required|default:False }}'.toLowerCase() === 'true';
+            if (twoFactorRequired) {
+                // Show OTP mode, hide login mode
+                const loginMode = document.getElementById('loginMode');
+                const otpMode = document.getElementById('otpMode');
+                if (loginMode) {
+                    loginMode.classList.remove('active');
+                    loginMode.style.display = 'none';
+                }
+                if (otpMode) {
+                    otpMode.classList.add('active');
+                }
+                // Set form to OTP mode
+                const loginForm = document.querySelector('.lpForm');
+                if (loginForm) loginForm.setAttribute('data-two-factor', 'True');
+                // Focus OTP input
+                const otpInput = document.getElementById('id_otp_code');
+                if (otpInput) {
+                    setTimeout(() => otpInput.focus(), 100);
+                }
+            }
+            
             // Password visibility toggle
             document.querySelectorAll('.showPassword').forEach(toggle => {
                 const targetId = toggle.getAttribute('data-target');
@@ -248,6 +334,33 @@
                     }
                 });
             });
+
+            // OTP input - only allow numeric characters
+            const otpInput = document.getElementById('id_otp_code');
+            if (otpInput) {
+                otpInput.addEventListener('keypress', function(e) {
+                    // Allow only digits
+                    if (!/[0-9]/.test(e.key)) {
+                        e.preventDefault();
+                    }
+                });
+                
+                otpInput.addEventListener('input', function() {
+                    // Remove any non-numeric characters
+                    this.value = this.value.replace(/[^0-9]/g, '');
+                    
+                    // Auto-submit if 6 digits are entered
+                    if (this.value.length === 6) {
+                        // Trigger OTP button click after a short delay
+                        setTimeout(() => {
+                            const otpBtn = document.getElementById('otpButton');
+                            if (otpBtn && !otpBtn.disabled) {
+                                otpBtn.click();
+                            }
+                        }, 100);
+                    }
+                });
+            }
 
             // Toggle between login and forgot password modes
             const toggleForgotPassword = document.getElementById('toggleForgotPassword');
@@ -342,16 +455,76 @@
             
             // Track if form has been submitted to prevent accidental re-submission via Enter key
             let isFormSubmitting = false;
+            let lastClickedButton = null;
+            
+            // Track which button was clicked
+            loginForm.addEventListener('click', function(e) {
+                if (e.target.closest('button[type="submit"]')) {
+                    lastClickedButton = e.target.closest('button[type="submit"]');
+                }
+            });
+            
+            // Add direct click handler to login button to ensure reCAPTCHA is checked
+            if (loginButton) {
+                loginButton.addEventListener('click', function(e) {
+                    console.log('Login button clicked');
+                    // Check reCAPTCHA before allowing form submission
+                    if (typeof grecaptcha !== 'undefined') {
+                        const response = grecaptcha.getResponse();
+                        if (!response) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            ToastNotification.warning('reCAPTCHA Required', 'Please complete the reCAPTCHA verification.');
+                            return false;
+                        }
+                        console.log('reCAPTCHA verified before submission');
+                    }
+                });
+            }
             
             loginForm.addEventListener('submit', function (e) {
-                // Prevent default form submission
+                console.log('Form submit event triggered');
+                
+                // Prevent default form submission initially to validate
                 e.preventDefault();
+                e.stopPropagation();
                 
                 // Prevent double submission
                 if (isFormSubmitting) {
+                    console.log('Form submission already in progress - blocking');
                     return false;
                 }
                 
+                // Check if we're in OTP mode (for form-based flow)
+                const otpModeDiv = document.getElementById('otpMode');
+                const isOTPMode = otpModeDiv && (otpModeDiv.classList.contains('active') || (otpModeDiv.style.display === 'flex' && otpModeDiv.offsetParent !== null));
+                
+                if (isOTPMode) {
+                    // OTP form submission - simple validation and submit
+                    const otpCode = document.getElementById('id_otp_code').value.trim();
+                    
+                    if (!otpCode || otpCode.length !== 6 || !/^\d{6}$/.test(otpCode)) {
+                        ToastNotification.error('Invalid OTP', 'Please enter a valid 6-digit code.');
+                        return false;
+                    }
+                    
+                    isFormSubmitting = true;
+                    
+                    // Disable button and show loading
+                    if (otpButton) {
+                        otpButton.disabled = true;
+                        const buttonText = otpButton.querySelector('.buttonText');
+                        const spinner = otpButton.querySelector('.spinner');
+                        buttonText.textContent = 'Verifying...';
+                        spinner.style.display = 'inline-block';
+                    }
+                    
+                    // Submit form normally for server-side processing
+                    loginForm.submit();
+                    return false;
+                }
+                
+                // Regular login mode - form-based submission
                 // Check if grecaptcha is available
                 if (typeof grecaptcha === 'undefined') {
                     console.error('reCAPTCHA not loaded');
@@ -360,24 +533,102 @@
                 }
                 
                 // Get reCAPTCHA response from the checkbox widget
-                const recaptchaResponse = grecaptcha.getResponse();
+                let recaptchaResponse = grecaptcha.getResponse();
                 
-                if (!recaptchaResponse) {
-                    ToastNotification.warning('reCAPTCHA Required', 'Please complete the reCAPTCHA verification.');
+                console.log('reCAPTCHA response check:', {
+                    hasResponse: !!recaptchaResponse,
+                    responseLength: recaptchaResponse ? recaptchaResponse.length : 0,
+                    responsePreview: recaptchaResponse ? recaptchaResponse.substring(0, 30) + '...' : 'EMPTY'
+                });
+                
+                if (!recaptchaResponse || recaptchaResponse.trim() === '') {
+                    console.warn('reCAPTCHA not completed by user - blocking submission');
+                    e.preventDefault();
+                    e.stopPropagation();
+                    ToastNotification.warning('reCAPTCHA Required', 'Please complete the reCAPTCHA verification before logging in.');
                     return false;
                 }
                 
-                // Get form data
-                const email = document.querySelector('input[name="email"]').value;
-                const password = document.querySelector('input[name="password"]').value;
+                console.log('reCAPTCHA token obtained:', recaptchaResponse.substring(0, 20) + '...');
+                                // Get form data
+                const emailInput = document.querySelector('input[name="email"]');
+                const passwordInput = document.querySelector('input[name="password"]');
+                
+                if (!emailInput || !passwordInput) {
+                    // Inputs not visible - this is likely API flow, use API endpoint
+                    const email = emailInput ? emailInput.value : document.querySelector('input[name="email_hidden"]')?.value;
+                    const password = passwordInput ? passwordInput.value : document.querySelector('input[name="password_hidden"]')?.value;
+                    
+                    if (!email || !password) {
+                        ToastNotification.error('Invalid Input', 'Email and password are required.');
+                        return false;
+                    }
+                    
+                    isFormSubmitting = true;
+                    
+                    // Use API endpoint
+                    callLoginAPI(email, password, recaptchaResponse);
+                    return false;
+                }
+                
+                const email = emailInput.value;
+                const password = passwordInput.value;
                 
                 if (!email || !password) {
                     ToastNotification.error('Invalid Input', 'Email and password are required.');
-                    return;
+                    return false;
                 }
                 
                 isFormSubmitting = true;
                 
+                // Disable submit buttons and show loading state
+                [loginButton, otpButton].forEach(btn => {
+                    if (btn) {
+                        btn.disabled = true;
+                        const buttonText = btn.querySelector('.buttonText');
+                        const spinner = btn.querySelector('.spinner');
+                        
+                        buttonText.textContent = 'Logging in...';
+                        spinner.style.display = 'inline-block';
+                    }
+                });
+                
+                // Add reCAPTCHA token to form as hidden input before submission
+                // Remove any existing recaptcha input first
+                const existingRecaptchaInput = loginForm.querySelector('input[name="captcha"]');
+                if (existingRecaptchaInput) {
+                    console.log('Removing existing captcha input');
+                    existingRecaptchaInput.remove();
+                }
+                
+                const recaptchaInput = document.createElement('input');
+                recaptchaInput.type = 'hidden';
+                recaptchaInput.name = 'captcha';
+                recaptchaInput.value = recaptchaResponse;
+                loginForm.appendChild(recaptchaInput);
+                
+                console.log('Added reCAPTCHA token to form:', {
+                    inputName: recaptchaInput.name,
+                    inputValue: recaptchaInput.value.substring(0, 30) + '...',
+                    formHasInput: !!loginForm.querySelector('input[name="captcha"]')
+                });
+                
+                // Verify the input is in the form
+                const verifyInput = loginForm.querySelector('input[name="captcha"]');
+                if (!verifyInput) {
+                    console.error('CRITICAL: Captcha input was not added to form!');
+                    ToastNotification.error('Form Error', 'Failed to add security token to form.');
+                    return false;
+                }
+                
+                // Submit form normally for form-based flow
+                console.log('Submitting form to /staff/login/');
+                loginForm.submit();
+                return false;
+            });
+            
+            // Helper function for API-based login (for future SPA integration)
+            function callLoginAPI(email, password, recaptchaResponse) {
                 // Disable submit buttons and show loading state
                 [loginButton, otpButton].forEach(btn => {
                     if (btn) {
@@ -424,6 +675,29 @@
                         setTimeout(() => {
                             window.location.href = '/api/v1/users/welcome/';
                         }, 1500);
+                    } else if (result.status === 200 && result.data.otp_required) {
+                        // OTP is required - show OTP input mode (API flow only)
+                        ToastNotification.info('Two-Factor Authentication', result.data.message);
+                        
+                        // Store temporary token and email for OTP verification (only if elements exist)
+                        const tempTokenEl = document.getElementById('temporaryToken');
+                        const userEmailEl = document.getElementById('userEmail');
+                        
+                        if (tempTokenEl && userEmailEl && result.data.temporary_token) {
+                            tempTokenEl.value = result.data.temporary_token;
+                            userEmailEl.value = result.data.user.email;
+                        }
+                        
+                        // Switch to OTP mode
+                        loginMode.classList.remove('active');
+                        document.getElementById('otpMode').classList.add('active');
+                        
+                        // Focus on OTP input
+                        setTimeout(() => {
+                            document.getElementById('id_otp_code').focus();
+                        }, 100);
+                        
+                        isFormSubmitting = false;
                     } else {
                         // Login failed - show error
                         const errorMsg = result.data.errors?.non_field_errors?.[0] || 
@@ -471,9 +745,7 @@
                     // Reset reCAPTCHA for retry
                     grecaptcha.reset();
                 });
-                
-                return false;
-            });
+            }
             
             // Reset form state if user goes back (for OTP screen)
             window.addEventListener('pageshow', function(event) {
@@ -503,17 +775,105 @@
                 }, 5000);
             });
 
-            // Handle Back to Login button - force server request to clear session
+            // Back to Login button - for OTP mode in form-based flow
             const backToLoginOtpBtn = document.querySelector('.backToLogin');
             if (backToLoginOtpBtn) {
                 backToLoginOtpBtn.addEventListener('click', function(e) {
                     e.preventDefault();
-                    // Reset form submission state
-                    isFormSubmitting = false;
-                    // Add timestamp to prevent caching and force session cleanup
-                    window.location.href = this.href + '?clear_otp=1&t=' + Date.now();
+                    // Reload page to clear OTP session and show login mode
+                    window.location.href = '{% url "auth_login" %}';
                 });
             }
+
+            // Handle OTP verification for API flow (dynamic OTP mode switching)
+            // Note: otpButton already declared globally above
+            // Only add this handler if we have the temporary token element (API flow only)
+            const temporaryTokenElement = document.getElementById('temporaryToken');
+            if (otpButton && temporaryTokenElement) {
+                otpButton.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    const temporaryToken = temporaryTokenElement.value;
+                    const otpCode = document.getElementById('id_otp_code').value.trim();
+                    
+                    if (!temporaryToken) {
+                        ToastNotification.error('Error', 'Session expired. Please log in again.');
+                        document.getElementById('otpMode').classList.remove('active');
+                        document.getElementById('loginMode').classList.add('active');
+                        document.getElementById('id_email').focus();
+                        return;
+                    }
+                    
+                    if (!otpCode || otpCode.length !== 6 || !/^\d{6}$/.test(otpCode)) {
+                        ToastNotification.error('Invalid OTP', 'Please enter a valid 6-digit code.');
+                        return;
+                    }
+                    
+                    // Disable button and show loading
+                    otpButton.disabled = true;
+                    const buttonText = otpButton.querySelector('.buttonText');
+                    const spinner = otpButton.querySelector('.spinner');
+                    buttonText.textContent = 'Verifying...';
+                    spinner.style.display = 'inline-block';
+                    
+                    // Call OTP verification endpoint
+                    fetch('/api/v1/users/login/verify-otp/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                        },
+                        body: JSON.stringify({
+                            temporary_token: temporaryToken,
+                            otp_code: otpCode
+                        })
+                    })
+                    .then(response => {
+                        return response.json().then(data => ({
+                            status: response.status,
+                            data: data
+                        }));
+                    })
+                    .then(result => {
+                        if (result.status === 200 && result.data.success) {
+                            // OTP verified - store tokens and redirect
+                            localStorage.setItem('access_token', result.data.access_token);
+                            localStorage.setItem('refresh_token', result.data.refresh_token);
+                            
+                            // Set cookies for token
+                            document.cookie = `access_token=${result.data.access_token}; path=/`;
+                            document.cookie = `refresh_token=${result.data.refresh_token}; path=/`;
+                            
+                            // Show success and redirect
+                            ToastNotification.success('Login Successful', 'Redirecting to your dashboard...', 1500);
+                            setTimeout(() => {
+                                window.location.href = '/api/v1/users/welcome/';
+                            }, 1500);
+                        } else if (result.data.otp_expired) {
+                            ToastNotification.error('OTP Expired', 'Your OTP has expired. Please log in again.');
+                            // Reset to login mode
+                            setTimeout(() => {
+                                document.getElementById('otpMode').classList.remove('active');
+                                document.getElementById('loginMode').classList.add('active');
+                                document.getElementById('id_email').focus();
+                            }, 2000);
+                        } else {
+                            ToastNotification.error('Invalid OTP', result.data.error || 'Invalid OTP code. Please try again.');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('OTP verification error:', error);
+                        ToastNotification.error('Error', 'An error occurred during OTP verification. Please try again.');
+                    })
+                    .finally(() => {
+                        otpButton.disabled = false;
+                        buttonText.textContent = 'Verify OTP';
+                        spinner.style.display = 'none';
+                    });
+                });
+            }
+
+            // Handle Back to Login button - force server request to clear session
         });
     </script>
 </body>
