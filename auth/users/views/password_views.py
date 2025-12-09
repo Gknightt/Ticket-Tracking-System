@@ -121,20 +121,11 @@ class ResetPasswordView(generics.GenericAPIView):
         return render(request, 'public/staff_reset_password.html', context)
         
     def post(self, request, *args, **kwargs):
-        """Process the password reset form submission."""
-        token = request.POST.get('token') or request.query_params.get('token', '')
-        password = request.POST.get('password', '')
-        password_confirm = request.POST.get('password_confirm', '')
+        """Process the password reset API submission."""
+        # Data comes from request.data for JSON requests
+        serializer = self.get_serializer(data=request.data)
         
-        data = {
-            'token': token,
-            'password': password,
-            'password_confirm': password_confirm
-        }
-        
-        serializer = self.get_serializer(data=data)
-        
-        if serializer.is_valid():
+        if serializer.is_valid(raise_exception=True): # Raise exception to get DRF's default error handling
             reset_token = serializer.validated_data['reset_token']
             password = serializer.validated_data['password']
             
@@ -149,18 +140,13 @@ class ResetPasswordView(generics.GenericAPIView):
             # Invalidate all existing OTP codes for security
             UserOTP.objects.filter(user=user, is_used=False).update(is_used=True)
             
-            context = {
+            return Response({
                 'success': True,
                 'message': 'Password has been reset successfully. You can now log in with your new password.'
-            }
-            return render(request, 'public/staff_reset_password_success.html', context)
+            }, status=status.HTTP_200_OK)
         
-        context = {
-            'token': token,
-            'token_valid': True,
-            'errors': serializer.errors
-        }
-        return render(request, 'public/staff_reset_password.html', context)
+        # If serializer.is_valid() returns False, it would have raised an exception due to raise_exception=True.
+        # This part of the code should not be reached.
 
 
 @extend_schema(

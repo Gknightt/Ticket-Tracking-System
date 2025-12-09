@@ -147,6 +147,9 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        .hidden {
+            display: none !important;
+        }
     </style>
 </head>
 
@@ -173,7 +176,7 @@
             </header>
 
             <!-- Login / OTP Form -->
-            <form id="loginForm" novalidate class="lpForm">
+            <form id="loginForm" novalidate class="lpForm" autocomplete="off">
                 <!-- Login Mode -->
                 <div id="loginMode" class="formMode active">
                     <!-- Email -->
@@ -205,7 +208,7 @@
                     <!-- Submit Button -->
                     <button type="submit" class="logInButton" id="loginButton">
                         <span class="buttonText">Log In</span>
-                        <span class="spinner" style="display:none;"></span>
+                        <span class="spinner hidden"></span>
                     </button>
                 </div>
 
@@ -225,7 +228,7 @@
                     <!-- OTP Submit Button -->
                     <button type="submit" class="logInButton" id="otpButton">
                         <span class="buttonText">Verify OTP</span>
-                        <span class="spinner" style="display:none;"></span>
+                        <span class="spinner hidden"></span>
                     </button>
 
                     <!-- Back to Login Toggle -->
@@ -252,7 +255,7 @@
                     <!-- Reset Submit Button -->
                     <button type="button" class="logInButton" id="resetButton" style="margin-top: 10px;">
                         <span class="buttonText">Send Reset Link</span>
-                        <span class="spinner" style="display:none;"></span>
+                        <span class="spinner hidden"></span>
                     </button>
 
                     <!-- Back to Login Toggle -->
@@ -407,7 +410,7 @@
 
                     btn.disabled = true;
                     btnText.textContent = 'Sending...';
-                    spinner.style.display = 'inline-block';
+                    spinner.classList.remove('hidden');
 
                     try {
                         const response = await fetch('/api/v1/users/password/forgot/', {
@@ -437,7 +440,7 @@
                     } finally {
                         btn.disabled = false;
                         btnText.textContent = 'Send Reset Link';
-                        spinner.style.display = 'none';
+                        spinner.classList.add('hidden');
                     }
                 });
             }
@@ -463,7 +466,7 @@
             });
 
             async function handleLoginSubmission() {
-                console.log('Handling login submission');
+                console.log('handleLoginSubmission called.');
 
                 // Validate inputs
                 const email = emailInput.value.trim();
@@ -493,7 +496,7 @@
                 const buttonText = loginButton.querySelector('.buttonText');
                 const spinner = loginButton.querySelector('.spinner');
                 buttonText.textContent = 'Logging in...';
-                spinner.style.display = 'inline-block';
+                spinner.classList.remove('hidden');
 
                 try {
                     // Call login API
@@ -565,12 +568,12 @@
                     loginState.isSubmitting = false;
                     loginButton.disabled = false;
                     buttonText.textContent = 'Log In';
-                    spinner.style.display = 'none';
+                    spinner.classList.add('hidden');
                 }
             }
 
             async function handleOTPSubmission() {
-                console.log('Handling OTP submission');
+                console.log('handleOTPSubmission called.');
 
                 const otpCode = otpInput.value.trim();
 
@@ -592,7 +595,7 @@
                 const buttonText = otpButton.querySelector('.buttonText');
                 const spinner = otpButton.querySelector('.spinner');
                 buttonText.textContent = 'Verifying...';
-                spinner.style.display = 'inline-block';
+                spinner.classList.remove('hidden');
 
                 try {
                     // Call OTP verify API
@@ -650,7 +653,7 @@
                     loginState.isSubmitting = false;
                     otpButton.disabled = false;
                     buttonText.textContent = 'Verify OTP';
-                    spinner.style.display = 'none';
+                    spinner.classList.add('hidden');
                 }
             }
         });
