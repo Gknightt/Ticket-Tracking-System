@@ -372,14 +372,11 @@ def request_otp_for_login(request):
                     otp_instance = UserOTP.generate_for_user(user, otp_type='email')
                     
                     try:
-                        from django.core.mail import send_mail
-                        
-                        send_mail(
-                            subject='Your Login OTP Code',
-                            message=f'Your OTP code is: {otp_instance.code}\n\nThis code will expire in 10 minutes.',
-                            from_email=settings.DEFAULT_FROM_EMAIL,
-                            recipient_list=[user.email],
-                            fail_silently=False,
+                        from emails.services import get_email_service
+                        get_email_service().send_otp_email(
+                            user_email=user.email,
+                            user_name=user.get_full_name() or user.username,
+                            otp_code=otp_instance.otp_code
                         )
                         
                         messages.success(
@@ -482,170 +479,34 @@ class LoginAPIView(APIView):
     
     def post(self, request):
         from rest_framework import status
-        from system_roles.models import UserSystemRole
-        from django.utils.timezone import now
-        from rest_framework_simplejwt.tokens import AccessToken
+        from django.contrib.auth import login
         
-        from ..serializers import LoginWithRecaptchaSerializer
+        from ..serializers import LoginProcessSerializer, LoginResponseSerializer
         
-        serializer = LoginWithRecaptchaSerializer(data=request.data)
-        email = request.data.get('email', '').lower()
+        # Pass request context for session and IP access
+        serializer = LoginProcessSerializer(data=request.data, context={'request': request})
         
         if serializer.is_valid():
-            user = serializer.validated_data['user']
+            # The serializer validate() method handles authentication, 2FA checks,
+            # token generation, and structuring the return data.
+            response_data = serializer.validated_data
             
-            # Check HDTS Employee approval status
-            is_hdts_employee = UserSystemRole.objects.filter(
-                user=user,
-                system__slug='hdts',
-                role__name='Employee'
-            ).exists()
+            # If login was successful (not just OTP step), perform Django login for session
+            if response_data.get('success') and not response_data.get('otp_required'):
+                user = response_data.get('user')
+                if user:
+                    login(request, user)
+                    
+                    # Record successful login (rate limiting)
+                    record_successful_login(request, user_email=user.email)
             
-            if is_hdts_employee and user.status != 'Approved':
-                error_message = 'Your account is pending approval by the HDTS system administrator.'
-                if user.status == 'Rejected':
-                    error_message = 'Your account has been rejected by the HDTS system administrator.'
-                
-                record_failed_login_attempt(request, user_email=user.email)
-                return Response(
-                    {'detail': error_message},
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            
-            # **CHECK FOR 2FA REQUIREMENT FIRST**
-            if user.otp_enabled:
-                # Generate OTP and send email
-                from ..models import UserOTP
-                otp_instance = UserOTP.generate_for_user(user, otp_type='email')
-                
-                try:
-                    from emails.services import get_email_service
-                    get_email_service().send_otp_email(
-                        user_email=user.email,
-                        user_name=user.get_full_name() or user.username,
-                        otp_code=otp_instance.otp_code
-                    )
-                except Exception as e:
-                    logger.warning(f"Failed to send OTP email to {user.email}: {str(e)}")
-                
-                # Create a temporary token for OTP verification
-                # We'll use the access token structure but mark it as temporary
-                from rest_framework_simplejwt.tokens import Token
-                
-                # Create a custom temporary token that includes the user but is clearly temporary
-                temp_token = RefreshToken.for_user(user)
-                temp_token['temp_otp_login'] = True
-                temp_token['otp_required'] = True
-                
-                return Response({
-                    'success': False,
-                    'otp_required': True,
-                    'message': 'OTP verification required. Check your email for the code.',
-                    'temporary_token': str(temp_token.access_token),
-                    'user': {
-                        'id': user.id,
-                        'email': user.email,
-                        'first_name': user.first_name,
-                    }
-                }, status=status.HTTP_200_OK)
-            
-            # Generate tokens using CustomTokenObtainPairSerializer for rich data
-            serializer_data = {
-                'email': user.email,
-                'password': request.data.get('password', ''),
-                'otp_code': ''
-            }
-            
-            token_serializer = CustomTokenObtainPairSerializer(
-                data=serializer_data,
-                context={'request': request}
-            )
-            
-            if token_serializer.is_valid():
-                tokens = token_serializer.validated_data
-                access_token = tokens['access']
-                refresh_token = tokens['refresh']
-            else:
-                # Fallback: create tokens manually
-                refresh = RefreshToken.for_user(user)
-                access_token = str(refresh.access_token)
-                refresh_token = str(refresh)
-            
-            # Reset failed login attempts
-            user.failed_login_attempts = 0
-            user.is_locked = False
-            user.lockout_time = None
-            user.save(update_fields=["failed_login_attempts", "is_locked", "lockout_time"])
-            
-            # Log the user into Django's session framework
-            login(request, user)
-            
-            # Update last_logged_on for all user system roles
-            UserSystemRole.objects.filter(user=user).update(last_logged_on=now())
-            
-            # Get system roles for the user
-            system_roles_data = []
-            user_system_roles = UserSystemRole.objects.filter(user=user).select_related('system', 'role')
-            for role_assignment in user_system_roles:
-                system_roles_data.append({
-                    'system_name': role_assignment.system.name,
-                    'system_slug': role_assignment.system.slug,
-                    'role_name': role_assignment.role.name,
-                    'assigned_at': role_assignment.assigned_at,
-                })
-            
-            # Determine the primary system and redirect URL
-            primary_system = None
-            redirect_url = settings.DEFAULT_SYSTEM_URL
-            
-            if system_roles_data:
-                primary_system = system_roles_data[0]['system_slug']
-                redirect_url = settings.SYSTEM_TEMPLATE_URLS.get(primary_system, settings.DEFAULT_SYSTEM_URL)
-            
-            # Prepare available system URLs for frontend
-            available_systems = {}
-            for role_data in system_roles_data:
-                system_slug = role_data['system_slug']
-                available_systems[system_slug] = settings.SYSTEM_TEMPLATE_URLS.get(system_slug, settings.DEFAULT_SYSTEM_URL)
-            
-            # Record successful login
-            record_successful_login(request, user_email=user.email)
-            
-            response_data = {
-                'success': True,
-                'otp_required': False,
-                'message': 'Authentication successful',
-                'access_token': access_token,
-                'refresh_token': refresh_token,
-                'user': {
-                    'id': user.id,
-                    'email': user.email,
-                    'first_name': user.first_name,
-                    'middle_name': user.middle_name,
-                    'last_name': user.last_name,
-                    'suffix': user.suffix,
-                    'username': user.username,
-                    'phone_number': user.phone_number,
-                    'company_id': user.company_id,
-                    'department': user.department,
-                    'status': user.status,
-                    'notified': user.notified,
-                    'is_staff': user.is_staff,
-                    'is_superuser': user.is_superuser,
-                    'otp_enabled': user.otp_enabled,
-                    'date_joined': user.date_joined,
-                    'system_roles': system_roles_data,
-                },
-                'redirect': {
-                    'primary_system': primary_system,
-                    'url': redirect_url,
-                    'available_systems': available_systems
-                }
-            }
-            
-            return Response(response_data, status=status.HTTP_200_OK)
+            # Use Response Serializer to ensure consistent output format
+            response_serializer = LoginResponseSerializer(response_data)
+            return Response(response_serializer.data, status=status.HTTP_200_OK)
         else:
-            record_failed_login_attempt(request, user_email=email)
+            email = request.data.get('email', '')
+            if email:
+                record_failed_login_attempt(request, user_email=email)
             
             return Response({
                 'success': False,
@@ -669,157 +530,30 @@ class VerifyOTPLoginView(APIView):
     
     def post(self, request):
         from rest_framework import status
-        from system_roles.models import UserSystemRole
-        from django.utils.timezone import now
+        from django.contrib.auth import login
         
-        temporary_token_str = request.data.get('temporary_token', '')
-        otp_code = request.data.get('otp_code', '').strip()
+        from ..serializers import VerifyOTPLoginSerializer, LoginResponseSerializer
         
-        if not temporary_token_str or not otp_code:
-            return Response({
-                'success': False,
-                'error': 'temporary_token and otp_code are required.'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        try:
-            # Decode temporary token
-            temp_token = AccessToken(temporary_token_str)
-            temp_token.verify()
-            
-            # Check if token is marked as temporary OTP token
-            if not temp_token.get('temp_otp_login'):
-                return Response({
-                    'success': False,
-                    'error': 'Invalid token. Please log in again.'
-                }, status=status.HTTP_401_UNAUTHORIZED)
-            
-            user_id = temp_token.get('user_id')
-            user = User.objects.get(id=user_id)
-            
-        except (TokenError, InvalidToken):
-            return Response({
-                'success': False,
-                'error': 'Invalid or expired token. Please log in again.'
-            }, status=status.HTTP_401_UNAUTHORIZED)
-        except User.DoesNotExist:
-            return Response({
-                'success': False,
-                'error': 'User not found. Please log in again.'
-            }, status=status.HTTP_401_UNAUTHORIZED)
-        
-        # Verify OTP code
-        otp_instance = UserOTP.get_valid_otp_for_user(user)
-        
-        if not otp_instance:
-            logger.warning(f"No valid OTP found for user {user.email}")
-            return Response({
-                'success': False,
-                'error': 'OTP expired. Please request a new one.',
-                'otp_expired': True
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        if not otp_instance.verify(otp_code):
-            logger.warning(f"Invalid OTP code provided by user {user.email}")
-            return Response({
-                'success': False,
-                'error': 'Invalid OTP code. Please try again.'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # OTP verified successfully - generate full tokens using the same serializer as form-based login
-        serializer_data = {
-            'username': user.email,
-            'email': user.email,
-            'password': '',  # Password already verified in initial login
-            'otp_code': otp_code
-        }
-        
-        serializer = CustomTokenObtainPairSerializer(
-            data=serializer_data,
-            context={'request': request}
-        )
+        serializer = VerifyOTPLoginSerializer(data=request.data, context={'request': request})
         
         if serializer.is_valid():
-            tokens = serializer.validated_data
-            access_token = tokens['access']
-            refresh_token = tokens['refresh']
-        else:
-            # Fallback to RefreshToken if serializer fails
-            refresh = RefreshToken.for_user(user)
-            access_token = str(refresh.access_token)
-            refresh_token = str(refresh)
+            response_data = serializer.validated_data
+            
+            # Log in the user to establish session
+            user = response_data.get('user')
+            if user:
+                login(request, user)
+                
+                # Record successful login (rate limiting)
+                record_successful_login(request, user_email=user.email)
+                
+                logger.info(f"User {user.email} successfully logged in with OTP verification")
+            
+            response_serializer = LoginResponseSerializer(response_data)
+            return Response(response_serializer.data, status=status.HTTP_200_OK)
         
-        # Reset failed login attempts
-        user.failed_login_attempts = 0
-        user.is_locked = False
-        user.lockout_time = None
-        user.save(update_fields=["failed_login_attempts", "is_locked", "lockout_time"])
-        
-        # Log the user into Django's session framework
-        login(request, user)
-        
-        # Update last_logged_on for all user system roles
-        UserSystemRole.objects.filter(user=user).update(last_logged_on=now())
-        
-        # Get system roles for the user
-        system_roles_data = []
-        user_system_roles = UserSystemRole.objects.filter(user=user).select_related('system', 'role')
-        for role_assignment in user_system_roles:
-            system_roles_data.append({
-                'system_name': role_assignment.system.name,
-                'system_slug': role_assignment.system.slug,
-                'role_name': role_assignment.role.name,
-                'assigned_at': role_assignment.assigned_at,
-            })
-        
-        # Determine the primary system and redirect URL
-        primary_system = None
-        redirect_url = settings.DEFAULT_SYSTEM_URL
-        
-        if system_roles_data:
-            primary_system = system_roles_data[0]['system_slug']
-            redirect_url = settings.SYSTEM_TEMPLATE_URLS.get(primary_system, settings.DEFAULT_SYSTEM_URL)
-        
-        # Prepare available system URLs for frontend
-        available_systems = {}
-        for role_data in system_roles_data:
-            system_slug = role_data['system_slug']
-            available_systems[system_slug] = settings.SYSTEM_TEMPLATE_URLS.get(system_slug, settings.DEFAULT_SYSTEM_URL)
-        
-        # Record successful login
-        record_successful_login(request, user_email=user.email)
-        
-        logger.info(f"User {user.email} successfully logged in with OTP verification")
-        
-        response_data = {
-            'success': True,
-            'message': 'OTP verification successful',
-            'access_token': access_token,
-            'refresh_token': refresh_token,
-            'user': {
-                'id': user.id,
-                'email': user.email,
-                'first_name': user.first_name,
-                'middle_name': user.middle_name,
-                'last_name': user.last_name,
-                'suffix': user.suffix,
-                'username': user.username,
-                'phone_number': user.phone_number,
-                'company_id': user.company_id,
-                'department': user.department,
-                'status': user.status,
-                'notified': user.notified,
-                'is_staff': user.is_staff,
-                'is_superuser': user.is_superuser,
-                'otp_enabled': user.otp_enabled,
-                'date_joined': user.date_joined,
-                'system_roles': system_roles_data,
-            },
-            'redirect': {
-                'primary_system': primary_system,
-                'url': redirect_url,
-                'available_systems': available_systems
-            }
-        }
-        
-        return Response(response_data, status=status.HTTP_200_OK)
+        return Response({
+            'success': False,
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
 

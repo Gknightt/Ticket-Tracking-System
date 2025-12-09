@@ -616,13 +616,16 @@
                         ToastNotification.success('Login Successful', 'Redirecting to your dashboard...', 1500);
 
                         // Set cookies
-                        document.cookie = `access_token=${data.access}; path=/`;
-                        document.cookie = `refresh_token=${data.refresh}; path=/`;
+                        document.cookie = `access_token=${data.access_token}; path=/`;
+                        document.cookie = `refresh_token=${data.refresh_token}; path=/`;
 
                         // Redirect
                         setTimeout(() => {
-                            if (data.systems && data.systems.length > 0) {
-                                const primarySystem = data.systems[0].system_slug;
+                            if (data.redirect && data.redirect.url) {
+                                window.location.href = data.redirect.url;
+                            } else if (data.user && data.user.system_roles && data.user.system_roles.length > 0) {
+                                // Fallback if redirect URL not provided but roles exist (legacy)
+                                const primarySystem = data.user.system_roles[0].system_slug;
                                 window.location.href = `/system/${primarySystem}/`;
                             } else {
                                 window.location.href = '/api/v1/users/welcome/';

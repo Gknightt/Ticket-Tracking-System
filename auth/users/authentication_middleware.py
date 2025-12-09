@@ -150,6 +150,7 @@ class AuthenticationRoutingMiddleware:
                         '/api/v1/hdts/employees/api/register/',
                         '/api/v1/users/password/forgot/',
                         '/api/v1/users/password/reset/',
+                        '/api/v1/users/login/verify-otp/',
                     }
                     if path in public_api_paths:
                         return True
