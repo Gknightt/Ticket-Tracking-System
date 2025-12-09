@@ -519,8 +519,12 @@ class LoginAPIView(APIView):
                 otp_instance = UserOTP.generate_for_user(user, otp_type='email')
                 
                 try:
-                    from notification_client import notification_client
-                    notification_client.send_otp_email_async(user, otp_instance.otp_code)
+                    from emails.services import get_email_service
+                    get_email_service().send_otp_email(
+                        user_email=user.email,
+                        user_name=user.get_full_name() or user.username,
+                        otp_code=otp_instance.otp_code
+                    )
                 except Exception as e:
                     logger.warning(f"Failed to send OTP email to {user.email}: {str(e)}")
                 

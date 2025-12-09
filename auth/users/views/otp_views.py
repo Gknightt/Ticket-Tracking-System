@@ -52,9 +52,13 @@ class RequestOTPView(generics.CreateAPIView):
             
             # Send OTP via SendGrid
             try:
-                from notification_client import notification_client
+                from emails.services import get_email_service
                 
-                success = notification_client.send_otp_email_async(user, otp_instance.otp_code)
+                success, _, _ = get_email_service().send_otp_email(
+                    user_email=user.email,
+                    user_name=user.get_full_name() or user.username,
+                    otp_code=otp_instance.otp_code
+                )
                 
                 if success:
                     return Response({
@@ -184,9 +188,13 @@ def request_otp_authenticated_view(request):
     
     # Send OTP via SendGrid
     try:
-        from notification_client import notification_client
+        from emails.services import get_email_service
         
-        success = notification_client.send_otp_email_async(user, otp_instance.otp_code)
+        success, _, _ = get_email_service().send_otp_email(
+            user_email=user.email,
+            user_name=user.get_full_name() or user.username,
+            otp_code=otp_instance.otp_code
+        )
         
         if success:
             return Response({

@@ -1,30 +1,25 @@
 """
-Simple SendGrid Email Service
+Simple Email Service
 
-Pure template-based email sending without database models
+Pure template-based email sending using Django's default mail backend
 """
 
 import logging
 from django.conf import settings
+from django.core.mail import send_mail
 from django.template.loader import render_to_string
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Email, To, Content
+from django.utils.html import strip_tags
 
 logger = logging.getLogger(__name__)
 
 
-class SendGridEmailService:
+class EmailService:
     """
-    Simple SendGrid email service using template files (no database)
+    Simple email service using template files and Django's mail backend
     """
     
     def __init__(self):
-        self.api_key = getattr(settings, 'SENDGRID_API_KEY', None)
-        self.from_email = getattr(settings, 'SENDGRID_FROM_EMAIL', 'noreply@ticketflow.com')
-        self.from_name = getattr(settings, 'SENDGRID_FROM_NAME', 'TicketFlow')
-        
-        if not self.api_key:
-            logger.warning("SendGrid API key not configured")
+        self.from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@ticketflow.com')
     
     def send_email(self, to_email, subject, template_name, context=None):
         """
@@ -39,11 +34,6 @@ class SendGridEmailService:
         Returns:
             tuple: (success: bool, message_id: str or None, error: str or None)
         """
-        if not self.api_key:
-            error_msg = "SendGrid API key not configured"
-            logger.error(error_msg)
-            return False, None, error_msg
-        
         try:
             # Render the HTML template
             if context is None:
@@ -57,28 +47,20 @@ class SendGridEmailService:
             # Render template
             template_path = f'emails/{template_name}'
             html_content = render_to_string(template_path, context)
-            
-            # Create SendGrid message
-            message = Mail(
-                from_email=Email(self.from_email, self.from_name),
-                to_emails=To(to_email),
-                subject=subject,
-                html_content=Content("text/html", html_content)
-            )
+            plain_message = strip_tags(html_content)
             
             # Send email
-            sg = SendGridAPIClient(self.api_key)
-            response = sg.send(message)
+            send_mail(
+                subject=subject,
+                message=plain_message,
+                from_email=self.from_email,
+                recipient_list=[to_email],
+                html_message=html_content,
+                fail_silently=False
+            )
             
-            if response.status_code in [200, 201, 202]:
-                logger.info(f"Email sent successfully to {to_email} using template {template_name}")
-                # SendGrid doesn't return message ID in the same way, use headers if available
-                message_id = response.headers.get('X-Message-Id', 'sent')
-                return True, message_id, None
-            else:
-                error_msg = f"SendGrid returned status {response.status_code}"
-                logger.error(error_msg)
-                return False, None, error_msg
+            logger.info(f"Email sent successfully to {to_email} using template {template_name}")
+            return True, 'sent', None
                 
         except Exception as e:
             error_msg = f"Failed to send email: {str(e)}"
@@ -176,7 +158,7 @@ def get_email_service():
     """Get or create the email service singleton"""
     global _email_service
     if _email_service is None:
-        _email_service = SendGridEmailService()
+        _email_service = EmailService()
     return _email_service
 
 

@@ -4,7 +4,7 @@ from django.contrib.auth import authenticate
 from django.core.mail import send_mail
 from django.conf import settings
 from .models import User, UserOTP, PasswordResetToken
-from notification_client import notification_client
+from emails.services import get_email_service
 from system_roles.models import UserSystemRole
 import hashlib
 import requests
@@ -388,11 +388,14 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                         user.lockout_time = None
                         user.save(update_fields=["is_locked", "failed_login_attempts", "lockout_time"])
                         # Send account unlocked notification via microservice
-                        notification_client.send_account_unlocked_notification(
-                            user=user,
-                            ip_address=self.context.get('request').META.get('REMOTE_ADDR') if self.context.get('request') else None,
-                            user_agent=self.context.get('request').META.get('HTTP_USER_AGENT') if self.context.get('request') else None
-                        )
+                        try:
+                            get_email_service().send_account_unlocked_email(
+                                user_email=user.email,
+                                user_name=user.get_full_name() or user.username,
+                                ip_address=self.context.get('request').META.get('REMOTE_ADDR') if self.context.get('request') else None
+                            )
+                        except Exception as e:
+                            logging.getLogger(__name__).error(f"Failed to send unlocked email: {e}")
                     else:
                         raise serializers.ValidationError(
                             "Account is locked due to too many failed login attempts. Please try again later.",
@@ -413,20 +416,19 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                         user.is_locked = True
                         user.lockout_time = timezone.now()
                         # Send account locked notification via microservice
-                        notification_client.send_account_locked_notification(
-                            user=user,
-                            failed_attempts=user.failed_login_attempts,
-                            ip_address=self.context.get('request').META.get('REMOTE_ADDR') if self.context.get('request') else None,
-                            user_agent=self.context.get('request').META.get('HTTP_USER_AGENT') if self.context.get('request') else None
-                        )
                     else:
                         # Send failed login attempt notification for multiple attempts (but not locked yet)
                         if user.failed_login_attempts >= 5:  # Start notifying after 5 attempts
-                            notification_client.send_failed_login_notification(
-                                user=user,
-                                ip_address=self.context.get('request').META.get('REMOTE_ADDR') if self.context.get('request') else None,
-                                user_agent=self.context.get('request').META.get('HTTP_USER_AGENT') if self.context.get('request') else None
-                            )
+                            try:
+                                get_email_service().send_failed_login_email(
+                                    user_email=user.email,
+                                    user_name=user.get_full_name() or user.username,
+                                    ip_address=self.context.get('request').META.get('REMOTE_ADDR') if self.context.get('request') else None,
+                                    attempt_time=timezone.now(),
+                                    failed_attempts=user.failed_login_attempts
+                                )
+                            except Exception as e:
+                                logging.getLogger(__name__).error(f"Failed to send failed login email: {e}")
                     user.save(update_fields=["failed_login_attempts", "is_locked", "lockout_time"])
                 raise serializers.ValidationError(
                     'Invalid email or password.',
@@ -633,11 +635,13 @@ class ResetPasswordSerializer(serializers.Serializer):
 
 
 def send_otp_email(user, otp_code):
-    """Send OTP code to user's email via notification service."""
-    from notification_client import notification_client
-    
+    """Send OTP code to user's email via email service."""
     try:
-        success = notification_client.send_otp_email_async(user, otp_code)
+        success, _, _ = get_email_service().send_otp_email(
+            user_email=user.email,
+            user_name=user.get_full_name() or user.username,
+            otp_code=otp_code
+        )
         return success
     except Exception as e:
         # Log the error in production
@@ -646,11 +650,22 @@ def send_otp_email(user, otp_code):
 
 
 def send_password_reset_email(user, reset_token, request=None):
-    """Send password reset email to user via notification service."""
-    from notification_client import notification_client
-    
+    """Send password reset email."""
     try:
-        success = notification_client.send_password_reset_email_async(user, reset_token, request)
+        # Build reset URL
+        if request:
+            base_url = f"{request.scheme}://{request.get_host()}"
+        else:
+            base_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+        
+        reset_url = f"{base_url}/api/v1/users/password/reset?token={reset_token.token}"
+        
+        success, _, _ = get_email_service().send_password_reset_email(
+            user_email=user.email,
+            user_name=user.get_full_name() or user.username,
+            reset_url=reset_url,
+            reset_token=reset_token.token
+        )
         return success
     except Exception as e:
         # Log the error in production
@@ -807,7 +822,6 @@ class LoginWithRecaptchaSerializer(serializers.Serializer):
         """Authenticate user with email and password after reCAPTCHA v2 verification."""
         from datetime import timedelta
         from django.utils import timezone
-        from notification_client import notification_client
         
         LOCKOUT_THRESHOLD = 10  # Number of allowed failed attempts
         LOCKOUT_TIME = timedelta(minutes=15)  # Lockout duration
@@ -859,11 +873,14 @@ class LoginWithRecaptchaSerializer(serializers.Serializer):
                         user.lockout_time = None
                         user.save(update_fields=["is_locked", "failed_login_attempts", "lockout_time"])
                         # Send account unlocked notification
-                        notification_client.send_account_unlocked_notification(
-                            user=user,
-                            ip_address=self.context.get('request').META.get('REMOTE_ADDR') if self.context.get('request') else None,
-                            user_agent=self.context.get('request').META.get('HTTP_USER_AGENT') if self.context.get('request') else None
-                        )
+                        try:
+                            get_email_service().send_account_unlocked_email(
+                                user_email=user.email,
+                                user_name=user.get_full_name() or user.username,
+                                ip_address=self.context.get('request').META.get('REMOTE_ADDR') if self.context.get('request') else None
+                            )
+                        except Exception as e:
+                            logging.getLogger(__name__).error(f"Failed to send unlocked email: {e}")
                     else:
                         raise serializers.ValidationError(
                             "Account is locked due to too many failed login attempts. Please try again later.",
@@ -881,20 +898,30 @@ class LoginWithRecaptchaSerializer(serializers.Serializer):
                         user.is_locked = True
                         user.lockout_time = timezone.now()
                         # Send account locked notification
-                        notification_client.send_account_locked_notification(
-                            user=user,
-                            failed_attempts=user.failed_login_attempts,
-                            ip_address=self.context.get('request').META.get('REMOTE_ADDR') if self.context.get('request') else None,
-                            user_agent=self.context.get('request').META.get('HTTP_USER_AGENT') if self.context.get('request') else None
-                        )
+                        try:
+                            get_email_service().send_account_locked_email(
+                                user_email=user.email,
+                                user_name=user.get_full_name() or user.username,
+                                locked_until=timezone.now() + LOCKOUT_TIME,
+                                failed_attempts=user.failed_login_attempts,
+                                lockout_duration="15 minutes",
+                                ip_address=self.context.get('request').META.get('REMOTE_ADDR') if self.context.get('request') else None
+                            )
+                        except Exception as e:
+                            logging.getLogger(__name__).error(f"Failed to send locked email: {e}")
                     else:
                         # Send failed login attempt notification for multiple attempts (but not locked yet)
                         if user.failed_login_attempts >= 5:  # Start notifying after 5 attempts
-                            notification_client.send_failed_login_notification(
-                                user=user,
-                                ip_address=self.context.get('request').META.get('REMOTE_ADDR') if self.context.get('request') else None,
-                                user_agent=self.context.get('request').META.get('HTTP_USER_AGENT') if self.context.get('request') else None
-                            )
+                            try:
+                                get_email_service().send_failed_login_email(
+                                    user_email=user.email,
+                                    user_name=user.get_full_name() or user.username,
+                                    ip_address=self.context.get('request').META.get('REMOTE_ADDR') if self.context.get('request') else None,
+                                    attempt_time=timezone.now(),
+                                    failed_attempts=user.failed_login_attempts
+                                )
+                            except Exception as e:
+                                logging.getLogger(__name__).error(f"Failed to send failed login email: {e}")
                     user.save(update_fields=["failed_login_attempts", "is_locked", "lockout_time"])
                 
                 raise serializers.ValidationError('Invalid email or password.')

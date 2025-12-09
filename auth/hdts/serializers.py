@@ -6,7 +6,6 @@ import logging
 import jwt
 import requests
 from .models import Employees, EmployeeOTP
-from notification_client import notification_client
 
 logger = logging.getLogger(__name__)
 
