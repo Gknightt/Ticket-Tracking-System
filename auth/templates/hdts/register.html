@@ -36,8 +36,12 @@
                     </p>
                 </header>
 
-                <form method="post" enctype="multipart/form-data" novalidate>
+                <form method="post" enctype="multipart/form-data" novalidate id="registerForm">
                     {% csrf_token %}
+
+                    <p class="back-to-login">
+                        Already have an account? <a href="{% url 'employee-login-shortcut' %}"><i class="fas fa-sign-in-alt"></i>&nbsp;Log In</a>
+                    </p>
 
                     {% if form.non_field_errors %}
                     <div class="fieldset">
@@ -55,9 +59,6 @@
                         <i class="fas fa-user-plus"></i>&nbsp;&nbsp;Sign Up
                     </button>
 
-                    <p class="back-to-login">
-                        Already have an account? <a href="{% url 'auth_login' %}"><i class="fas fa-sign-in-alt"></i>&nbsp;Log In</a>
-                    </p>
                 </form>
             </div>
         </section>
@@ -143,6 +144,56 @@
             } else {
                 console.error('Cropper.js failed to load');
             }
+        });
+        
+        // Handle API-based registration
+        document.getElementById('registerForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const submitBtn = this.querySelector('.submit-button');
+            
+            // Show loading state
+            submitBtn.disabled = true;
+            const originalText = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>&nbsp;&nbsp;Creating Account...';
+            
+            // Get access token from cookies if available
+            const accessToken = document.cookie.split('; ').find(row => row.startsWith('access_token='))?.split('=')[1];
+            
+            const fetchOptions = {
+                method: 'POST',
+                body: formData
+            };
+            
+            // Add Authorization header if we have a token
+            if (accessToken) {
+                fetchOptions.headers = {
+                    'Authorization': `Bearer ${accessToken}`
+                };
+            }
+            
+            fetch('/api/v1/hdts/employees/api/register/', fetchOptions)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success || data.id) {
+                    // Success
+                    alert('Account created successfully! Please log in with your credentials.');
+                    window.location.href = '{% url "employee-login-shortcut" %}';
+                } else {
+                    // Error
+                    const errorMsg = data.error || data.detail || data.message || 'Registration failed. Please try again.';
+                    alert('Error: ' + errorMsg);
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalText;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred during registration. Please try again.');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            });
         });
     </script>
     <script src="{% static 'hdts/script.js' %}"></script>
