@@ -47,10 +47,10 @@ class LoginView(FormView):
     - Captcha protection
     - Account lockout protection
     
-    NOTE: This view now serves the API-based login template (login_api.html)
+    NOTE: This view serves the staff login template (staff_login.html)
     which communicates with /api/v1/users/login/api/ and /api/v1/users/login/verify-otp/
     """
-    template_name = 'users/login_api.html'  # Changed to API-based template
+    template_name = 'public/staff_login.html'  # Changed to staff login template
     form_class = LoginForm
     success_url = reverse_lazy('system-welcome')
     OTP_ERROR_CODES = {'otp_required', 'otp_invalid', 'otp_expired'}

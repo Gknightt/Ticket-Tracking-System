@@ -44,7 +44,6 @@ from .password_views import (
     ForgotPasswordView,
     ResetPasswordView,
     ProfilePasswordResetView,
-    ForgotPasswordUIView,
     ChangePasswordUIView,
 )
 
@@ -110,7 +109,6 @@ __all__ = [
     'ForgotPasswordView',
     'ResetPasswordView',
     'ProfilePasswordResetView',
-    'ForgotPasswordUIView',
     'ChangePasswordUIView',
     # User Management
     'UserViewSet',

@@ -29,7 +29,6 @@ from hdts.employee_template_views import (
     EmployeeLoginView,
     EmployeeRegisterView,
     EmployeeVerifyOTPView,
-    EmployeeForgotPasswordUIView,
     EmployeeResetPasswordUIView,
     EmployeeProfileSettingsView,
     EmployeeChangePasswordView,
@@ -134,7 +133,7 @@ urlpatterns = [
     path('verify-otp/', EmployeeVerifyOTPView.as_view(), name='employee-verify-otp-shortcut'),
     path('profile-settings/', EmployeeProfileSettingsView.as_view(), name='employee-profile-settings-shortcut'),
     path('change-password/', EmployeeChangePasswordView.as_view(), name='employee-change-password-shortcut'),
-    path('forgot-password/', EmployeeForgotPasswordUIView.as_view(), name='employee-forgot-password-shortcut'),
+    
     path('reset-password/', EmployeeResetPasswordUIView.as_view(), name='employee-reset-password-shortcut'),
     
     # API shortcut for current user profile (works for both staff and employees)

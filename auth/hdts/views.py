@@ -36,7 +36,6 @@ from .employee_template_views import (
     EmployeeProfileSettingsView,
     EmployeeChangePasswordView as TemplateChangePasswordView,
     EmployeeLogoutView as TemplateLogoutView,
-    EmployeeForgotPasswordUIView,
     EmployeeResetPasswordUIView,
 )
 
@@ -82,7 +81,7 @@ def register_user_view(request):
     else:
         form = UserRegistrationForm()
         
-    return render(request, 'hdts/register.html', {'form': form})
+    return render(request, 'public/hdts_register.html', {'form': form})
 
 
 # --- NEW VIEW FOR USER MANAGEMENT ---
@@ -102,7 +101,7 @@ def manage_pending_users_view(request):
     context = {
         'pending_users': pending_users
     }
-    return render(request, 'hdts/user_management/pending_approvals.html', context)
+    return render(request, 'management/hdts/user_management/pending_approvals.html', context)
 
 @hdts_admin_required
 @require_POST # Ensure this view only accepts POST requests

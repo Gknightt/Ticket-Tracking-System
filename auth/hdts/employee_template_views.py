@@ -82,7 +82,7 @@ class EmployeeLoginView(EmployeeNotAuthenticatedMixin, TemplateView):
     - If not authenticated: show login page
     - If authenticated: redirect to profile settings
     """
-    template_name = 'hdts/employee_login.html'
+    template_name = 'public/hdts_login.html'
     permission_classes = [AllowAny]
 
     def get_context_data(self, **kwargs):
@@ -98,7 +98,7 @@ class EmployeeRegisterView(EmployeeNotAuthenticatedMixin, TemplateView):
     - If not authenticated: show registration page
     - If authenticated: redirect to profile settings
     """
-    template_name = 'hdts/register.html'
+    template_name = 'public/hdts_register.html'
     permission_classes = [AllowAny]
 
     def get_context_data(self, **kwargs):
@@ -114,21 +114,7 @@ class EmployeeVerifyOTPView(EmployeeNotAuthenticatedMixin, TemplateView):
     - If not authenticated: show OTP verification page
     - If authenticated: redirect to profile settings
     """
-    template_name = 'hdts/employee_verify_otp.html'
-    permission_classes = [AllowAny]
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        return context
-
-
-class EmployeeForgotPasswordView(EmployeeNotAuthenticatedMixin, TemplateView):
-    """
-    Serve the forgot password template.
-    - If not authenticated: show forgot password page
-    - If authenticated: redirect to profile settings
-    """
-    template_name = 'hdts/forgot_password.html'
+    template_name = 'public/hdts_verify_otp.html'
     permission_classes = [AllowAny]
 
     def get_context_data(self, **kwargs):
@@ -142,7 +128,7 @@ class EmployeeResetPasswordView(EmployeeNotAuthenticatedMixin, TemplateView):
     - If not authenticated: show reset password page (with token)
     - If authenticated: redirect to profile settings
     """
-    template_name = 'hdts/reset_password.html'
+    template_name = 'public/hdts_reset_password.html'
     permission_classes = [AllowAny]
 
     def get_context_data(self, **kwargs):
@@ -160,7 +146,7 @@ class EmployeeDashboardView(EmployeeLoginRequiredMixin, TemplateView):
     - If authenticated: show dashboard
     - If not authenticated: redirect to /login/
     """
-    template_name = 'hdts/employee_dashboard.html'
+    template_name = 'hdts/dashboard.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -173,7 +159,7 @@ class EmployeeProfileSettingsView(EmployeeLoginRequiredMixin, TemplateView):
     - If authenticated: show profile settings
     - If not authenticated: redirect to /login/
     """
-    template_name = 'hdts/employee_profile.html'
+    template_name = 'hdts/profile.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -198,7 +184,7 @@ class EmployeeChangePasswordView(EmployeeLoginRequiredMixin, TemplateView):
     - If authenticated: show change password page
     - If not authenticated: redirect to /login/
     """
-    template_name = 'hdts/employee_change_password.html'
+    template_name = 'hdts/change_password.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -210,24 +196,11 @@ class EmployeeLogoutView(TemplateView):
     Handle employee logout and redirect to login.
     Shows login template after logout.
     """
-    template_name = 'hdts/employee_login.html'
+    template_name = 'public/hdts_login.html'
 
     def get(self, request, *args, **kwargs):
         # Clear any session data or cookies if needed
         return super().get(request, *args, **kwargs)
-
-
-class EmployeeForgotPasswordUIView(EmployeeNotAuthenticatedMixin, TemplateView):
-    """
-    Alias for EmployeeForgotPasswordView for backward compatibility.
-    - If not authenticated: show forgot password page
-    - If authenticated: redirect to profile settings
-    """
-    template_name = 'hdts/forgot_password.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        return context
 
 
 class EmployeeResetPasswordUIView(EmployeeNotAuthenticatedMixin, TemplateView):
@@ -236,7 +209,7 @@ class EmployeeResetPasswordUIView(EmployeeNotAuthenticatedMixin, TemplateView):
     - If not authenticated: show reset password page (with token)
     - If authenticated: redirect to profile settings
     """
-    template_name = 'hdts/reset_password.html'
+    template_name = 'public/hdts_reset_password.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
