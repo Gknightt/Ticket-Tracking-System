@@ -343,6 +343,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['email'] = user.email
         token['username'] = user.username
         token['full_name'] = user.get_full_name()
+        token['user_type'] = 'staff'  # This is for Staff users (User model)
         
         # Add system-specific roles using the existing UserSystemRole model
         roles = []

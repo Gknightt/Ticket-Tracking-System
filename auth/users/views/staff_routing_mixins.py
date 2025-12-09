@@ -42,35 +42,17 @@ class StaffLoginRequiredMixin(StaffAuthenticationMixin):
 class StaffNotAuthenticatedMixin(StaffAuthenticationMixin):
     """
     Mixin that redirects authenticated staff away from public pages.
-    If already authenticated:
-    - Single system assigned → Redirect to system dashboard
-    - Multiple systems assigned → Redirect to system selection page
-    - No systems assigned → Redirect to welcome page
+    
+    NOTE: Routing is now handled by AuthenticationRoutingMiddleware.
+    This mixin is kept for compatibility but should be deprecated.
     """
     
     def dispatch(self, request, *args, **kwargs):
         super().dispatch(request, *args, **kwargs)
         
         if self.is_authenticated_staff:
-            # Get user's assigned systems
-            user_systems = System.objects.filter(
-                user_roles__user=request.user,
-                user_roles__is_active=True
-            ).distinct()
-            
-            if user_systems.count() == 1:
-                # Single system: redirect to system dashboard
-                from users.utils import get_system_redirect_url
-                system = user_systems.first()
-                redirect_url = get_system_redirect_url(request.user, system.slug)
-                if redirect_url:
-                    return redirect(redirect_url)
-            
-            if user_systems.count() > 1:
-                # Multiple systems: redirect to system welcome/selection page
-                return redirect('system-welcome')
-            
-            # No systems: redirect to welcome page
+            # Middleware will handle routing based on user type and system assignment
+            # For now, redirect to system selection page
             return redirect('system-welcome')
         
         return super(StaffAuthenticationMixin, self).dispatch(request, *args, **kwargs)

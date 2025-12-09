@@ -26,7 +26,6 @@ from ..models import User, UserOTP
 from ..forms import LoginForm
 from ..serializers import CustomTokenObtainPairSerializer
 from ..decorators import jwt_cookie_required
-from ..utils import create_system_redirect_response
 from ..rate_limiting import (
     check_login_rate_limits,
     record_failed_login_attempt,
@@ -85,46 +84,8 @@ class LoginView(FormView):
             request.COOKIES.pop('access_token', None)
             request.COOKIES.pop('refresh_token', None)
         
-        # If user is authenticated, redirect to their system
-        if user:
-            from users.utils import get_system_redirect_url
-
-            access_token = request.COOKIES.get('access_token')
-            system_slug = request.GET.get('system')
-
-            if system_slug:
-                redirect_url = get_system_redirect_url(user, system_slug)
-                if redirect_url:
-                    if access_token:
-                        separator = '&' if '?' in redirect_url else '?'
-                        redirect_url += f"{separator}token={access_token}"
-                    request.session['last_selected_system'] = system_slug
-                    return redirect(redirect_url)
-                messages.error(request, 'You do not have access to the requested system.')
-
-            available_systems = System.objects.filter(
-                user_roles__user=user,
-                user_roles__is_active=True
-            ).distinct()
-
-            if not available_systems.exists():
-                messages.error(request, 'No systems are assigned to your account. Please contact support.')
-                return redirect('system-welcome')
-
-            if available_systems.count() == 1:
-                selected_system = available_systems.first()
-                redirect_url = get_system_redirect_url(user, selected_system.slug)
-                if redirect_url:
-                    if access_token:
-                        separator = '&' if '?' in redirect_url else '?'
-                        redirect_url += f"{separator}token={access_token}"
-                    request.session['last_selected_system'] = selected_system.slug
-                    return redirect(redirect_url)
-                logger.error(f'System redirect URL is None for system: {selected_system.slug}')
-                messages.error(request, f'System "{selected_system.name}" is not properly configured. Please contact support.')
-                return redirect('system-welcome')
-
-            return redirect('system-welcome')
+        # If user is authenticated, middleware will handle routing
+        # Just show the login page (user shouldn't see it if already authenticated)
         
         # Proceed with normal dispatch and clear invalid cookies from response
         response = super().dispatch(request, *args, **kwargs)
@@ -240,21 +201,8 @@ class LoginView(FormView):
 
         if system_count == 1:
             selected_system = available_systems.first()
-            from users.utils import get_system_redirect_url
-            redirect_target_url = get_system_redirect_url(user, selected_system.slug)
-            if redirect_target_url:
-                separator = '&' if '?' in redirect_target_url else '?'
-                redirect_target_url += f"{separator}token={access_token}"
-                self.request.session['last_selected_system'] = selected_system.slug
-            else:
-                logger.error(f'System redirect URL is None for system: {selected_system.slug}')
-                messages.error(
-                    self.request,
-                    f'System "{selected_system.name}" is not properly configured. Please contact support.'
-                )
-                return HttpResponseServerError(
-                    f'System "{selected_system.name}" (slug: {selected_system.slug}) URL not configured.'
-                )
+            # System routing is now handled by AuthenticationRoutingMiddleware based on JWT user_type claim
+            self.request.session['last_selected_system'] = selected_system.slug
         elif system_count == 0:
             messages.error(
                 self.request,
@@ -481,32 +429,18 @@ class SystemWelcomeView(TemplateView):
         return context
 
     def get(self, request, *args, **kwargs):
-        system_slug = request.GET.get('system')
-
-        if system_slug:
-            response = create_system_redirect_response(request, system_slug, include_token=True)
-            if response:
-                request.session['last_selected_system'] = system_slug
-                return response
-            messages.error(request, 'You do not have access to the requested system or it is not configured.')
-
+        # Middleware handles routing, just display system selection page
         systems = list(self.get_user_systems())
 
         if not systems:
             messages.error(request, 'No systems are assigned to your account. Please contact support.')
             return self.render_to_response(self.get_context_data(systems=systems))
 
-        if len(systems) == 1 and not system_slug:
-            sole_system = systems[0]
-            request.session['last_selected_system'] = sole_system.slug
-            response = create_system_redirect_response(request, sole_system.slug, include_token=True)
-            if response:
-                return response
-            messages.error(request, f'System "{sole_system.name}" is not properly configured. Please contact support.')
-
         return self.render_to_response(self.get_context_data(systems=systems))
 
     def post(self, request, *args, **kwargs):
+        # System selection is now handled by the frontend/middleware
+        # This is kept for legacy support
         system_slug = request.POST.get('system_slug') or request.POST.get('system')
 
         if not system_slug:
@@ -520,15 +454,10 @@ class SystemWelcomeView(TemplateView):
             messages.error(request, 'You do not have access to the selected system.')
             return self.get(request, *args, **kwargs)
 
-
         request.session['last_selected_system'] = selected_system.slug
-        response = create_system_redirect_response(request, selected_system.slug, include_token=True)
+        # Middleware will redirect based on user_type, just redirect to home
+        return redirect('/')
 
-        if response:
-            return response
-
-        messages.error(request, f'System "{selected_system.name}" is not properly configured. Please contact support.')
-        return self.get(request, *args, **kwargs)
 
 
 # API-based login endpoint with reCAPTCHA
