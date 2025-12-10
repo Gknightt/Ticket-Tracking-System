@@ -422,21 +422,22 @@ def request_otp_for_login(request):
                     otp_instance = UserOTP.generate_for_user(user, otp_type='email')
                     
                     try:
-                        from django.core.mail import send_mail
+                        from notification_client import notification_client
                         
-                        send_mail(
-                            subject='Your Login OTP Code',
-                            message=f'Your OTP code is: {otp_instance.code}\n\nThis code will expire in 10 minutes.',
-                            from_email=settings.DEFAULT_FROM_EMAIL,
-                            recipient_list=[user.email],
-                            fail_silently=False,
-                        )
+                        success = notification_client.send_otp_email_async(user, otp_instance.otp_code)
                         
-                        messages.success(
-                            request, 
-                            'OTP code has been sent to your email address.'
-                        )
+                        if success:
+                            messages.success(
+                                request, 
+                                'OTP code has been sent to your email address.'
+                            )
+                        else:
+                            messages.error(
+                                request, 
+                                'Failed to send OTP. Please try again or contact support.'
+                            )
                     except Exception as e:
+                        logger.error(f"Failed to send OTP for login to {user.email}: {str(e)}")
                         messages.error(
                             request, 
                             'Failed to send OTP. Please try again or contact support.'
@@ -549,9 +550,15 @@ class LoginAPIView(APIView):
     def post(self, request):
         from ..serializers import LoginWithRecaptchaSerializer
         
-        serializer = LoginWithRecaptchaSerializer(data=request.data)
+        print(f"\n{'='*60}")
+        print(f"🌐 LoginAPIView.post() called")
+        print(f"   Request data: {request.data}")
+        print(f"{'='*60}\n")
+        
+        serializer = LoginWithRecaptchaSerializer(data=request.data, context={'request': request})
         
         if serializer.is_valid():
+            print("✅ Serializer is valid")
             user = serializer.validated_data['user']
             
             # Generate tokens
@@ -580,6 +587,8 @@ class LoginAPIView(APIView):
                 }
             })
         else:
+            print(f"❌ Serializer validation failed")
+            print(f"   Errors: {serializer.errors}")
             record_failed_login_attempt(request, user_email=request.data.get('email'))
             
             return Response({

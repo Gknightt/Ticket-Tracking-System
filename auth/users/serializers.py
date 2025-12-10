@@ -797,6 +797,7 @@ class LoginWithRecaptchaSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)
     password = serializers.CharField(write_only=True, required=True)
     g_recaptcha_response = serializers.CharField(required=True, write_only=True)
+    otp_code = serializers.CharField(required=False, allow_blank=True, write_only=True)
     
     def validate(self, attrs):
         """Authenticate user with email and password after reCAPTCHA v2 verification."""
@@ -804,39 +805,52 @@ class LoginWithRecaptchaSerializer(serializers.Serializer):
         from django.utils import timezone
         from notification_client import notification_client
         
+        print(f"\n{'='*60}")
+        print(f"🔐 LoginWithRecaptchaSerializer.validate() called")
+        print(f"   Received attrs: {attrs}")
+        print(f"{'='*60}\n")
+        
         LOCKOUT_THRESHOLD = 10  # Number of allowed failed attempts
         LOCKOUT_TIME = timedelta(minutes=15)  # Lockout duration
         
         email = attrs.get('email')
         password = attrs.get('password')
         recaptcha_response = attrs.get('g_recaptcha_response')
+        otp_code = attrs.get('otp_code', '')
         
-        # Verify reCAPTCHA v2 response first (MANDATORY)
-        if recaptcha_response:
-            verify_url = 'https://www.google.com/recaptcha/api/siteverify'
-            secret_key = settings.RECAPTCHA_SECRET_KEY
+        print(f"   Email: {email}")
+        print(f"   Has Password: {bool(password)}")
+        print(f"   Has reCAPTCHA: {bool(recaptcha_response)}")
+        print(f"   Has OTP: {bool(otp_code)}")
+        
+        # Verify reCAPTCHA v2 response first (MANDATORY for initial login, skip if OTP provided)
+        # If OTP is provided, user already passed reCAPTCHA in the first step
+        if not otp_code:
+            if recaptcha_response:
+                verify_url = 'https://www.google.com/recaptcha/api/siteverify'
+                secret_key = settings.RECAPTCHA_SECRET_KEY
             
-            try:
-                response = requests.post(
-                    verify_url,
-                    data={'secret': secret_key, 'response': recaptcha_response},
-                    timeout=5
-                )
-                response.raise_for_status()
-                result = response.json()
-                
-                is_valid = result.get('success', False)
-                error_codes = result.get('error-codes', [])
-                
-                if not is_valid:
-                    raise serializers.ValidationError('reCAPTCHA verification failed.')
+                try:
+                    response = requests.post(
+                        verify_url,
+                        data={'secret': secret_key, 'response': recaptcha_response},
+                        timeout=5
+                    )
+                    response.raise_for_status()
+                    result = response.json()
                     
-            except requests.RequestException as e:
-                raise serializers.ValidationError('Failed to verify reCAPTCHA. Please try again.')
-        else:
-            raise serializers.ValidationError('reCAPTCHA verification is required.')
+                    is_valid = result.get('success', False)
+                    error_codes = result.get('error-codes', [])
+                    
+                    if not is_valid:
+                        raise serializers.ValidationError('reCAPTCHA verification failed.')
+                        
+                except requests.RequestException as e:
+                    raise serializers.ValidationError('Failed to verify reCAPTCHA. Please try again.')
+            else:
+                raise serializers.ValidationError('reCAPTCHA verification is required.')
         
-        # Authenticate user after reCAPTCHA passes
+        # Authenticate user after reCAPTCHA passes (or if OTP is provided)
         if email and password:
             # Check if user exists first
             try:
@@ -893,6 +907,55 @@ class LoginWithRecaptchaSerializer(serializers.Serializer):
                     user.save(update_fields=["failed_login_attempts", "is_locked", "lockout_time"])
                 
                 raise serializers.ValidationError('Invalid email or password.')
+            
+            # Reset failed attempts on successful authentication
+            if user:
+                user.failed_login_attempts = 0
+                user.is_locked = False
+                user.lockout_time = None
+                user.save(update_fields=["failed_login_attempts", "is_locked", "lockout_time"])
+            
+            # Check if 2FA is enabled for this user
+            if user_auth.otp_enabled:
+                # Check if OTP code is provided
+                if not otp_code or otp_code.strip() == '':
+                    # OTP required but not provided
+                    raise serializers.ValidationError({
+                        'otp_required': True,
+                        'message': 'Two-factor authentication is enabled. Please enter your OTP code.',
+                        'email': email
+                    }, code='otp_required')
+                
+                # Get the most recent valid OTP for this user
+                otp_instance = UserOTP.get_valid_otp_for_user(user_auth)
+                
+                print(f"🔍 OTP Debug:")
+                print(f"   User: {user_auth.email}")
+                print(f"   Provided OTP: '{otp_code}' (length: {len(otp_code)})")
+                print(f"   OTP Instance: {otp_instance}")
+                
+                if not otp_instance:
+                    print(f"   ❌ No valid OTP found")
+                    raise serializers.ValidationError({
+                        'otp_expired': True,
+                        'message': 'Your OTP code has expired. Please request a new one.'
+                    }, code='otp_expired')
+                
+                print(f"   Expected OTP: '{otp_instance.otp_code}' (length: {len(otp_instance.otp_code)})")
+                print(f"   Is Valid: {otp_instance.is_valid()}")
+                print(f"   Is Used: {otp_instance.is_used}")
+                print(f"   Is Expired: {otp_instance.is_expired()}")
+                print(f"   Attempts: {otp_instance.attempts}/{otp_instance.max_attempts}")
+                
+                # Verify the provided OTP code
+                verification_result = otp_instance.verify(otp_code)
+                print(f"   Verification Result: {verification_result}")
+                
+                if not verification_result:
+                    raise serializers.ValidationError({
+                        'otp_invalid': True,
+                        'message': 'Invalid OTP code. Please check your code and try again.'
+                    }, code='otp_invalid')
             
             attrs['user'] = user_auth
         else:

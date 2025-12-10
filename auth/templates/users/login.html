@@ -290,12 +290,136 @@
                         
                         // Redirect to system welcome page
                         window.location.href = '/api/v1/users/welcome/';
+                    } else if (result.data.errors?.otp_required) {
+                        // 2FA is enabled - show OTP input field
+                        isFormSubmitting = false;
+                        
+                        // Store credentials and reCAPTCHA in sessionStorage for OTP verification
+                        sessionStorage.setItem('login_email', email);
+                        sessionStorage.setItem('login_password', password);
+                        sessionStorage.setItem('login_recaptcha', recaptchaResponse);
+                        
+                        // Hide email/password fields
+                        document.querySelectorAll('fieldset').forEach(field => field.style.display = 'none');
+                        document.querySelector('.remember-me').style.display = 'none';
+                        document.querySelector('.g-recaptcha').style.display = 'none';
+                        document.querySelector('.form-footer').style.display = 'none';
+                        
+                        // Show OTP message and request OTP
+                        const form = document.querySelector('.lpForm');
+                        const otpHTML = `
+                            <div class="otp-section" style="margin-top: 20px;">
+                                <p class="infoMsg" style="text-align: center; color: #007bff; margin-bottom: 20px;">
+                                    <i class="fa fa-shield-alt"></i> Two-Factor Authentication is enabled. 
+                                    An OTP code has been sent to your email.
+                                </p>
+                                <fieldset>
+                                    <label for="otp_input">Enter OTP Code:</label>
+                                    <input type="text" id="otp_input" name="otp_code" 
+                                           class="form-control" placeholder="Enter 6-digit code" 
+                                           maxlength="6" autocomplete="off" required 
+                                           style="text-align: center; font-size: 18px; letter-spacing: 5px;">
+                                    <div class="form-text" style="text-align: center; margin-top: 10px;">
+                                        Check your email for the verification code
+                                    </div>
+                                </fieldset>
+                                <button type="button" id="verifyOtpBtn" class="logInButton" style="margin-top: 20px;">
+                                    <span class="buttonText">Verify Code</span>
+                                    <span class="spinner" style="display:none;"></span>
+                                </button>
+                                <a href="/api/v1/users/login/ui/" class="backToLogin" 
+                                   style="display: block; text-align: center; margin-top: 15px; color: #666; text-decoration: none;">
+                                    <i class="fa fa-arrow-left"></i> Back to Login
+                                </a>
+                            </div>
+                        `;
+                        
+                        loginButton.insertAdjacentHTML('beforebegin', otpHTML);
+                        loginButton.style.display = 'none';
+                        
+                        // Auto-request OTP
+                        fetch('/api/v1/users/login/request-otp/', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                                'X-CSRFToken': document.querySelector('[name="csrfmiddlewaretoken"]').value
+                            },
+                            body: `email=${encodeURIComponent(email)}`
+                        });
+                        
+                        // Focus OTP input
+                        setTimeout(() => document.getElementById('otp_input').focus(), 100);
+                        
+                        // Handle OTP verification
+                        document.getElementById('verifyOtpBtn').addEventListener('click', function() {
+                            const otpCode = document.getElementById('otp_input').value;
+                            
+                            if (!otpCode || otpCode.length !== 6) {
+                                alert('Please enter a valid 6-digit OTP code.');
+                                return;
+                            }
+                            
+                            this.disabled = true;
+                            this.querySelector('.buttonText').textContent = 'Verifying...';
+                            this.querySelector('.spinner').style.display = 'inline-block';
+                            
+                            // Get stored credentials
+                            const storedEmail = sessionStorage.getItem('login_email');
+                            const storedPassword = sessionStorage.getItem('login_password');
+                            const storedRecaptcha = sessionStorage.getItem('login_recaptcha');
+                            
+                            // Login with OTP
+                            fetch('/api/v1/users/login/api/', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRFToken': document.querySelector('[name="csrfmiddlewaretoken"]').value
+                                },
+                                body: JSON.stringify({
+                                    email: storedEmail,
+                                    password: storedPassword,
+                                    g_recaptcha_response: storedRecaptcha,
+                                    otp_code: otpCode
+                                })
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    // Clear stored credentials
+                                    sessionStorage.removeItem('login_email');
+                                    sessionStorage.removeItem('login_password');
+                                    sessionStorage.removeItem('login_recaptcha');
+                                    
+                                    localStorage.setItem('access_token', data.access_token);
+                                    localStorage.setItem('refresh_token', data.refresh_token);
+                                    document.cookie = `access_token=${data.access_token}; path=/`;
+                                    document.cookie = `refresh_token=${data.refresh_token}; path=/`;
+                                    window.location.href = '/api/v1/users/welcome/';
+                                } else {
+                                    alert(data.errors?.message || data.errors?.otp_invalid?.[0]?.message || data.errors?.non_field_errors?.[0] || 'Invalid OTP code. Please try again.');
+                                    document.getElementById('verifyOtpBtn').disabled = false;
+                                    document.getElementById('verifyOtpBtn').querySelector('.buttonText').textContent = 'Verify Code';
+                                    document.getElementById('verifyOtpBtn').querySelector('.spinner').style.display = 'none';
+                                    document.getElementById('otp_input').value = '';
+                                    document.getElementById('otp_input').focus();
+                                }
+                            });
+                        });
+                        
+                        // Allow Enter key to submit OTP
+                        document.getElementById('otp_input').addEventListener('keypress', function(e) {
+                            if (e.key === 'Enter') {
+                                document.getElementById('verifyOtpBtn').click();
+                            }
+                        });
+                        
                     } else {
                         // Login failed - show error
                         const errorMsg = result.data.errors?.non_field_errors?.[0] || 
                                         result.data.errors?.email?.[0] || 
                                         result.data.errors?.password?.[0] ||
                                         result.data.errors?.g_recaptcha_response?.[0] ||
+                                        result.data.errors?.message ||
                                         'Login failed. Please try again.';
                         
                         alert(errorMsg);

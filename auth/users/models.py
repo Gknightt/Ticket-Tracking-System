@@ -183,12 +183,21 @@ class UserOTP(models.Model):
     
     def verify(self, provided_otp):
         """Verify the provided OTP code."""
+        # Check if OTP can still be used (before incrementing attempts)
+        if self.is_used:
+            return False
+        
+        if self.is_expired():
+            return False
+        
+        if self.attempts >= self.max_attempts:
+            return False
+        
+        # Increment attempts
         self.attempts += 1
         self.save(update_fields=['attempts'])
         
-        if not self.is_valid():
-            return False
-        
+        # Check if the code matches
         if self.otp_code == provided_otp:
             self.is_used = True
             self.save(update_fields=['is_used'])
