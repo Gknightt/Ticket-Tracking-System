@@ -370,3 +370,65 @@
   width: 100%;
   padding: 16px 0 0 0;
 }
+
+/* Clickable Elements for Drilldown */
+.clickable {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.clickable:hover {
+  background-color: var(--primary-color-light, rgba(74, 144, 226, 0.1));
+  transform: translateX(2px);
+}
+
+.clickable:active {
+  transform: translateX(0);
+}
+
+.gridRow.clickable:hover {
+  background-color: var(--primary-color-light, rgba(74, 144, 226, 0.15));
+  box-shadow: inset 3px 0 0 var(--primary-color, #4a90e2);
+}
+
+.clickHint {
+  font-size: 11px;
+  color: var(--secondary-color);
+  opacity: 0.6;
+  margin-left: 8px;
+  font-style: italic;
+}
+
+.clickable:hover .clickHint {
+  opacity: 1;
+  color: var(--primary-color, #4a90e2);
+}
+
+/* Chart Container Clickable */
+.chartClickable {
+  cursor: pointer;
+}
+
+.chartClickable canvas {
+  cursor: pointer;
+}
+
+/* Stat Card Clickable */
+.statCard.clickable:hover {
+  border-color: var(--primary-color, #4a90e2);
+  box-shadow: 0 4px 12px rgba(74, 144, 226, 0.2);
+}
+
+/* List Item Clickable */
+.analyticsSection li.clickable {
+  padding: 8px 12px;
+  margin: 4px 0;
+  border-radius: 4px;
+  border: 1px solid transparent;
+}
+
+.analyticsSection li.clickable:hover {
+  border-color: var(--primary-color, #4a90e2);
+  background-color: var(--primary-color-light, rgba(74, 144, 226, 0.08));
+}

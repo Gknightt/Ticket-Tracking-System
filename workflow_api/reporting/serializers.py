@@ -101,3 +101,88 @@ class AssignmentAnalyticsSerializer(serializers.Serializer):
     avg_assignments_per_user = serializers.FloatField()
     total_users_in_role = serializers.IntegerField()
     reassignment_count = serializers.IntegerField()
+
+
+# ==================== DRILLABLE SERIALIZERS ====================
+
+class DrilldownTicketSerializer(serializers.Serializer):
+    """Serializer for drilldown ticket details"""
+    task_id = serializers.IntegerField()
+    ticket_number = serializers.CharField()
+    subject = serializers.CharField(required=False, allow_null=True)
+    status = serializers.CharField()
+    priority = serializers.CharField(required=False, allow_null=True)
+    department = serializers.CharField(required=False, allow_null=True)
+    workflow_name = serializers.CharField(required=False, allow_null=True)
+    current_step = serializers.CharField(required=False, allow_null=True)
+    created_at = serializers.DateTimeField()
+    target_resolution = serializers.DateTimeField(required=False, allow_null=True)
+    resolution_time = serializers.DateTimeField(required=False, allow_null=True)
+    assigned_users = serializers.ListField(child=serializers.CharField(), required=False)
+    sla_status = serializers.CharField(required=False, allow_null=True)
+
+
+class DrilldownUserPerformanceSerializer(serializers.Serializer):
+    """Serializer for drilldown user performance details"""
+    user_id = serializers.IntegerField()
+    user_name = serializers.CharField()
+    task_item_id = serializers.IntegerField()
+    ticket_number = serializers.CharField()
+    subject = serializers.CharField(required=False, allow_null=True)
+    status = serializers.CharField()
+    origin = serializers.CharField()
+    assigned_on = serializers.DateTimeField()
+    acted_on = serializers.DateTimeField(required=False, allow_null=True)
+    target_resolution = serializers.DateTimeField(required=False, allow_null=True)
+    resolution_time = serializers.DateTimeField(required=False, allow_null=True)
+    time_to_action_hours = serializers.FloatField(required=False, allow_null=True)
+    sla_status = serializers.CharField(required=False, allow_null=True)
+
+
+class DrilldownWorkflowSerializer(serializers.Serializer):
+    """Serializer for drilldown workflow details"""
+    workflow_id = serializers.IntegerField()
+    workflow_name = serializers.CharField()
+    task_id = serializers.IntegerField()
+    ticket_number = serializers.CharField()
+    subject = serializers.CharField(required=False, allow_null=True)
+    status = serializers.CharField()
+    current_step = serializers.CharField(required=False, allow_null=True)
+    created_at = serializers.DateTimeField()
+    resolution_time = serializers.DateTimeField(required=False, allow_null=True)
+
+
+class DrilldownStepSerializer(serializers.Serializer):
+    """Serializer for drilldown step details"""
+    step_id = serializers.IntegerField()
+    step_name = serializers.CharField()
+    task_id = serializers.IntegerField()
+    ticket_number = serializers.CharField()
+    status = serializers.CharField()
+    assigned_user = serializers.CharField(required=False, allow_null=True)
+    entered_at = serializers.DateTimeField(required=False, allow_null=True)
+
+
+class DrilldownSLASerializer(serializers.Serializer):
+    """Serializer for drilldown SLA details"""
+    task_id = serializers.IntegerField()
+    ticket_number = serializers.CharField()
+    subject = serializers.CharField(required=False, allow_null=True)
+    priority = serializers.CharField(required=False, allow_null=True)
+    status = serializers.CharField()
+    target_resolution = serializers.DateTimeField(required=False, allow_null=True)
+    resolution_time = serializers.DateTimeField(required=False, allow_null=True)
+    sla_status = serializers.CharField()
+    time_remaining_hours = serializers.FloatField(required=False, allow_null=True)
+    time_overdue_hours = serializers.FloatField(required=False, allow_null=True)
+
+
+class DrilldownTransferSerializer(serializers.Serializer):
+    """Serializer for drilldown transfer details"""
+    task_item_id = serializers.IntegerField()
+    ticket_number = serializers.CharField()
+    from_user = serializers.CharField(required=False, allow_null=True)
+    to_user = serializers.CharField(required=False, allow_null=True)
+    transferred_at = serializers.DateTimeField(required=False, allow_null=True)
+    origin = serializers.CharField()
+    step_name = serializers.CharField(required=False, allow_null=True)

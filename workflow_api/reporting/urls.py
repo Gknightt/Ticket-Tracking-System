@@ -22,6 +22,18 @@ from .views import (
     AggregatedTicketsReportView,
     AggregatedWorkflowsReportView,
     AggregatedTasksReportView,
+    # Drillable endpoints
+    DrilldownTicketsByStatusView,
+    DrilldownTicketsByPriorityView,
+    DrilldownTicketsByAgeView,
+    DrilldownSLAComplianceView,
+    DrilldownUserTasksView,
+    DrilldownWorkflowTasksView,
+    DrilldownStepTasksView,
+    DrilldownDepartmentTasksView,
+    DrilldownTransfersView,
+    DrilldownTaskItemsByStatusView,
+    DrilldownTaskItemsByOriginView,
 )
 
 app_name = 'reporting'
@@ -58,6 +70,23 @@ urlpatterns = [
     path('reports/tickets/', AggregatedTicketsReportView.as_view(), name='aggregated-tickets'),
     path('reports/workflows/', AggregatedWorkflowsReportView.as_view(), name='aggregated-workflows'),
     path('reports/tasks/', AggregatedTasksReportView.as_view(), name='aggregated-tasks'),
+    
+    # Drillable endpoints - Tickets
+    path('drilldown/tickets/status/', DrilldownTicketsByStatusView.as_view(), name='drilldown-tickets-status'),
+    path('drilldown/tickets/priority/', DrilldownTicketsByPriorityView.as_view(), name='drilldown-tickets-priority'),
+    path('drilldown/tickets/age/', DrilldownTicketsByAgeView.as_view(), name='drilldown-tickets-age'),
+    path('drilldown/tickets/sla/', DrilldownSLAComplianceView.as_view(), name='drilldown-sla'),
+    
+    # Drillable endpoints - Workflows
+    path('drilldown/workflows/', DrilldownWorkflowTasksView.as_view(), name='drilldown-workflow-tasks'),
+    path('drilldown/steps/', DrilldownStepTasksView.as_view(), name='drilldown-step-tasks'),
+    path('drilldown/departments/', DrilldownDepartmentTasksView.as_view(), name='drilldown-department-tasks'),
+    
+    # Drillable endpoints - Task Items
+    path('drilldown/task-items/status/', DrilldownTaskItemsByStatusView.as_view(), name='drilldown-taskitems-status'),
+    path('drilldown/task-items/origin/', DrilldownTaskItemsByOriginView.as_view(), name='drilldown-taskitems-origin'),
+    path('drilldown/user-tasks/', DrilldownUserTasksView.as_view(), name='drilldown-user-tasks'),
+    path('drilldown/transfers/', DrilldownTransfersView.as_view(), name='drilldown-transfers'),
     
     # Include router URLs
     path('', include(router.urls)),

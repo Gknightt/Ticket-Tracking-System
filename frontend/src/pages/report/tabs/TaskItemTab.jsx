@@ -4,8 +4,17 @@ import BarChart from "../../../components/charts/BarChart";
 import DoughnutChart from "../../../components/charts/DoughnutChart";
 import ChartContainer from "../../../components/charts/ChartContainer";
 
+// components
+import DrilldownModal, { DRILLDOWN_COLUMNS } from "../components/DrilldownModal";
+
+// hooks
+import useDrilldownAnalytics from "../../../api/useDrilldownAnalytics";
+
 // icons
 import { AlertTriangle, GitBranch, Clock, Users, TrendingUp } from "lucide-react";
+
+// react
+import { useState } from "react";
 
 // styles
 import styles from "../report.module.css";
@@ -18,6 +27,23 @@ export default function TaskItemTab({
   error,
 }) {
   const tasksReport = analyticsData || {};
+
+  // Drilldown state
+  const [drilldownOpen, setDrilldownOpen] = useState(false);
+  const [drilldownTitle, setDrilldownTitle] = useState('');
+  const [drilldownColumns, setDrilldownColumns] = useState([]);
+  const [drilldownParams, setDrilldownParams] = useState({});
+  const [drilldownType, setDrilldownType] = useState('');
+  
+  const {
+    loading: drilldownLoading,
+    drilldownData,
+    drilldownTaskItemsByStatus,
+    drilldownTaskItemsByOrigin,
+    drilldownUserTasks,
+    drilldownTransfers,
+    clearDrilldownData,
+  } = useDrilldownAnalytics();
 
   if (loading) return <div style={{ padding: "20px" }}>Loading analytics...</div>;
   if (error) return <div style={{ color: "red", padding: "20px" }}>Error: {error}</div>;
@@ -63,6 +89,83 @@ export default function TaskItemTab({
   );
   const escalationCounts = escalationsByStep.map((e) => e.escalation_count);
 
+  // Drilldown handlers
+  const handleStatusClick = async (status) => {
+    setDrilldownTitle(`Task Items - ${status}`);
+    setDrilldownColumns(DRILLDOWN_COLUMNS.taskItems);
+    setDrilldownType('status');
+    setDrilldownParams({ status });
+    setDrilldownOpen(true);
+    await drilldownTaskItemsByStatus({ 
+      status, 
+      start_date: timeFilter?.startDate?.toISOString()?.split('T')[0],
+      end_date: timeFilter?.endDate?.toISOString()?.split('T')[0],
+    });
+  };
+
+  const handleOriginClick = async (origin) => {
+    setDrilldownTitle(`Task Items - ${origin}`);
+    setDrilldownColumns(DRILLDOWN_COLUMNS.taskItems);
+    setDrilldownType('origin');
+    setDrilldownParams({ origin });
+    setDrilldownOpen(true);
+    await drilldownTaskItemsByOrigin({ 
+      origin,
+      start_date: timeFilter?.startDate?.toISOString()?.split('T')[0],
+      end_date: timeFilter?.endDate?.toISOString()?.split('T')[0],
+    });
+  };
+
+  const handleUserClick = async (userId, userName) => {
+    setDrilldownTitle(`Tasks for ${userName}`);
+    setDrilldownColumns(DRILLDOWN_COLUMNS.userTasks);
+    setDrilldownType('user');
+    setDrilldownParams({ user_id: userId });
+    setDrilldownOpen(true);
+    await drilldownUserTasks({ 
+      user_id: userId,
+      start_date: timeFilter?.startDate?.toISOString()?.split('T')[0],
+      end_date: timeFilter?.endDate?.toISOString()?.split('T')[0],
+    });
+  };
+
+  const handleTransferClick = async (origin = null) => {
+    setDrilldownTitle(origin ? `${origin} Records` : 'Transfers & Escalations');
+    setDrilldownColumns(DRILLDOWN_COLUMNS.transfers);
+    setDrilldownType('transfer');
+    setDrilldownParams({ origin });
+    setDrilldownOpen(true);
+    await drilldownTransfers({ 
+      origin,
+      start_date: timeFilter?.startDate?.toISOString()?.split('T')[0],
+      end_date: timeFilter?.endDate?.toISOString()?.split('T')[0],
+    });
+  };
+
+  const handleDrilldownPageChange = async (page) => {
+    const params = { 
+      ...drilldownParams, 
+      page,
+      start_date: timeFilter?.startDate?.toISOString()?.split('T')[0],
+      end_date: timeFilter?.endDate?.toISOString()?.split('T')[0],
+    };
+    
+    if (drilldownType === 'status') {
+      await drilldownTaskItemsByStatus(params);
+    } else if (drilldownType === 'origin') {
+      await drilldownTaskItemsByOrigin(params);
+    } else if (drilldownType === 'user') {
+      await drilldownUserTasks(params);
+    } else if (drilldownType === 'transfer') {
+      await drilldownTransfers(params);
+    }
+  };
+
+  const handleCloseDrilldown = () => {
+    setDrilldownOpen(false);
+    clearDrilldownData();
+  };
+
   const kpiData = [
     {
       title: "Avg. Time to Action (hrs)",
@@ -100,6 +203,17 @@ export default function TaskItemTab({
   if (displayStyle === "list") {
     return (
       <div className={styles.rpTicketTabSection}>
+        {/* Drilldown Modal */}
+        <DrilldownModal
+          isOpen={drilldownOpen}
+          onClose={handleCloseDrilldown}
+          title={drilldownTitle}
+          data={drilldownData}
+          columns={drilldownColumns}
+          onPageChange={handleDrilldownPageChange}
+          loading={drilldownLoading}
+        />
+        
         <div className={styles.chartSection}>
           <h2>Task Item KPI</h2>
           <div className={styles.listView}>
@@ -119,18 +233,26 @@ export default function TaskItemTab({
           <h2>Status & Origin Distribution</h2>
           <div className={styles.listView}>
             <div className={styles.analyticsSection}>
-              <h3>Task Status</h3>
+              <h3>Task Status <span className={styles.clickHint}>(click to drill down)</span></h3>
               {statusLabels.map((label, idx) => (
-                <div key={idx} className={styles.listItem}>
+                <div 
+                  key={idx} 
+                  className={`${styles.listItem} ${styles.clickable}`}
+                  onClick={() => handleStatusClick(label)}
+                >
                   <span className={styles.listLabel}>{label}</span>
                   <span className={styles.listValue}>{statusCounts[idx]}</span>
                 </div>
               ))}
             </div>
             <div className={styles.analyticsSection}>
-              <h3>Origin Distribution</h3>
+              <h3>Origin Distribution <span className={styles.clickHint}>(click to drill down)</span></h3>
               {originLabels.map((label, idx) => (
-                <div key={idx} className={styles.listItem}>
+                <div 
+                  key={idx} 
+                  className={`${styles.listItem} ${styles.clickable}`}
+                  onClick={() => handleOriginClick(label)}
+                >
                   <span className={styles.listLabel}>{label}</span>
                   <span className={styles.listValue}>{originCounts[idx]}</span>
                 </div>
@@ -140,45 +262,26 @@ export default function TaskItemTab({
         </div>
 
         <div className={styles.chartSection}>
-          <h2>User Performance</h2>
+          <h2>User Performance <span className={styles.clickHint}>(click user to drill down)</span></h2>
           <div className={styles.listView}>
-            {userLabels.map((label, idx) => (
-              <div key={idx} className={styles.analyticsSection}>
-                <h3>{label}</h3>
+            {userPerf.map((user, idx) => (
+              <div 
+                key={idx} 
+                className={`${styles.analyticsSection} ${styles.clickable}`}
+                onClick={() => handleUserClick(user.user_id, user.user_name)}
+              >
+                <h3>{user.user_name || `User ${user.user_id}`}</h3>
                 <div className={styles.listItem}>
                   <span className={styles.listLabel}>Resolved</span>
-                  <span className={styles.listValue}>{userResolved[idx]}</span>
+                  <span className={styles.listValue}>{user.resolved}</span>
                 </div>
                 <div className={styles.listItem}>
                   <span className={styles.listLabel}>Escalated</span>
-                  <span className={styles.listValue}>{userEscalated[idx]}</span>
+                  <span className={styles.listValue}>{user.escalated}</span>
                 </div>
                 <div className={styles.listItem}>
                   <span className={styles.listLabel}>Breached</span>
-                  <span className={styles.listValue}>{userBreached[idx]}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className={styles.chartSection}>
-          <h2>User Performance</h2>
-          <div className={styles.listView}>
-            {userLabels.map((label, idx) => (
-              <div key={idx} className={styles.analyticsSection}>
-                <h3>{label}</h3>
-                <div className={styles.listItem}>
-                  <span className={styles.listLabel}>Resolved</span>
-                  <span className={styles.listValue}>{userResolved[idx]}</span>
-                </div>
-                <div className={styles.listItem}>
-                  <span className={styles.listLabel}>Escalated</span>
-                  <span className={styles.listValue}>{userEscalated[idx]}</span>
-                </div>
-                <div className={styles.listItem}>
-                  <span className={styles.listLabel}>Breached</span>
-                  <span className={styles.listValue}>{userBreached[idx]}</span>
+                  <span className={styles.listValue}>{user.breached}</span>
                 </div>
               </div>
             ))}
@@ -191,6 +294,17 @@ export default function TaskItemTab({
   if (displayStyle === "grid") {
     return (
       <div className={styles.rpTicketTabSection}>
+        {/* Drilldown Modal */}
+        <DrilldownModal
+          isOpen={drilldownOpen}
+          onClose={handleCloseDrilldown}
+          title={drilldownTitle}
+          data={drilldownData}
+          columns={drilldownColumns}
+          onPageChange={handleDrilldownPageChange}
+          loading={drilldownLoading}
+        />
+        
         <div className={styles.chartSection}>
           <h2>Task Item KPI</h2>
           <div className={styles.gridTable}>
@@ -208,14 +322,18 @@ export default function TaskItemTab({
         </div>
 
         <div className={styles.chartSection}>
-          <h2>Task Status Distribution</h2>
+          <h2>Task Status Distribution <span className={styles.clickHint}>(click to drill down)</span></h2>
           <div className={styles.gridTable}>
             <div className={styles.gridHeader}>
               <div>Status</div>
               <div>Count</div>
             </div>
             {statusLabels.map((label, idx) => (
-              <div key={idx} className={styles.gridRow}>
+              <div 
+                key={idx} 
+                className={`${styles.gridRow} ${styles.clickable}`}
+                onClick={() => handleStatusClick(label)}
+              >
                 <div>{label}</div>
                 <div>{statusCounts[idx]}</div>
               </div>
@@ -224,14 +342,18 @@ export default function TaskItemTab({
         </div>
 
         <div className={styles.chartSection}>
-          <h2>Assignment Origin Distribution</h2>
+          <h2>Assignment Origin Distribution <span className={styles.clickHint}>(click to drill down)</span></h2>
           <div className={styles.gridTable}>
             <div className={styles.gridHeader}>
               <div>Origin</div>
               <div>Count</div>
             </div>
             {originLabels.map((label, idx) => (
-              <div key={idx} className={styles.gridRow}>
+              <div 
+                key={idx} 
+                className={`${styles.gridRow} ${styles.clickable}`}
+                onClick={() => handleOriginClick(label)}
+              >
                 <div>{label}</div>
                 <div>{originCounts[idx]}</div>
               </div>
@@ -240,7 +362,7 @@ export default function TaskItemTab({
         </div>
 
         <div className={styles.chartSection}>
-          <h2>User Performance Details</h2>
+          <h2>User Performance Details <span className={styles.clickHint}>(click user to drill down)</span></h2>
           <div className={styles.gridTable}>
             <div className={styles.gridHeader}>
               <div>User</div>
@@ -248,12 +370,16 @@ export default function TaskItemTab({
               <div>Escalated</div>
               <div>Breached</div>
             </div>
-            {userLabels.map((label, idx) => (
-              <div key={idx} className={styles.gridRow}>
-                <div>{label}</div>
-                <div>{userResolved[idx]}</div>
-                <div>{userEscalated[idx]}</div>
-                <div>{userBreached[idx]}</div>
+            {userPerf.map((user, idx) => (
+              <div 
+                key={idx} 
+                className={`${styles.gridRow} ${styles.clickable}`}
+                onClick={() => handleUserClick(user.user_id, user.user_name)}
+              >
+                <div>{user.user_name || `User ${user.user_id}`}</div>
+                <div>{user.resolved}</div>
+                <div>{user.escalated}</div>
+                <div>{user.breached}</div>
               </div>
             ))}
           </div>
@@ -264,6 +390,17 @@ export default function TaskItemTab({
 
   return (
     <div className={styles.rpTicketTabSection}>
+      {/* Drilldown Modal */}
+      <DrilldownModal
+        isOpen={drilldownOpen}
+        onClose={handleCloseDrilldown}
+        title={drilldownTitle}
+        data={drilldownData}
+        columns={drilldownColumns}
+        onPageChange={handleDrilldownPageChange}
+        loading={drilldownLoading}
+      />
+      
       {/* KPI */}
       <div className={styles.chartSection}>
         <h2>Task Item KPI</h2>
@@ -285,7 +422,7 @@ export default function TaskItemTab({
       {/* Task Item Status & Origin */}
       <div className={styles.chartsGrid}>
         <div className={styles.chartSection}>
-          <h2>Task Item Status Distribution</h2>
+          <h2>Task Item Status Distribution <span className={styles.clickHint}>(click to drill down)</span></h2>
           <div className={styles.chartRow}>
             <ChartContainer title="Task Item Status Breakdown">
               <PieChart
@@ -293,6 +430,7 @@ export default function TaskItemTab({
                 dataPoints={statusCounts}
                 chartTitle="Task Item Status"
                 chartLabel="Count"
+                onClick={({ label }) => handleStatusClick(label)}
               />
             </ChartContainer>
 
@@ -302,6 +440,7 @@ export default function TaskItemTab({
                 values={originCounts}
                 chartTitle="Assignment Origin"
                 chartLabel="Count"
+                onClick={({ label }) => handleOriginClick(label)}
               />
             </ChartContainer>
           </div>
@@ -311,7 +450,7 @@ export default function TaskItemTab({
       {/* Transfer & Escalation Analytics */}
       <div className={styles.chartsGrid}>
         <div className={styles.chartSection}>
-          <h2>Transfer & Escalation Analytics</h2>
+          <h2>Transfer & Escalation Analytics <span className={styles.clickHint}>(click to drill down)</span></h2>
           <div className={styles.chartRow}>
             <ChartContainer title="Top Task Transferrers">
               <BarChart
@@ -319,6 +458,7 @@ export default function TaskItemTab({
                 dataPoints={transferrerCounts}
                 chartTitle="Task Transfers"
                 chartLabel="Count"
+                onClick={() => handleTransferClick('Transferred')}
               />
             </ChartContainer>
 
@@ -328,6 +468,7 @@ export default function TaskItemTab({
                 dataPoints={escalationCounts}
                 chartTitle="Escalations"
                 chartLabel="Count"
+                onClick={() => handleTransferClick('Escalation')}
               />
             </ChartContainer>
           </div>

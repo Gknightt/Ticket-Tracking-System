@@ -1,0 +1,273 @@
+.modalBackdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modalContent {
+  background: #fff;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 1200px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e5e5;
+  background: #f8f9fa;
+}
+
+.modalTitle {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.headerInfo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.totalCount {
+  font-size: 0.875rem;
+  color: #666;
+  background: #e9ecef;
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 8px;
+  color: #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.closeBtn:hover {
+  background: #e9ecef;
+  color: #333;
+}
+
+.filtersBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: #f0f7ff;
+  border-bottom: 1px solid #e5e5e5;
+  flex-wrap: wrap;
+}
+
+.filtersLabel {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #555;
+}
+
+.filterTag {
+  font-size: 0.75rem;
+  background: #fff;
+  border: 1px solid #4a90e2;
+  color: #4a90e2;
+  padding: 4px 10px;
+  border-radius: 16px;
+  text-transform: capitalize;
+}
+
+.modalBody {
+  flex: 1;
+  overflow: auto;
+  padding: 0;
+}
+
+.tableWrapper {
+  overflow-x: auto;
+}
+
+.dataTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.dataTable th {
+  background: #f8f9fa;
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #555;
+  border-bottom: 2px solid #e5e5e5;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.dataTable td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  color: #333;
+  vertical-align: middle;
+}
+
+.dataTable tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.clickableRow {
+  cursor: pointer;
+}
+
+.clickableRow:hover {
+  background: #e9f5ff !important;
+}
+
+.actionCol {
+  width: 60px;
+  text-align: center;
+}
+
+.actionIcon {
+  color: #4a90e2;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.clickableRow:hover .actionIcon {
+  opacity: 1;
+}
+
+.loadingState,
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: #666;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e5e5e5;
+  border-top-color: #4a90e2;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 24px;
+  border-top: 1px solid #e5e5e5;
+  background: #f8f9fa;
+}
+
+.pageBtn {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid #ddd;
+  background: #fff;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  color: #333;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.pageBtn:hover:not(:disabled) {
+  background: #4a90e2;
+  border-color: #4a90e2;
+  color: #fff;
+}
+
+.pageBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pageBtn.active {
+  background: #4a90e2;
+  border-color: #4a90e2;
+  color: #fff;
+}
+
+.pageInfo {
+  margin-left: 16px;
+  font-size: 0.875rem;
+  color: #666;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .modalBackdrop {
+    padding: 10px;
+  }
+
+  .modalContent {
+    max-height: 90vh;
+  }
+
+  .modalHeader {
+    padding: 16px;
+  }
+
+  .modalTitle {
+    font-size: 1rem;
+  }
+
+  .dataTable th,
+  .dataTable td {
+    padding: 10px 12px;
+    font-size: 0.8rem;
+  }
+
+  .pagination {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .pageBtn {
+    min-width: 32px;
+    height: 32px;
+    font-size: 0.8rem;
+  }
+}

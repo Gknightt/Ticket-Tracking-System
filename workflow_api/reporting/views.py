@@ -30,6 +30,12 @@ from .serializers import (
     DashboardSummarySerializer,
     PriorityDistributionSerializer,
     AssignmentAnalyticsSerializer,
+    DrilldownTicketSerializer,
+    DrilldownUserPerformanceSerializer,
+    DrilldownWorkflowSerializer,
+    DrilldownStepSerializer,
+    DrilldownSLASerializer,
+    DrilldownTransferSerializer,
 )
 
 from task.models import TaskItemHistory
@@ -1577,3 +1583,878 @@ class AggregatedTasksReportView(APIView):
         except Exception as e:
             return Response({'error': str(e), 'type': type(e).__name__}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+# ==================== DRILLABLE ENDPOINTS ====================
+
+class DrilldownTicketsByStatusView(APIView):
+    """Drillable endpoint: Get detailed ticket list filtered by status"""
+    authentication_classes = [JWTCookieAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            status_filter = request.query_params.get('status')
+            start_date_str = request.query_params.get('start_date')
+            end_date_str = request.query_params.get('end_date')
+            priority_filter = request.query_params.get('priority')
+            workflow_filter = request.query_params.get('workflow_id')
+            page = int(request.query_params.get('page', 1))
+            page_size = int(request.query_params.get('page_size', 20))
+
+            queryset = Task.objects.select_related(
+                'ticket_id', 'workflow_id', 'current_step'
+            ).all()
+
+            # Apply filters
+            if status_filter:
+                queryset = queryset.filter(status=status_filter)
+            if priority_filter:
+                queryset = queryset.filter(ticket_id__priority=priority_filter)
+            if workflow_filter:
+                queryset = queryset.filter(workflow_id=workflow_filter)
+            
+            # Date filters
+            if start_date_str:
+                try:
+                    start_dt = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                    start_aware = timezone.make_aware(datetime.combine(start_dt, datetime.min.time()))
+                    queryset = queryset.filter(created_at__gte=start_aware)
+                except ValueError:
+                    pass
+            if end_date_str:
+                try:
+                    end_dt = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+                    end_aware = timezone.make_aware(datetime.combine(end_dt, datetime.max.time()))
+                    queryset = queryset.filter(created_at__lte=end_aware)
+                except ValueError:
+                    pass
+
+            # Pagination
+            total_count = queryset.count()
+            start_idx = (page - 1) * page_size
+            end_idx = start_idx + page_size
+            queryset = queryset.order_by('-created_at')[start_idx:end_idx]
+
+            data = []
+            now = timezone.now()
+            for task in queryset:
+                # Determine SLA status
+                sla_status = 'no_sla'
+                if task.target_resolution:
+                    if task.status == 'completed':
+                        if task.resolution_time and task.resolution_time <= task.target_resolution:
+                            sla_status = 'met'
+                        else:
+                            sla_status = 'breached'
+                    else:
+                        sla_status = 'on_track' if task.target_resolution > now else 'at_risk'
+
+                # Get assigned users
+                assigned_users = list(task.taskitem_set.values_list(
+                    'role_user__user_full_name', flat=True
+                ))
+
+                data.append({
+                    'task_id': task.task_id,
+                    'ticket_number': task.ticket_id.ticket_number if task.ticket_id else '',
+                    'subject': task.ticket_id.ticket_data.get('subject', '') if task.ticket_id else '',
+                    'status': task.status,
+                    'priority': task.ticket_id.priority if task.ticket_id else None,
+                    'department': task.workflow_id.department if task.workflow_id else None,
+                    'workflow_name': task.workflow_id.name if task.workflow_id else None,
+                    'current_step': task.current_step.name if task.current_step else None,
+                    'created_at': task.created_at,
+                    'target_resolution': task.target_resolution,
+                    'resolution_time': task.resolution_time,
+                    'assigned_users': assigned_users,
+                    'sla_status': sla_status,
+                })
+
+            return Response({
+                'total_count': total_count,
+                'page': page,
+                'page_size': page_size,
+                'total_pages': (total_count + page_size - 1) // page_size,
+                'filters_applied': {
+                    'status': status_filter,
+                    'priority': priority_filter,
+                    'workflow_id': workflow_filter,
+                    'start_date': start_date_str,
+                    'end_date': end_date_str,
+                },
+                'tickets': data,
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class DrilldownTicketsByPriorityView(APIView):
+    """Drillable endpoint: Get detailed ticket list filtered by priority"""
+    authentication_classes = [JWTCookieAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            priority_filter = request.query_params.get('priority')
+            status_filter = request.query_params.get('status')
+            start_date_str = request.query_params.get('start_date')
+            end_date_str = request.query_params.get('end_date')
+            page = int(request.query_params.get('page', 1))
+            page_size = int(request.query_params.get('page_size', 20))
+
+            queryset = Task.objects.select_related(
+                'ticket_id', 'workflow_id', 'current_step'
+            ).all()
+
+            # Apply filters
+            if priority_filter:
+                queryset = queryset.filter(ticket_id__priority=priority_filter)
+            if status_filter:
+                queryset = queryset.filter(status=status_filter)
+            
+            # Date filters
+            if start_date_str:
+                try:
+                    start_dt = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                    start_aware = timezone.make_aware(datetime.combine(start_dt, datetime.min.time()))
+                    queryset = queryset.filter(created_at__gte=start_aware)
+                except ValueError:
+                    pass
+            if end_date_str:
+                try:
+                    end_dt = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+                    end_aware = timezone.make_aware(datetime.combine(end_dt, datetime.max.time()))
+                    queryset = queryset.filter(created_at__lte=end_aware)
+                except ValueError:
+                    pass
+
+            # Pagination
+            total_count = queryset.count()
+            start_idx = (page - 1) * page_size
+            end_idx = start_idx + page_size
+            queryset = queryset.order_by('-created_at')[start_idx:end_idx]
+
+            data = []
+            now = timezone.now()
+            for task in queryset:
+                sla_status = 'no_sla'
+                if task.target_resolution:
+                    if task.status == 'completed':
+                        sla_status = 'met' if task.resolution_time and task.resolution_time <= task.target_resolution else 'breached'
+                    else:
+                        sla_status = 'on_track' if task.target_resolution > now else 'at_risk'
+
+                data.append({
+                    'task_id': task.task_id,
+                    'ticket_number': task.ticket_id.ticket_number if task.ticket_id else '',
+                    'subject': task.ticket_id.ticket_data.get('subject', '') if task.ticket_id else '',
+                    'status': task.status,
+                    'priority': task.ticket_id.priority if task.ticket_id else None,
+                    'workflow_name': task.workflow_id.name if task.workflow_id else None,
+                    'created_at': task.created_at,
+                    'target_resolution': task.target_resolution,
+                    'sla_status': sla_status,
+                })
+
+            return Response({
+                'total_count': total_count,
+                'page': page,
+                'page_size': page_size,
+                'total_pages': (total_count + page_size - 1) // page_size,
+                'tickets': data,
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class DrilldownTicketsByAgeView(APIView):
+    """Drillable endpoint: Get detailed ticket list filtered by age bucket"""
+    authentication_classes = [JWTCookieAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            age_bucket = request.query_params.get('age_bucket')
+            status_filter = request.query_params.get('status')
+            page = int(request.query_params.get('page', 1))
+            page_size = int(request.query_params.get('page_size', 20))
+
+            now = timezone.now()
+            queryset = Task.objects.select_related(
+                'ticket_id', 'workflow_id', 'current_step'
+            ).all()
+
+            # Apply age bucket filter
+            if age_bucket == '0-1 days':
+                queryset = queryset.filter(created_at__gte=now - timedelta(days=1))
+            elif age_bucket == '1-7 days':
+                queryset = queryset.filter(
+                    created_at__gte=now - timedelta(days=7),
+                    created_at__lt=now - timedelta(days=1)
+                )
+            elif age_bucket == '7-30 days':
+                queryset = queryset.filter(
+                    created_at__gte=now - timedelta(days=30),
+                    created_at__lt=now - timedelta(days=7)
+                )
+            elif age_bucket == '30-90 days':
+                queryset = queryset.filter(
+                    created_at__gte=now - timedelta(days=90),
+                    created_at__lt=now - timedelta(days=30)
+                )
+            elif age_bucket == '90+ days':
+                queryset = queryset.filter(created_at__lt=now - timedelta(days=90))
+
+            if status_filter:
+                queryset = queryset.filter(status=status_filter)
+
+            # Pagination
+            total_count = queryset.count()
+            start_idx = (page - 1) * page_size
+            end_idx = start_idx + page_size
+            queryset = queryset.order_by('created_at')[start_idx:end_idx]
+
+            data = []
+            for task in queryset:
+                age_days = (now - task.created_at).days if task.created_at else 0
+                data.append({
+                    'task_id': task.task_id,
+                    'ticket_number': task.ticket_id.ticket_number if task.ticket_id else '',
+                    'subject': task.ticket_id.ticket_data.get('subject', '') if task.ticket_id else '',
+                    'status': task.status,
+                    'priority': task.ticket_id.priority if task.ticket_id else None,
+                    'created_at': task.created_at,
+                    'age_days': age_days,
+                    'workflow_name': task.workflow_id.name if task.workflow_id else None,
+                })
+
+            return Response({
+                'total_count': total_count,
+                'page': page,
+                'page_size': page_size,
+                'total_pages': (total_count + page_size - 1) // page_size,
+                'age_bucket': age_bucket,
+                'tickets': data,
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class DrilldownSLAComplianceView(APIView):
+    """Drillable endpoint: Get detailed SLA compliance data"""
+    authentication_classes = [JWTCookieAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            sla_status_filter = request.query_params.get('sla_status')  # met, breached, at_risk, on_track
+            priority_filter = request.query_params.get('priority')
+            start_date_str = request.query_params.get('start_date')
+            end_date_str = request.query_params.get('end_date')
+            page = int(request.query_params.get('page', 1))
+            page_size = int(request.query_params.get('page_size', 20))
+
+            queryset = Task.objects.select_related(
+                'ticket_id', 'workflow_id'
+            ).filter(target_resolution__isnull=False)
+
+            if priority_filter:
+                queryset = queryset.filter(ticket_id__priority=priority_filter)
+
+            # Date filters
+            if start_date_str:
+                try:
+                    start_dt = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                    start_aware = timezone.make_aware(datetime.combine(start_dt, datetime.min.time()))
+                    queryset = queryset.filter(created_at__gte=start_aware)
+                except ValueError:
+                    pass
+            if end_date_str:
+                try:
+                    end_dt = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+                    end_aware = timezone.make_aware(datetime.combine(end_dt, datetime.max.time()))
+                    queryset = queryset.filter(created_at__lte=end_aware)
+                except ValueError:
+                    pass
+
+            now = timezone.now()
+            
+            # Build filtered list based on SLA status
+            tasks_list = list(queryset)
+            filtered_tasks = []
+            
+            for task in tasks_list:
+                if task.status == 'completed':
+                    if task.resolution_time and task.resolution_time <= task.target_resolution:
+                        task_sla_status = 'met'
+                    else:
+                        task_sla_status = 'breached'
+                else:
+                    if task.target_resolution > now:
+                        task_sla_status = 'on_track'
+                    else:
+                        task_sla_status = 'at_risk'
+                
+                if not sla_status_filter or task_sla_status == sla_status_filter:
+                    time_remaining = None
+                    time_overdue = None
+                    if task.status != 'completed':
+                        diff = (task.target_resolution - now).total_seconds() / 3600
+                        if diff > 0:
+                            time_remaining = round(diff, 2)
+                        else:
+                            time_overdue = round(abs(diff), 2)
+                    
+                    filtered_tasks.append({
+                        'task_id': task.task_id,
+                        'ticket_number': task.ticket_id.ticket_number if task.ticket_id else '',
+                        'subject': task.ticket_id.ticket_data.get('subject', '') if task.ticket_id else '',
+                        'priority': task.ticket_id.priority if task.ticket_id else None,
+                        'status': task.status,
+                        'target_resolution': task.target_resolution,
+                        'resolution_time': task.resolution_time,
+                        'sla_status': task_sla_status,
+                        'time_remaining_hours': time_remaining,
+                        'time_overdue_hours': time_overdue,
+                    })
+
+            # Pagination
+            total_count = len(filtered_tasks)
+            start_idx = (page - 1) * page_size
+            end_idx = start_idx + page_size
+            paginated = filtered_tasks[start_idx:end_idx]
+
+            return Response({
+                'total_count': total_count,
+                'page': page,
+                'page_size': page_size,
+                'total_pages': (total_count + page_size - 1) // page_size,
+                'sla_status_filter': sla_status_filter,
+                'tickets': paginated,
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class DrilldownUserTasksView(APIView):
+    """Drillable endpoint: Get detailed task items for a specific user"""
+    authentication_classes = [JWTCookieAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            user_id = request.query_params.get('user_id')
+            status_filter = request.query_params.get('status')
+            start_date_str = request.query_params.get('start_date')
+            end_date_str = request.query_params.get('end_date')
+            page = int(request.query_params.get('page', 1))
+            page_size = int(request.query_params.get('page_size', 20))
+
+            if not user_id:
+                return Response({'error': 'user_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+            queryset = TaskItem.objects.select_related(
+                'task', 'task__ticket_id', 'role_user', 'assigned_on_step'
+            ).filter(role_user__user_id=user_id)
+
+            # Date filters
+            if start_date_str:
+                try:
+                    start_dt = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                    start_aware = timezone.make_aware(datetime.combine(start_dt, datetime.min.time()))
+                    queryset = queryset.filter(assigned_on__gte=start_aware)
+                except ValueError:
+                    pass
+            if end_date_str:
+                try:
+                    end_dt = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+                    end_aware = timezone.make_aware(datetime.combine(end_dt, datetime.max.time()))
+                    queryset = queryset.filter(assigned_on__lte=end_aware)
+                except ValueError:
+                    pass
+
+            # Get latest status for filtering
+            now = timezone.now()
+            task_items = list(queryset)
+            filtered_items = []
+
+            for item in task_items:
+                latest_history = item.taskitemhistory_set.order_by('-created_at').first()
+                current_status = latest_history.status if latest_history else 'new'
+                
+                if status_filter and current_status != status_filter:
+                    continue
+
+                # Calculate time to action
+                time_to_action = None
+                if item.acted_on and item.assigned_on:
+                    time_to_action = round((item.acted_on - item.assigned_on).total_seconds() / 3600, 2)
+
+                # SLA status
+                sla_status = 'no_sla'
+                if item.target_resolution:
+                    if current_status in ['resolved', 'escalated', 'reassigned']:
+                        sla_status = 'met'
+                    elif item.target_resolution > now:
+                        sla_status = 'on_track'
+                    else:
+                        sla_status = 'at_risk'
+
+                filtered_items.append({
+                    'user_id': user_id,
+                    'user_name': item.role_user.user_full_name if item.role_user else f'User {user_id}',
+                    'task_item_id': item.task_item_id,
+                    'ticket_number': item.task.ticket_id.ticket_number if item.task and item.task.ticket_id else '',
+                    'subject': item.task.ticket_id.ticket_data.get('subject', '') if item.task and item.task.ticket_id else '',
+                    'status': current_status,
+                    'origin': item.origin,
+                    'assigned_on': item.assigned_on,
+                    'acted_on': item.acted_on,
+                    'target_resolution': item.target_resolution,
+                    'resolution_time': item.resolution_time,
+                    'time_to_action_hours': time_to_action,
+                    'sla_status': sla_status,
+                })
+
+            # Pagination
+            total_count = len(filtered_items)
+            start_idx = (page - 1) * page_size
+            end_idx = start_idx + page_size
+            paginated = filtered_items[start_idx:end_idx]
+
+            return Response({
+                'total_count': total_count,
+                'page': page,
+                'page_size': page_size,
+                'total_pages': (total_count + page_size - 1) // page_size,
+                'user_id': user_id,
+                'task_items': paginated,
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class DrilldownWorkflowTasksView(APIView):
+    """Drillable endpoint: Get detailed tasks for a specific workflow"""
+    authentication_classes = [JWTCookieAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            workflow_id = request.query_params.get('workflow_id')
+            status_filter = request.query_params.get('status')
+            step_id = request.query_params.get('step_id')
+            start_date_str = request.query_params.get('start_date')
+            end_date_str = request.query_params.get('end_date')
+            page = int(request.query_params.get('page', 1))
+            page_size = int(request.query_params.get('page_size', 20))
+
+            if not workflow_id:
+                return Response({'error': 'workflow_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+            queryset = Task.objects.select_related(
+                'ticket_id', 'workflow_id', 'current_step'
+            ).filter(workflow_id=workflow_id)
+
+            if status_filter:
+                queryset = queryset.filter(status=status_filter)
+            if step_id:
+                queryset = queryset.filter(current_step_id=step_id)
+
+            # Date filters
+            if start_date_str:
+                try:
+                    start_dt = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                    start_aware = timezone.make_aware(datetime.combine(start_dt, datetime.min.time()))
+                    queryset = queryset.filter(created_at__gte=start_aware)
+                except ValueError:
+                    pass
+            if end_date_str:
+                try:
+                    end_dt = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+                    end_aware = timezone.make_aware(datetime.combine(end_dt, datetime.max.time()))
+                    queryset = queryset.filter(created_at__lte=end_aware)
+                except ValueError:
+                    pass
+
+            # Pagination
+            total_count = queryset.count()
+            start_idx = (page - 1) * page_size
+            end_idx = start_idx + page_size
+            queryset = queryset.order_by('-created_at')[start_idx:end_idx]
+
+            # Get workflow info
+            workflow = Workflows.objects.filter(workflow_id=workflow_id).first()
+            workflow_name = workflow.name if workflow else f'Workflow {workflow_id}'
+
+            data = []
+            for task in queryset:
+                data.append({
+                    'workflow_id': int(workflow_id),
+                    'workflow_name': workflow_name,
+                    'task_id': task.task_id,
+                    'ticket_number': task.ticket_id.ticket_number if task.ticket_id else '',
+                    'subject': task.ticket_id.ticket_data.get('subject', '') if task.ticket_id else '',
+                    'status': task.status,
+                    'current_step': task.current_step.name if task.current_step else None,
+                    'created_at': task.created_at,
+                    'resolution_time': task.resolution_time,
+                })
+
+            return Response({
+                'total_count': total_count,
+                'page': page,
+                'page_size': page_size,
+                'total_pages': (total_count + page_size - 1) // page_size,
+                'workflow_id': workflow_id,
+                'workflow_name': workflow_name,
+                'tasks': data,
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class DrilldownStepTasksView(APIView):
+    """Drillable endpoint: Get detailed tasks for a specific step"""
+    authentication_classes = [JWTCookieAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            step_id = request.query_params.get('step_id')
+            status_filter = request.query_params.get('status')
+            page = int(request.query_params.get('page', 1))
+            page_size = int(request.query_params.get('page_size', 20))
+
+            if not step_id:
+                return Response({'error': 'step_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+            queryset = Task.objects.select_related(
+                'ticket_id', 'workflow_id', 'current_step'
+            ).filter(current_step_id=step_id)
+
+            if status_filter:
+                queryset = queryset.filter(status=status_filter)
+
+            # Pagination
+            total_count = queryset.count()
+            start_idx = (page - 1) * page_size
+            end_idx = start_idx + page_size
+            queryset = queryset.order_by('-created_at')[start_idx:end_idx]
+
+            # Get step info
+            step = Steps.objects.filter(step_id=step_id).first()
+            step_name = step.name if step else f'Step {step_id}'
+
+            data = []
+            for task in queryset:
+                # Get assigned user for this task
+                task_item = task.taskitem_set.first()
+                assigned_user = task_item.role_user.user_full_name if task_item and task_item.role_user else None
+
+                data.append({
+                    'step_id': int(step_id),
+                    'step_name': step_name,
+                    'task_id': task.task_id,
+                    'ticket_number': task.ticket_id.ticket_number if task.ticket_id else '',
+                    'status': task.status,
+                    'assigned_user': assigned_user,
+                    'entered_at': task.created_at,
+                })
+
+            return Response({
+                'total_count': total_count,
+                'page': page,
+                'page_size': page_size,
+                'total_pages': (total_count + page_size - 1) // page_size,
+                'step_id': step_id,
+                'step_name': step_name,
+                'tasks': data,
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class DrilldownDepartmentTasksView(APIView):
+    """Drillable endpoint: Get detailed tasks for a specific department"""
+    authentication_classes = [JWTCookieAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            department = request.query_params.get('department')
+            status_filter = request.query_params.get('status')
+            start_date_str = request.query_params.get('start_date')
+            end_date_str = request.query_params.get('end_date')
+            page = int(request.query_params.get('page', 1))
+            page_size = int(request.query_params.get('page_size', 20))
+
+            if not department:
+                return Response({'error': 'department is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+            queryset = Task.objects.select_related(
+                'ticket_id', 'workflow_id', 'current_step'
+            ).filter(workflow_id__department=department)
+
+            if status_filter:
+                queryset = queryset.filter(status=status_filter)
+
+            # Date filters
+            if start_date_str:
+                try:
+                    start_dt = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                    start_aware = timezone.make_aware(datetime.combine(start_dt, datetime.min.time()))
+                    queryset = queryset.filter(created_at__gte=start_aware)
+                except ValueError:
+                    pass
+            if end_date_str:
+                try:
+                    end_dt = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+                    end_aware = timezone.make_aware(datetime.combine(end_dt, datetime.max.time()))
+                    queryset = queryset.filter(created_at__lte=end_aware)
+                except ValueError:
+                    pass
+
+            # Pagination
+            total_count = queryset.count()
+            start_idx = (page - 1) * page_size
+            end_idx = start_idx + page_size
+            queryset = queryset.order_by('-created_at')[start_idx:end_idx]
+
+            data = []
+            for task in queryset:
+                data.append({
+                    'task_id': task.task_id,
+                    'ticket_number': task.ticket_id.ticket_number if task.ticket_id else '',
+                    'subject': task.ticket_id.ticket_data.get('subject', '') if task.ticket_id else '',
+                    'status': task.status,
+                    'priority': task.ticket_id.priority if task.ticket_id else None,
+                    'workflow_name': task.workflow_id.name if task.workflow_id else None,
+                    'current_step': task.current_step.name if task.current_step else None,
+                    'created_at': task.created_at,
+                })
+
+            return Response({
+                'total_count': total_count,
+                'page': page,
+                'page_size': page_size,
+                'total_pages': (total_count + page_size - 1) // page_size,
+                'department': department,
+                'tasks': data,
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class DrilldownTransfersView(APIView):
+    """Drillable endpoint: Get detailed transfer/escalation records"""
+    authentication_classes = [JWTCookieAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            origin_filter = request.query_params.get('origin')  # Transferred, Escalation
+            user_id = request.query_params.get('user_id')
+            start_date_str = request.query_params.get('start_date')
+            end_date_str = request.query_params.get('end_date')
+            page = int(request.query_params.get('page', 1))
+            page_size = int(request.query_params.get('page_size', 20))
+
+            queryset = TaskItem.objects.select_related(
+                'task', 'task__ticket_id', 'role_user', 'transferred_to', 'assigned_on_step'
+            ).exclude(origin='System')
+
+            if origin_filter:
+                queryset = queryset.filter(origin=origin_filter)
+            if user_id:
+                queryset = queryset.filter(
+                    Q(role_user__user_id=user_id) | Q(transferred_to__user_id=user_id)
+                )
+
+            # Date filters
+            if start_date_str:
+                try:
+                    start_dt = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                    start_aware = timezone.make_aware(datetime.combine(start_dt, datetime.min.time()))
+                    queryset = queryset.filter(assigned_on__gte=start_aware)
+                except ValueError:
+                    pass
+            if end_date_str:
+                try:
+                    end_dt = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+                    end_aware = timezone.make_aware(datetime.combine(end_dt, datetime.max.time()))
+                    queryset = queryset.filter(assigned_on__lte=end_aware)
+                except ValueError:
+                    pass
+
+            # Pagination
+            total_count = queryset.count()
+            start_idx = (page - 1) * page_size
+            end_idx = start_idx + page_size
+            queryset = queryset.order_by('-assigned_on')[start_idx:end_idx]
+
+            data = []
+            for item in queryset:
+                data.append({
+                    'task_item_id': item.task_item_id,
+                    'ticket_number': item.task.ticket_id.ticket_number if item.task and item.task.ticket_id else '',
+                    'from_user': item.role_user.user_full_name if item.role_user else None,
+                    'to_user': item.transferred_to.user_full_name if item.transferred_to else None,
+                    'transferred_at': item.assigned_on,
+                    'origin': item.origin,
+                    'step_name': item.assigned_on_step.name if item.assigned_on_step else None,
+                })
+
+            return Response({
+                'total_count': total_count,
+                'page': page,
+                'page_size': page_size,
+                'total_pages': (total_count + page_size - 1) // page_size,
+                'origin_filter': origin_filter,
+                'transfers': data,
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class DrilldownTaskItemsByStatusView(APIView):
+    """Drillable endpoint: Get detailed task items filtered by status"""
+    authentication_classes = [JWTCookieAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            status_filter = request.query_params.get('status')
+            start_date_str = request.query_params.get('start_date')
+            end_date_str = request.query_params.get('end_date')
+            page = int(request.query_params.get('page', 1))
+            page_size = int(request.query_params.get('page_size', 20))
+
+            queryset = TaskItem.objects.select_related(
+                'task', 'task__ticket_id', 'role_user', 'assigned_on_step'
+            ).all()
+
+            # Date filters
+            if start_date_str:
+                try:
+                    start_dt = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                    start_aware = timezone.make_aware(datetime.combine(start_dt, datetime.min.time()))
+                    queryset = queryset.filter(assigned_on__gte=start_aware)
+                except ValueError:
+                    pass
+            if end_date_str:
+                try:
+                    end_dt = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+                    end_aware = timezone.make_aware(datetime.combine(end_dt, datetime.max.time()))
+                    queryset = queryset.filter(assigned_on__lte=end_aware)
+                except ValueError:
+                    pass
+
+            # Filter by latest status
+            task_items = list(queryset)
+            filtered_items = []
+
+            for item in task_items:
+                latest_history = item.taskitemhistory_set.order_by('-created_at').first()
+                current_status = latest_history.status if latest_history else 'new'
+                
+                if status_filter and current_status != status_filter:
+                    continue
+
+                filtered_items.append({
+                    'task_item_id': item.task_item_id,
+                    'ticket_number': item.task.ticket_id.ticket_number if item.task and item.task.ticket_id else '',
+                    'subject': item.task.ticket_id.ticket_data.get('subject', '') if item.task and item.task.ticket_id else '',
+                    'user_name': item.role_user.user_full_name if item.role_user else None,
+                    'status': current_status,
+                    'origin': item.origin,
+                    'assigned_on': item.assigned_on,
+                    'step_name': item.assigned_on_step.name if item.assigned_on_step else None,
+                })
+
+            # Pagination
+            total_count = len(filtered_items)
+            start_idx = (page - 1) * page_size
+            end_idx = start_idx + page_size
+            paginated = filtered_items[start_idx:end_idx]
+
+            return Response({
+                'total_count': total_count,
+                'page': page,
+                'page_size': page_size,
+                'total_pages': (total_count + page_size - 1) // page_size,
+                'status_filter': status_filter,
+                'task_items': paginated,
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class DrilldownTaskItemsByOriginView(APIView):
+    """Drillable endpoint: Get detailed task items filtered by origin"""
+    authentication_classes = [JWTCookieAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            origin_filter = request.query_params.get('origin')  # System, Transferred, Escalation
+            start_date_str = request.query_params.get('start_date')
+            end_date_str = request.query_params.get('end_date')
+            page = int(request.query_params.get('page', 1))
+            page_size = int(request.query_params.get('page_size', 20))
+
+            queryset = TaskItem.objects.select_related(
+                'task', 'task__ticket_id', 'role_user', 'assigned_on_step'
+            ).all()
+
+            if origin_filter:
+                queryset = queryset.filter(origin=origin_filter)
+
+            # Date filters
+            if start_date_str:
+                try:
+                    start_dt = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                    start_aware = timezone.make_aware(datetime.combine(start_dt, datetime.min.time()))
+                    queryset = queryset.filter(assigned_on__gte=start_aware)
+                except ValueError:
+                    pass
+            if end_date_str:
+                try:
+                    end_dt = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+                    end_aware = timezone.make_aware(datetime.combine(end_dt, datetime.max.time()))
+                    queryset = queryset.filter(assigned_on__lte=end_aware)
+                except ValueError:
+                    pass
+
+            # Pagination
+            total_count = queryset.count()
+            start_idx = (page - 1) * page_size
+            end_idx = start_idx + page_size
+            queryset = queryset.order_by('-assigned_on')[start_idx:end_idx]
+
+            data = []
+            for item in queryset:
+                latest_history = item.taskitemhistory_set.order_by('-created_at').first()
+                current_status = latest_history.status if latest_history else 'new'
+
+                data.append({
+                    'task_item_id': item.task_item_id,
+                    'ticket_number': item.task.ticket_id.ticket_number if item.task and item.task.ticket_id else '',
+                    'subject': item.task.ticket_id.ticket_data.get('subject', '') if item.task and item.task.ticket_id else '',
+                    'user_name': item.role_user.user_full_name if item.role_user else None,
+                    'status': current_status,
+                    'origin': item.origin,
+                    'assigned_on': item.assigned_on,
+                    'step_name': item.assigned_on_step.name if item.assigned_on_step else None,
+                })
+
+            return Response({
+                'total_count': total_count,
+                'page': page,
+                'page_size': page_size,
+                'total_pages': (total_count + page_size - 1) // page_size,
+                'origin_filter': origin_filter,
+                'task_items': data,
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
