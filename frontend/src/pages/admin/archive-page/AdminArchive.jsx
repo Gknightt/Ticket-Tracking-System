@@ -1,5 +1,6 @@
 // components
 import AdminNav from "../../../components/navigation/AdminNav";
+import Pagination from "../../../components/component/Pagination";
 
 // style
 import styles from "./admin-archive.module.css";
@@ -11,8 +12,8 @@ import { useNavigate } from "react-router-dom";
 
 // hook
 import useUserTickets from "../../../api/useUserTickets";
-import useTasksFetcher from "../../../api/useTasksFetcher";
 import useTicketsFetcher from "../../../api/useTicketsFetcher";
+import useDebounce from "../../../utils/useDebounce";
 
 export default function AdminArchive() {
   const navigate = useNavigate();
@@ -26,13 +27,8 @@ export default function AdminArchive() {
     fetchTickets,
     loading: ticketsLoading,
     error: ticketsError,
+    pagination,
   } = useTicketsFetcher();
-  const {
-    tasks,
-    fetchTasks,
-    loading: tasksLoading,
-    error: tasksError,
-  } = useTasksFetcher();
 
   // State Management
   const [activeTab, setActiveTab] = useState("Active");
@@ -44,16 +40,24 @@ export default function AdminArchive() {
   const [expandedTickets, setExpandedTickets] = useState({});
   const [showFilters, setShowFilters] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
-  const [itemsPerPage] = useState(10); // Items to load per click
-  const [displayedCount, setDisplayedCount] = useState(10); // Total items currently displayed
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
-  // Fetch data on mount
+  // Debounce search term to avoid too many API calls
+  const debouncedSearchTerm = useDebounce(searchTerm, 400);
+
+  // Reset to page 1 when search term or tab changes
   useEffect(() => {
-    fetchTickets();
-    fetchTasks();
-  }, [fetchTickets, fetchTasks]);
+    setCurrentPage(1);
+  }, [debouncedSearchTerm, activeTab]);
 
-  // Use tickets data directly - already in correct format from API
+  // Fetch data on mount and when pagination/filters change
+  useEffect(() => {
+    const tabParam = activeTab.toLowerCase();
+    fetchTickets(currentPage, pageSize, tabParam, debouncedSearchTerm);
+  }, [fetchTickets, currentPage, pageSize, activeTab, debouncedSearchTerm]);
+
+  // Use tickets data directly - already filtered by backend
   const allTasks = tickets || [];
 
   // Get status color based on tab and status
@@ -105,45 +109,10 @@ export default function AdminArchive() {
   };
 
   // Filter data based on active tab and search
+  // Note: Tab and search filtering is now done on the backend
+  // This function just returns all tasks for client-side processing
   const getFilteredData = () => {
-    let data = [];
-
-    if (activeTab === "Active") {
-      data = allTasks.filter(
-        (t) =>
-          t.task_status === "in progress" ||
-          t.task_status === "open" ||
-          t.task_status === "pending" ||
-          t.status === "in progress" ||
-          t.status === "open"
-      );
-    } else if (activeTab === "Inactive") {
-      data = allTasks.filter(
-        (t) =>
-          t.task_status === "closed" ||
-          t.task_status === "resolved" ||
-          t.task_status === "completed" ||
-          t.status === "closed" ||
-          t.status === "resolved"
-      );
-    } else if (activeTab === "Unassigned") {
-      data = allTasks.filter((t) => !t.user_id || t.user_id === null);
-    }
-
-    // Apply search filter
-    return data.filter((item) => {
-      const searchLower = searchTerm.toLowerCase();
-      return (
-        (item.ticket_number &&
-          item.ticket_number.toLowerCase().includes(searchLower)) ||
-        (item.ticket_subject &&
-          item.ticket_subject.toLowerCase().includes(searchLower)) ||
-        (item.user_full_name &&
-          item.user_full_name.toLowerCase().includes(searchLower)) ||
-        (item.ticket_description &&
-          item.ticket_description.toLowerCase().includes(searchLower))
-      );
-    });
+    return allTasks;
   };
 
   // Group tasks by ticket_id and get only the most recent one per ticket
@@ -188,17 +157,14 @@ export default function AdminArchive() {
   const getGroupedData = () => {
     const filtered = getFilteredData();
     const mostRecent = getMostRecentTasksPerTicket(filtered);
-    
-    // Apply load more limit
-    const limitedItems = mostRecent.slice(0, displayedCount);
 
     if (groupBy === "none") {
-      const sorted = sortItems(limitedItems);
+      const sorted = sortItems(mostRecent);
       return { "All Items": sorted };
     }
 
     // First group, then sort within each group
-    const grouped = limitedItems.reduce((acc, item) => {
+    const grouped = mostRecent.reduce((acc, item) => {
       let key;
       switch (groupBy) {
         case "workflow":
@@ -319,16 +285,17 @@ export default function AdminArchive() {
 
   const grouped = getGroupedData();
   const stats = getSummaryStats();
-  const isLoading = userTicketsLoading || ticketsLoading || tasksLoading;
+  const isLoading = userTicketsLoading || ticketsLoading;
 
-  // Handle load more
-  const handleLoadMore = () => {
-    setDisplayedCount((prev) => prev + itemsPerPage);
+  // Handle pagination
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
   };
 
-  // Get total filtered count to determine if load more should be shown
-  const totalFilteredCount = getFilteredData().length;
-  const hasMoreItems = displayedCount < totalFilteredCount;
+  const handlePageSizeChange = (newPageSize) => {
+    setPageSize(newPageSize);
+    setCurrentPage(1); // Reset to first page when page size changes
+  };
 
   return (
     <>
@@ -350,7 +317,6 @@ export default function AdminArchive() {
                   setActiveTab(tab);
                   setExpandedGroups({});
                   setExpandedRows({});
-                  setDisplayedCount(10);
                 }}
                 className={`${styles.tpTabLink} ${
                   activeTab === tab ? styles.active : ""
@@ -374,7 +340,6 @@ export default function AdminArchive() {
                   onChange={(e) => {
                     setGroupBy(e.target.value);
                     setExpandedGroups({});
-                    setDisplayedCount(10);
                   }}
                   className={styles.selectControl}
                 >
@@ -401,10 +366,7 @@ export default function AdminArchive() {
                 type="text"
                 placeholder="Search by ticket number, subject, or assignee..."
                 value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setDisplayedCount(10);
-                }}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 className={styles.searchInput}
               />
               {showFilters && (
@@ -733,18 +695,17 @@ export default function AdminArchive() {
               </div>
             )}
             
-            {/* Load More Button */}
-            {!isLoading && getFilteredData().length > 0 && hasMoreItems && (
-              <div className={styles.loadMoreContainer}>
-                <button 
-                  onClick={handleLoadMore}
-                  className={styles.loadMoreButton}
-                >
-                  Load More
-                </button>
-                <p className={styles.loadMoreText}>
-                  Showing {displayedCount} of {totalFilteredCount} items
-                </p>
+            {/* Pagination */}
+            {!isLoading && pagination.count > 0 && (
+              <div className={styles.paginationContainer}>
+                <Pagination
+                  currentPage={currentPage}
+                  pageSize={pageSize}
+                  totalItems={pagination.count}
+                  onPageChange={handlePageChange}
+                  onPageSizeChange={handlePageSizeChange}
+                  pageSizeOptions={[10, 20, 50, 100]}
+                />
               </div>
             )}
           </div>

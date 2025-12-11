@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.generics import ListAPIView
 from rest_framework.filters import SearchFilter, OrderingFilter
+from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
 from django.utils import timezone
@@ -19,6 +20,12 @@ from tickets.models import WorkflowTicket
 from role.models import RoleUsers
 
 logger = logging.getLogger(__name__)
+
+
+class TaskPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 100
 
 
 class UserTaskListView(ListAPIView):
@@ -84,17 +91,23 @@ class AllTasksListView(ListAPIView):
     View to list all TaskItems across all users.
     Same as UserTaskListView but without user filtering.
     Each row represents a TaskItem with associated task and ticket data.
+    
+    Query Parameters:
+        - tab: 'active', 'inactive', 'unassigned' - filters by task status
+        - search: search term for ticket subject/description/number or assignee name
+        - page: page number
+        - page_size: items per page (default 10, max 100)
     """
     serializer_class = UserTaskListSerializer
     authentication_classes = [JWTCookieAuthentication]
     permission_classes = [IsAuthenticated]
-    filter_backends = [SearchFilter, OrderingFilter]
-    search_fields = ['task__ticket_id__subject', 'task__ticket_id__description']
+    filter_backends = [OrderingFilter]  # Removed SearchFilter - using custom search
     ordering_fields = ['assigned_on']
     ordering = ['-assigned_on']
+    pagination_class = TaskPagination
     
     def get_queryset(self):
-        """Return all TaskItems without user filtering."""
+        """Return all TaskItems with tab-based filtering and search."""
         queryset = TaskItem.objects.select_related(
             'task__ticket_id', 
             'task__workflow_id', 
@@ -107,6 +120,33 @@ class AllTasksListView(ListAPIView):
         role = self.request.query_params.get('role')
         if role:
             queryset = queryset.filter(role_user__role_id__name=role)
+        
+        # Apply tab filter (active, inactive, unassigned)
+        tab = self.request.query_params.get('tab', '').lower()
+        if tab == 'active':
+            queryset = queryset.filter(
+                Q(task__status__in=['in progress', 'open', 'pending', 'in_progress']) |
+                Q(task__ticket_id__status__in=['in progress', 'open', 'pending', 'in_progress'])
+            )
+        elif tab == 'inactive':
+            queryset = queryset.filter(
+                Q(task__status__in=['closed', 'resolved', 'completed']) |
+                Q(task__ticket_id__status__in=['closed', 'resolved', 'completed'])
+            )
+        elif tab == 'unassigned':
+            queryset = queryset.filter(
+                Q(role_user__user_id__isnull=True) | Q(role_user__isnull=True)
+            )
+        
+        # Apply custom search filter (searches in JSONField ticket_data)
+        search = self.request.query_params.get('search', '').strip()
+        if search:
+            queryset = queryset.filter(
+                Q(task__ticket_id__ticket_number__icontains=search) |
+                Q(task__ticket_id__ticket_data__subject__icontains=search) |
+                Q(task__ticket_id__ticket_data__description__icontains=search) |
+                Q(role_user__user_full_name__icontains=search)
+            )
         
         return queryset
     
