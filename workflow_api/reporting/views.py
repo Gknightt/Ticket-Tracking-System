@@ -42,11 +42,27 @@ def apply_date_filter(queryset, request, date_field='created_at'):
     return queryset
 
 
+def get_date_params(request):
+    """Extract date parameters from request for passing to sub-endpoints."""
+    return {
+        'start_date': request.query_params.get('start_date'),
+        'end_date': request.query_params.get('end_date'),
+    }
+
+
 def get_date_range_display(request):
     """Get date range display values for response."""
     return {
         'start_date': request.query_params.get('start_date') or 'all time',
         'end_date': request.query_params.get('end_date') or 'all time',
+    }
+
+
+def build_base_response(request, data):
+    """Build standard response with date range info."""
+    return {
+        'date_range': get_date_range_display(request),
+        **data
     }
 
 
@@ -331,7 +347,16 @@ class TicketCategoryAnalyticsView(BaseReportingView):
 
 
 class AggregatedTicketsReportView(BaseReportingView):
-    """Aggregated tickets reporting endpoint with time filtering."""
+    """Aggregated tickets reporting endpoint with time filtering.
+    
+    DEPRECATED: This endpoint returns all ticket analytics in one call.
+    Prefer using the individual endpoints for better performance:
+    - /tickets/dashboard/ - KPI metrics
+    - /tickets/status/ - Status summary
+    - /tickets/priority/ - Priority distribution
+    - /tickets/age/ - Ticket age buckets
+    - /tickets/sla/ - SLA compliance by priority
+    """
 
     def get(self, request):
         try:
@@ -412,6 +437,458 @@ class AggregatedTicketsReportView(BaseReportingView):
         except Exception as e:
             return self.handle_exception(e)
 
+
+# ==================== TICKET ANALYTICS ENDPOINTS (NEW) ====================
+
+class TicketDashboardView(BaseReportingView):
+    """Ticket Dashboard KPIs - high-level metrics for tickets."""
+
+    def get(self, request):
+        try:
+            queryset = apply_date_filter(Task.objects.all(), request)
+            total_tickets = queryset.count()
+            now = timezone.now()
+            
+            completed_tickets = queryset.filter(status='completed').count()
+            pending_tickets = queryset.filter(status='pending').count()
+            in_progress_tickets = queryset.filter(status='in progress').count()
+            
+            total_with_sla = queryset.filter(target_resolution__isnull=False).count()
+            sla_met = queryset.filter(
+                Q(status='completed'),
+                Q(resolution_time__lte=F('target_resolution')) | Q(resolution_time__isnull=True),
+                target_resolution__isnull=False
+            ).count()
+            
+            total_users = queryset.values('taskitem__role_user__user_id').distinct().count()
+            total_workflows = queryset.values('workflow_id').distinct().count()
+            escalated_count = TaskItem.objects.filter(task__in=queryset, origin='Escalation').distinct().count()
+            
+            return Response(build_base_response(request, {
+                'total_tickets': total_tickets,
+                'completed_tickets': completed_tickets,
+                'pending_tickets': pending_tickets,
+                'in_progress_tickets': in_progress_tickets,
+                'sla_compliance_rate': safe_percentage(sla_met, total_with_sla),
+                'total_users': total_users,
+                'total_workflows': total_workflows,
+                'escalation_rate': safe_percentage(escalated_count, total_tickets),
+            }), status=status.HTTP_200_OK)
+        except Exception as e:
+            return self.handle_exception(e)
+
+
+class TicketStatusSummaryView(BaseReportingView):
+    """Ticket Status Summary - count of tickets by status."""
+
+    def get(self, request):
+        try:
+            queryset = apply_date_filter(Task.objects.all(), request)
+            total_tickets = queryset.count()
+            
+            status_data = [{
+                'status': item['status'],
+                'count': item['count'],
+                'percentage': safe_percentage(item['count'], total_tickets),
+            } for item in queryset.values('status').annotate(count=Count('task_id')).order_by('-count')]
+            
+            return Response(build_base_response(request, {
+                'total_tickets': total_tickets,
+                'status_summary': status_data,
+            }), status=status.HTTP_200_OK)
+        except Exception as e:
+            return self.handle_exception(e)
+
+
+class TicketPriorityDistributionView(BaseReportingView):
+    """Ticket Priority Distribution - count of tickets by priority."""
+
+    def get(self, request):
+        try:
+            queryset = apply_date_filter(Task.objects.all(), request)
+            total_tickets = queryset.count()
+            
+            priority_data = [{
+                'priority': item['ticket_id__priority'],
+                'count': item['count'],
+                'percentage': safe_percentage(item['count'], total_tickets),
+            } for item in queryset.values('ticket_id__priority').annotate(count=Count('task_id')).order_by('-count')]
+            
+            return Response(build_base_response(request, {
+                'total_tickets': total_tickets,
+                'priority_distribution': priority_data,
+            }), status=status.HTTP_200_OK)
+        except Exception as e:
+            return self.handle_exception(e)
+
+
+class TicketAgeDistributionView(BaseReportingView):
+    """Ticket Age Distribution - tickets grouped by age buckets."""
+
+    AGE_BUCKETS = [
+        ('0-1 days', timedelta(days=1), None),
+        ('1-7 days', timedelta(days=7), timedelta(days=1)),
+        ('7-30 days', timedelta(days=30), timedelta(days=7)),
+        ('30-90 days', timedelta(days=90), timedelta(days=30)),
+        ('90+ days', None, timedelta(days=90)),
+    ]
+
+    def get(self, request):
+        try:
+            queryset = apply_date_filter(Task.objects.all(), request)
+            total_tickets = queryset.count()
+            now = timezone.now()
+            
+            age_data = []
+            for bucket_name, start_delta, end_delta in self.AGE_BUCKETS:
+                filters = {}
+                if start_delta:
+                    filters['created_at__gte'] = now - start_delta
+                if end_delta:
+                    filters['created_at__lt'] = now - end_delta
+                count = queryset.filter(**filters).count()
+                age_data.append({
+                    'age_bucket': bucket_name,
+                    'count': count,
+                    'percentage': safe_percentage(count, total_tickets),
+                })
+            
+            return Response(build_base_response(request, {
+                'total_tickets': total_tickets,
+                'ticket_age': age_data,
+            }), status=status.HTTP_200_OK)
+        except Exception as e:
+            return self.handle_exception(e)
+
+
+class TicketSLAComplianceView(BaseReportingView):
+    """Ticket SLA Compliance - compliance metrics grouped by priority."""
+
+    def get(self, request):
+        try:
+            queryset = apply_date_filter(Task.objects.all(), request)
+            total_with_sla = queryset.filter(target_resolution__isnull=False).count()
+            
+            sla_compliance = queryset.filter(ticket_id__priority__isnull=False).values('ticket_id__priority').annotate(
+                total_tasks=Count('task_id'),
+                sla_met=Count(Case(
+                    When(Q(resolution_time__lte=F('target_resolution')) | Q(resolution_time__isnull=True), then=1),
+                    output_field=IntegerField()
+                ))
+            ).order_by('-total_tasks')
+            
+            sla_compliance_data = [{
+                'priority': item['ticket_id__priority'],
+                'total_tasks': item['total_tasks'],
+                'sla_met': item['sla_met'],
+                'sla_breached': item['total_tasks'] - item['sla_met'],
+                'compliance_rate': safe_percentage(item['sla_met'], item['total_tasks']),
+            } for item in sla_compliance]
+            
+            # Overall SLA metrics
+            total_sla_met = sum(item['sla_met'] for item in sla_compliance_data)
+            total_tasks = sum(item['total_tasks'] for item in sla_compliance_data)
+            
+            return Response(build_base_response(request, {
+                'total_with_sla': total_with_sla,
+                'overall_compliance_rate': safe_percentage(total_sla_met, total_tasks),
+                'sla_compliance': sla_compliance_data,
+            }), status=status.HTTP_200_OK)
+        except Exception as e:
+            return self.handle_exception(e)
+
+
+# ==================== WORKFLOW ANALYTICS ENDPOINTS (NEW) ====================
+
+class WorkflowMetricsView(BaseReportingView):
+    """Workflow Metrics - task counts and completion rates per workflow."""
+
+    def get(self, request):
+        try:
+            queryset = apply_date_filter(Task.objects.all(), request)
+            
+            workflows = queryset.values('workflow_id', 'workflow_id__name').annotate(
+                total_tasks=Count('task_id'),
+                completed_tasks=Count(Case(When(status='completed', then=1), output_field=IntegerField())),
+                pending_tasks=Count(Case(When(status='pending', then=1), output_field=IntegerField())),
+                in_progress_tasks=Count(Case(When(status='in progress', then=1), output_field=IntegerField()))
+            ).order_by('-total_tasks')
+            
+            workflow_data = [{
+                'workflow_id': wf['workflow_id'],
+                'workflow_name': wf['workflow_id__name'],
+                'total_tasks': wf['total_tasks'],
+                'completed_tasks': wf['completed_tasks'],
+                'pending_tasks': wf['pending_tasks'],
+                'in_progress_tasks': wf['in_progress_tasks'],
+                'completion_rate': safe_percentage(wf['completed_tasks'], wf['total_tasks']),
+            } for wf in workflows]
+            
+            return Response(build_base_response(request, {
+                'workflow_metrics': workflow_data,
+            }), status=status.HTTP_200_OK)
+        except Exception as e:
+            return self.handle_exception(e)
+
+
+class DepartmentAnalyticsView(BaseReportingView):
+    """Department Analytics - ticket counts and completion rates per department."""
+
+    def get(self, request):
+        try:
+            queryset = apply_date_filter(Task.objects.all(), request)
+            
+            departments = queryset.filter(workflow_id__isnull=False).values('workflow_id__department').annotate(
+                total_tickets=Count('task_id'),
+                completed_tickets=Count(Case(When(status='completed', then=1), output_field=IntegerField()))
+            ).order_by('-total_tickets')
+            
+            department_data = [{
+                'department': dept['workflow_id__department'],
+                'total_tickets': dept['total_tickets'],
+                'completed_tickets': dept['completed_tickets'],
+                'completion_rate': safe_percentage(dept['completed_tickets'], dept['total_tickets']),
+            } for dept in departments]
+            
+            return Response(build_base_response(request, {
+                'department_analytics': department_data,
+            }), status=status.HTTP_200_OK)
+        except Exception as e:
+            return self.handle_exception(e)
+
+
+class StepPerformanceView(BaseReportingView):
+    """Step Performance - task counts per workflow step."""
+
+    def get(self, request):
+        try:
+            queryset = apply_date_filter(Task.objects.all(), request)
+            
+            steps = queryset.filter(current_step__isnull=False).values(
+                'current_step_id', 'current_step__name', 'workflow_id', 'workflow_id__name'
+            ).annotate(
+                total_tasks=Count('task_id'),
+                completed_tasks=Count(Case(When(status='completed', then=1), output_field=IntegerField()))
+            ).order_by('-total_tasks')
+            
+            step_data = [{
+                'step_id': step['current_step_id'],
+                'step_name': step['current_step__name'],
+                'workflow_id': step['workflow_id'],
+                'workflow_name': step['workflow_id__name'],
+                'total_tasks': step['total_tasks'],
+                'completed_tasks': step['completed_tasks'],
+                'completion_rate': safe_percentage(step['completed_tasks'], step['total_tasks']),
+            } for step in steps]
+            
+            return Response(build_base_response(request, {
+                'step_performance': step_data,
+            }), status=status.HTTP_200_OK)
+        except Exception as e:
+            return self.handle_exception(e)
+
+
+# ==================== TASK ITEM ANALYTICS ENDPOINTS (NEW) ====================
+
+class TaskItemStatusDistributionView(BaseReportingView):
+    """Task Item Status Distribution - count of task items by current status."""
+
+    def get(self, request):
+        try:
+            queryset = apply_date_filter(TaskItem.objects.all(), request, date_field='assigned_on')
+            total_items = queryset.count()
+            
+            queryset_with_status = queryset.annotate(
+                latest_status=Coalesce(Subquery(get_latest_status_subquery()), Value('new'))
+            )
+            status_data = [{
+                'status': item['latest_status'],
+                'count': item['count'],
+                'percentage': safe_percentage(item['count'], total_items),
+            } for item in queryset_with_status.values('latest_status').annotate(
+                count=Count('task_item_id', distinct=True)
+            ).order_by('-count') if item['latest_status']]
+            
+            return Response(build_base_response(request, {
+                'total_task_items': total_items,
+                'status_distribution': status_data,
+            }), status=status.HTTP_200_OK)
+        except Exception as e:
+            return self.handle_exception(e)
+
+
+class TaskItemOriginDistributionView(BaseReportingView):
+    """Task Item Origin Distribution - count of task items by origin type."""
+
+    def get(self, request):
+        try:
+            queryset = apply_date_filter(TaskItem.objects.all(), request, date_field='assigned_on')
+            total_items = queryset.count()
+            
+            origin_data = [{
+                'origin': item['origin'],
+                'count': item['count'],
+                'percentage': safe_percentage(item['count'], total_items),
+            } for item in queryset.values('origin').annotate(count=Count('task_item_id')).order_by('-count')]
+            
+            return Response(build_base_response(request, {
+                'total_task_items': total_items,
+                'origin_distribution': origin_data,
+            }), status=status.HTTP_200_OK)
+        except Exception as e:
+            return self.handle_exception(e)
+
+
+class TaskItemPerformanceView(BaseReportingView):
+    """Task Item Performance - time to action, SLA compliance, active/overdue items."""
+
+    def _get_time_to_action_hours(self, queryset):
+        """Calculate time to action statistics."""
+        time_to_action = queryset.filter(
+            assigned_on__isnull=False, acted_on__isnull=False
+        ).annotate(time_delta=F('acted_on') - F('assigned_on')).aggregate(
+            average=Avg('time_delta'), minimum=Min('time_delta'), maximum=Max('time_delta')
+        )
+        return {
+            key: float(val / timedelta(hours=1)) if val else None
+            for key, val in time_to_action.items()
+        }
+
+    def _get_sla_compliance(self, queryset):
+        """Calculate SLA compliance data."""
+        sla_items = queryset.filter(target_resolution__isnull=False)
+        sla_items_with_status = sla_items.annotate(
+            latest_status=Coalesce(Subquery(get_latest_status_subquery()), Value('new'))
+        )
+        
+        all_statuses = ['new', 'in progress', 'resolved', 'escalated', 'reassigned']
+        now = timezone.now()
+        status_breakdown = {}
+        
+        for status_name in all_statuses:
+            status_items = sla_items_with_status.filter(latest_status=status_name)
+            count = status_items.count()
+            
+            if status_name in ['resolved', 'completed', 'escalated', 'reassigned']:
+                status_breakdown[status_name] = {'total': count, 'met_sla': count, 'missed_sla': 0}
+            else:
+                on_track = status_items.filter(target_resolution__gt=now).count() if count > 0 else 0
+                status_breakdown[status_name] = {'total': count, 'on_track': on_track, 'breached': count - on_track}
+        
+        tasks_on_track = sla_items_with_status.filter(
+            latest_status__in=['resolved', 'completed', 'escalated', 'reassigned']
+        ).count() + sla_items_with_status.filter(
+            latest_status__in=['new', 'in progress'], target_resolution__gt=now
+        ).count()
+        
+        tasks_breached = sla_items_with_status.filter(
+            latest_status__in=['new', 'in progress'], target_resolution__lte=now
+        ).count()
+        
+        total_sla = sla_items.count()
+        return {
+            'summary': {
+                'total_tasks_with_sla': total_sla,
+                'tasks_on_track': tasks_on_track,
+                'tasks_breached': tasks_breached,
+                'current_compliance_rate_percent': round(safe_percentage(tasks_on_track, total_sla), 1),
+            },
+            'by_current_status': status_breakdown
+        }
+
+    def get(self, request):
+        try:
+            queryset = apply_date_filter(TaskItem.objects.all(), request, date_field='assigned_on')
+            now = timezone.now()
+            
+            return Response(build_base_response(request, {
+                'time_to_action_hours': self._get_time_to_action_hours(queryset),
+                'sla_compliance': self._get_sla_compliance(queryset),
+                'active_items': queryset.exclude(taskitemhistory_set__status__in=['resolved', 'reassigned', 'escalated']).count(),
+                'overdue_items': queryset.filter(target_resolution__isnull=False, target_resolution__lt=now).exclude(
+                    taskitemhistory_set__status__in=['resolved', 'reassigned', 'escalated']
+                ).count(),
+            }), status=status.HTTP_200_OK)
+        except Exception as e:
+            return self.handle_exception(e)
+
+
+class UserPerformanceView(BaseReportingView):
+    """User Performance - metrics for each user handling task items."""
+
+    def get(self, request):
+        try:
+            queryset = apply_date_filter(TaskItem.objects.all(), request, date_field='assigned_on')
+            now = timezone.now()
+            
+            user_perf_list = []
+            unique_user_ids = set(queryset.values_list('role_user__user_id', flat=True).distinct())
+            
+            for user_id in unique_user_ids:
+                user_items = queryset.filter(role_user__user_id=user_id)
+                first_item = user_items.first()
+                user_name = first_item.role_user.user_full_name if first_item and first_item.role_user else f'User {user_id}'
+                total = user_items.count()
+                
+                user_items_with_status = user_items.annotate(
+                    latest_status=Coalesce(Subquery(get_latest_status_subquery()), Value('new'))
+                )
+                
+                counts = {
+                    'new': user_items_with_status.filter(latest_status='new').count(),
+                    'in_progress': user_items_with_status.filter(latest_status='in progress').count(),
+                    'resolved': user_items_with_status.filter(latest_status='resolved').count(),
+                    'reassigned': user_items_with_status.filter(latest_status='reassigned').count(),
+                    'escalated': user_items_with_status.filter(latest_status='escalated').count(),
+                    'breached': user_items_with_status.filter(
+                        target_resolution__isnull=False, target_resolution__lt=now
+                    ).exclude(latest_status__in=['resolved', 'reassigned', 'escalated']).count(),
+                }
+                
+                user_perf_list.append({
+                    'user_id': user_id,
+                    'user_name': user_name,
+                    'total_items': total,
+                    **counts,
+                    'resolution_rate': safe_percentage(counts['resolved'], total),
+                    'escalation_rate': safe_percentage(counts['escalated'], total),
+                    'breach_rate': safe_percentage(counts['breached'], total),
+                })
+            
+            return Response(build_base_response(request, {
+                'user_performance': user_perf_list,
+            }), status=status.HTTP_200_OK)
+        except Exception as e:
+            return self.handle_exception(e)
+
+
+class TransferAnalyticsView(BaseReportingView):
+    """Transfer Analytics - transfer/escalation metrics."""
+
+    def get(self, request):
+        try:
+            queryset = apply_date_filter(TaskItem.objects.all(), request, date_field='assigned_on')
+            
+            transferred_qs = queryset.filter(transferred_to__isnull=False)
+            
+            return Response(build_base_response(request, {
+                'total_transfers': transferred_qs.count(),
+                'top_transferrers': list(transferred_qs.values(
+                    'role_user__user_id', 'role_user__user_full_name'
+                ).annotate(transfer_count=Count('task_item_id')).order_by('-transfer_count')[:10]),
+                'top_transfer_recipients': list(transferred_qs.values(
+                    'transferred_to__user_id', 'transferred_to__user_full_name'
+                ).annotate(received_count=Count('task_item_id')).order_by('-received_count')[:10]),
+                'total_escalations': queryset.filter(origin='Escalation').count(),
+                'escalations_by_step': list(queryset.filter(origin='Escalation').values(
+                    'assigned_on_step__name'
+                ).annotate(escalation_count=Count('task_item_id')).order_by('-escalation_count')),
+            }), status=status.HTTP_200_OK)
+        except Exception as e:
+            return self.handle_exception(e)
+
+
+# ==================== LEGACY AGGREGATED ENDPOINTS (DEPRECATED) ====================
 
 class AggregatedWorkflowsReportView(BaseReportingView):
     """Aggregated workflows reporting endpoint with time filtering."""

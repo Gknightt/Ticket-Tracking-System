@@ -25,6 +25,22 @@ export default function DrilldownModal({
   onRowClick,
 }) {
   const [currentPage, setCurrentPage] = useState(1);
+  const [prevItems, setPrevItems] = useState([]);
+  const [prevTotalPages, setPrevTotalPages] = useState(1);
+
+  // Get items array from data - handle different response structures
+  const items = data?.tickets || data?.tasks || data?.task_items || data?.transfers || [];
+  const totalCount = data?.total_count || 0;
+  const totalPages = data?.total_pages || 1;
+  const pageSize = data?.page_size || 20;
+
+  // Preserve previous items during loading for smooth transitions
+  useEffect(() => {
+    if (items.length > 0) {
+      setPrevItems(items);
+      setPrevTotalPages(totalPages);
+    }
+  }, [items, totalPages]);
 
   // Reset page when data changes
   useEffect(() => {
@@ -33,10 +49,14 @@ export default function DrilldownModal({
     }
   }, [data?.page]);
 
+  // Use previous items while loading to prevent shrinking
+  const displayItems = loading && prevItems.length > 0 ? prevItems : items;
+  const displayTotalPages = loading ? prevTotalPages : totalPages;
+
   if (!isOpen) return null;
 
   const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= (data?.total_pages || 1)) {
+    if (newPage >= 1 && newPage <= displayTotalPages) {
       setCurrentPage(newPage);
       if (onPageChange) {
         onPageChange(newPage);
@@ -50,18 +70,12 @@ export default function DrilldownModal({
     }
   };
 
-  // Get items array from data - handle different response structures
-  const items = data?.tickets || data?.tasks || data?.task_items || data?.transfers || [];
-  const totalCount = data?.total_count || 0;
-  const totalPages = data?.total_pages || 1;
-  const pageSize = data?.page_size || 20;
-
   // Generate page numbers for pagination
   const getPageNumbers = () => {
     const pages = [];
     const maxVisible = 5;
     let start = Math.max(1, currentPage - Math.floor(maxVisible / 2));
-    let end = Math.min(totalPages, start + maxVisible - 1);
+    let end = Math.min(displayTotalPages, start + maxVisible - 1);
     
     if (end - start < maxVisible - 1) {
       start = Math.max(1, end - maxVisible + 1);
@@ -80,9 +94,11 @@ export default function DrilldownModal({
         <div className={styles.modalHeader}>
           <h2 className={styles.modalTitle}>{title}</h2>
           <div className={styles.headerInfo}>
-            <span className={styles.totalCount}>{totalCount} records</span>
-            <button className={styles.closeBtn} onClick={onClose}>
-              <X size={20} />
+            <span className={styles.totalCount}>
+              {totalCount.toLocaleString()} {totalCount === 1 ? 'record' : 'records'}
+            </span>
+            <button className={styles.closeBtn} onClick={onClose} title="Close">
+              <X size={18} />
             </button>
           </div>
         </div>
@@ -103,58 +119,63 @@ export default function DrilldownModal({
 
         {/* Content */}
         <div className={styles.modalBody}>
-          {loading ? (
-            <div className={styles.loadingState}>
-              <div className={styles.spinner}></div>
-              <p>Loading...</p>
-            </div>
-          ) : items.length === 0 ? (
+          {/* Show empty state only when not loading and no items */}
+          {!loading && items.length === 0 && prevItems.length === 0 ? (
             <div className={styles.emptyState}>
-              <p>No records found</p>
+              <p>No records found matching your criteria</p>
             </div>
           ) : (
-            <div className={styles.tableWrapper}>
-              <table className={styles.dataTable}>
-                <thead>
-                  <tr>
-                    {columns.map((col) => (
-                      <th key={col.key}>{col.label}</th>
-                    ))}
-                    {onRowClick && <th className={styles.actionCol}>Action</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((item, idx) => (
-                    <tr 
-                      key={item.task_id || item.task_item_id || idx}
-                      className={onRowClick ? styles.clickableRow : ''}
-                      onClick={() => onRowClick && onRowClick(item)}
-                    >
+            <div className={styles.tableContainer}>
+              {/* Loading overlay */}
+              {loading && (
+                <div className={styles.loadingOverlay}>
+                  <div className={styles.spinner}></div>
+                  <p>Loading records...</p>
+                </div>
+              )}
+              <div className={`${styles.tableWrapper} ${loading ? styles.tableLoading : ''}`}>
+                <table className={styles.dataTable}>
+                  <thead>
+                    <tr>
                       {columns.map((col) => (
-                        <td key={col.key}>
-                          {col.render ? col.render(item[col.key], item) : formatValue(item[col.key])}
-                        </td>
+                        <th key={col.key}>{col.label}</th>
                       ))}
-                      {onRowClick && (
-                        <td className={styles.actionCol}>
-                          <ExternalLink size={16} className={styles.actionIcon} />
-                        </td>
-                      )}
+                      {onRowClick && <th className={styles.actionCol}>Action</th>}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {displayItems.map((item, idx) => (
+                      <tr 
+                        key={item.task_id || item.task_item_id || item.ticket_number || idx}
+                        className={onRowClick ? styles.clickableRow : ''}
+                        onClick={() => !loading && onRowClick && onRowClick(item)}
+                      >
+                        {columns.map((col) => (
+                          <td key={col.key}>
+                            {col.render ? col.render(item[col.key], item) : formatValue(item[col.key])}
+                          </td>
+                        ))}
+                        {onRowClick && (
+                          <td className={styles.actionCol}>
+                            <ExternalLink size={16} className={styles.actionIcon} />
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
 
         {/* Pagination */}
-        {totalPages > 1 && !loading && (
+        {displayTotalPages > 1 && (
           <div className={styles.pagination}>
             <button
               className={styles.pageBtn}
               onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
+              disabled={currentPage === 1 || loading}
             >
               <ChevronLeft size={18} />
             </button>
@@ -164,6 +185,7 @@ export default function DrilldownModal({
                 key={pageNum}
                 className={`${styles.pageBtn} ${pageNum === currentPage ? styles.active : ''}`}
                 onClick={() => handlePageChange(pageNum)}
+                disabled={loading}
               >
                 {pageNum}
               </button>
@@ -172,13 +194,13 @@ export default function DrilldownModal({
             <button
               className={styles.pageBtn}
               onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
+              disabled={currentPage === displayTotalPages || loading}
             >
               <ChevronRight size={18} />
             </button>
             
             <span className={styles.pageInfo}>
-              Page {currentPage} of {totalPages}
+              Page {currentPage} of {displayTotalPages}
             </span>
           </div>
         )}
@@ -272,25 +294,35 @@ export const DRILLDOWN_COLUMNS = {
   ],
 };
 
-// Helper components for rendering badges
+// Helper components for rendering badges - matches system design (dynamic-table.module.css)
 function StatusBadge({ status }) {
-  const statusColors = {
-    'pending': '#f5a623',
-    'in progress': '#4a90e2',
-    'completed': '#7ed321',
-    'new': '#9b9b9b',
-    'resolved': '#7ed321',
-    'escalated': '#e74c3c',
-    'reassigned': '#f5a623',
-    'on_hold': '#9b9b9b',
-    'cancelled': '#e74c3c',
+  const statusConfig = {
+    'open': { color: '#0EA5E9', bg: '#A6CCDD' },
+    'approved': { color: '#10B981', bg: '#A7D1C3' },
+    'in progress': { color: '#6366F1', bg: '#BCBCDF' },
+    'in_progress': { color: '#6366F1', bg: '#BCBCDF' },
+    'pending': { color: '#F59E0B', bg: '#FEF3C7' },
+    'completed': { color: '#10B981', bg: '#A7D1C3' },
+    'new': { color: '#0EA5E9', bg: '#A6CCDD' },
+    'resolved': { color: '#10B981', bg: '#A7D1C3' },
+    'escalated': { color: '#EF4444', bg: '#FEE2E2' },
+    'reassigned': { color: '#F59E0B', bg: '#FEF3C7' },
+    'on_hold': { color: '#6B7280', bg: '#F3F4F6' },
+    'cancelled': { color: '#EF4444', bg: '#FEE2E2' },
   };
-  const color = statusColors[status?.toLowerCase()] || '#9b9b9b';
+  const config = statusConfig[status?.toLowerCase()] || { color: '#6B7280', bg: '#F3F4F6' };
   return (
     <span style={{ 
-      color, 
-      fontWeight: 500,
-      textTransform: 'capitalize' 
+      display: 'inline-block',
+      color: config.color, 
+      backgroundColor: config.bg,
+      padding: '2px 10px',
+      borderRadius: '12px',
+      fontSize: '0.75rem',
+      fontWeight: 600,
+      textTransform: 'uppercase',
+      whiteSpace: 'nowrap',
+      textAlign: 'center',
     }}>
       {status || '-'}
     </span>
@@ -298,18 +330,26 @@ function StatusBadge({ status }) {
 }
 
 function PriorityBadge({ priority }) {
-  const priorityColors = {
-    'critical': '#e74c3c',
-    'high': '#f5a623',
-    'medium': '#4a90e2',
-    'low': '#7ed321',
+  // Uses CSS variables from index.css
+  const priorityConfig = {
+    'critical': { color: 'var(--critical-color, #a00000)', bg: 'var(--critical-bg-color, #f8d7da)' },
+    'high': { color: 'var(--high-color, #b35000)', bg: 'var(--high-bg-color, #ffe5b4)' },
+    'medium': { color: 'var(--medium-color, #b38f00)', bg: 'var(--medium-bg-color, #fff9cc)' },
+    'low': { color: 'var(--low-color, #2e7d32)', bg: 'var(--low-bg-color, #d0f0c0)' },
   };
-  const color = priorityColors[priority?.toLowerCase()] || '#9b9b9b';
+  const config = priorityConfig[priority?.toLowerCase()] || { color: '#6B7280', bg: '#F3F4F6' };
   return (
     <span style={{ 
-      color, 
-      fontWeight: 500,
-      textTransform: 'capitalize' 
+      display: 'inline-block',
+      color: config.color, 
+      backgroundColor: config.bg,
+      padding: '2px 10px',
+      borderRadius: '12px',
+      fontSize: '0.75rem',
+      fontWeight: 600,
+      textTransform: 'uppercase',
+      whiteSpace: 'nowrap',
+      textAlign: 'center',
     }}>
       {priority || '-'}
     </span>
@@ -317,12 +357,12 @@ function PriorityBadge({ priority }) {
 }
 
 function SLABadge({ status }) {
-  const slaColors = {
-    'met': '#7ed321',
-    'on_track': '#4a90e2',
-    'at_risk': '#e74c3c',
-    'breached': '#e74c3c',
-    'no_sla': '#9b9b9b',
+  const slaConfig = {
+    'met': { color: '#10B981', bg: '#A7D1C3' },
+    'on_track': { color: '#0EA5E9', bg: '#A6CCDD' },
+    'at_risk': { color: 'var(--high-color, #b35000)', bg: 'var(--high-bg-color, #ffe5b4)' },
+    'breached': { color: 'var(--critical-color, #a00000)', bg: 'var(--critical-bg-color, #f8d7da)' },
+    'no_sla': { color: '#6B7280', bg: '#F3F4F6' },
   };
   const slaLabels = {
     'met': 'Met',
@@ -331,11 +371,19 @@ function SLABadge({ status }) {
     'breached': 'Breached',
     'no_sla': 'No SLA',
   };
-  const color = slaColors[status] || '#9b9b9b';
+  const config = slaConfig[status] || { color: '#6B7280', bg: '#F3F4F6' };
   return (
     <span style={{ 
-      color, 
-      fontWeight: 500 
+      display: 'inline-block',
+      color: config.color, 
+      backgroundColor: config.bg,
+      padding: '2px 10px',
+      borderRadius: '12px',
+      fontSize: '0.75rem',
+      fontWeight: 600,
+      textTransform: 'uppercase',
+      whiteSpace: 'nowrap',
+      textAlign: 'center',
     }}>
       {slaLabels[status] || status || '-'}
     </span>
