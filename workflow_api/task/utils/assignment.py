@@ -237,3 +237,75 @@ def assign_users_for_escalation(task, escalate_to_role, reason):
     
     return [task_item]
 
+
+# Ticket Coordinator role name constant
+TICKET_COORDINATOR_ROLE = "Ticket Coordinator"
+
+
+def assign_ticket_owner(task):
+    """
+    Assign a Ticket Coordinator as the ticket owner for a task using round-robin.
+    The ticket owner is assigned to every task and stays with the task throughout its lifecycle.
+    
+    Args:
+        task: Task instance to assign an owner to
+    
+    Returns:
+        RoleUsers instance if assigned, None otherwise
+    """
+    try:
+        # Get all active users with the Ticket Coordinator role
+        role = Roles.objects.filter(name=TICKET_COORDINATOR_ROLE).first()
+        
+        if not role:
+            logger.warning(f"⚠️ Role '{TICKET_COORDINATOR_ROLE}' not found. Ticket owner not assigned.")
+            return None
+        
+        role_users_qs = RoleUsers.objects.filter(
+            role_id=role,
+            is_active=True
+        ).select_related('role_id')
+        
+        if not role_users_qs.exists():
+            logger.warning(f"⚠️ No active users found for role '{TICKET_COORDINATOR_ROLE}'. Ticket owner not assigned.")
+            return None
+        
+        # Get or create round-robin state for Ticket Coordinator
+        round_robin_state, _ = RoundRobin.objects.get_or_create(
+            role_name=TICKET_COORDINATOR_ROLE,
+            defaults={"current_index": 0}
+        )
+        
+        # Convert queryset to list for round-robin indexing
+        role_users_list = list(role_users_qs)
+        current_index = round_robin_state.current_index
+        user_index = current_index % len(role_users_list)
+        selected_owner = role_users_list[user_index]
+        
+        # Assign the ticket owner to the task
+        task.ticket_owner = selected_owner
+        task.save(update_fields=['ticket_owner'])
+        
+        # Update round-robin state for next assignment
+        round_robin_state.current_index = (current_index + 1) % len(role_users_list)
+        round_robin_state.save()
+        
+        logger.info(f"👑 Ticket owner assigned: User {selected_owner.user_id} ({selected_owner.user_full_name}) for Task {task.task_id}")
+        
+        # Send notification to ticket owner
+        try:
+            notify_task.delay(
+                user_id=selected_owner.user_id,
+                task_id=str(task.task_id),
+                task_title=str(task.ticket_id.ticket_number) if hasattr(task, 'ticket_id') else f"Task {task.task_id}",
+                role_name=TICKET_COORDINATOR_ROLE
+            )
+        except Exception as e:
+            logger.error(f"⚠️ Failed to send ticket owner notification: {e}")
+        
+        return selected_owner
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to assign ticket owner: {e}", exc_info=True)
+        return None
+

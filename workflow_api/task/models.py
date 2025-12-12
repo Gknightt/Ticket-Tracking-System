@@ -54,6 +54,14 @@ class Task(models.Model):
         blank=True,
         to_field='step_id'
     )
+    ticket_owner = models.ForeignKey(
+        'role.RoleUsers',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='owned_tasks',
+        help_text="Ticket Coordinator assigned as owner via round-robin rotation"
+    )
     status = models.CharField(
         max_length=36, 
         choices=TASK_STATUS_CHOICES,

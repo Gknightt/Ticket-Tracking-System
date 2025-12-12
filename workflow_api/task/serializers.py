@@ -58,6 +58,9 @@ class TaskSerializer(serializers.ModelSerializer):
     current_step_role = serializers.CharField(source='current_step.role_id.name', read_only=True)
     assigned_users = serializers.SerializerMethodField()
     assigned_users_count = serializers.SerializerMethodField()
+    ticket_owner_id = serializers.IntegerField(source='ticket_owner.user_id', read_only=True, allow_null=True)
+    ticket_owner_name = serializers.CharField(source='ticket_owner.user_full_name', read_only=True, allow_null=True)
+    ticket_owner_role = serializers.CharField(source='ticket_owner.role_id.name', read_only=True, allow_null=True)
     
     class Meta:
         model = Task
@@ -65,11 +68,12 @@ class TaskSerializer(serializers.ModelSerializer):
             'task_id', 'ticket_id', 'workflow_id', 'current_step',
             'status', 'created_at', 'updated_at', 'fetched_at',
             'target_resolution', 'resolution_time',
+            'ticket_owner', 'ticket_owner_id', 'ticket_owner_name', 'ticket_owner_role',
             # Read-only fields for easier frontend consumption
             'ticket_subject', 'ticket_description', 'workflow_name', 'current_step_name', 
             'current_step_role', 'assigned_users', 'assigned_users_count'
         ]
-        read_only_fields = ['task_id', 'created_at', 'updated_at', 'target_resolution', 'resolution_time']
+        read_only_fields = ['task_id', 'created_at', 'updated_at', 'target_resolution', 'resolution_time', 'ticket_owner_id', 'ticket_owner_name', 'ticket_owner_role']
     
     def get_ticket_subject(self, obj):
         """Extract subject from ticket_data"""
@@ -132,6 +136,11 @@ class UserTaskListSerializer(serializers.ModelSerializer):
     # Task status
     task_status = serializers.CharField(source='task.status', read_only=True)
     
+    # Ticket owner fields
+    ticket_owner_id = serializers.IntegerField(source='task.ticket_owner.user_id', read_only=True, allow_null=True)
+    ticket_owner_name = serializers.CharField(source='task.ticket_owner.user_full_name', read_only=True, allow_null=True)
+    ticket_owner_role = serializers.CharField(source='task.ticket_owner.role_id.name', read_only=True, allow_null=True)
+    
     # Status and history - from latest TaskItemHistory
     status = serializers.SerializerMethodField()
     status_updated_on = serializers.SerializerMethodField()
@@ -167,6 +176,9 @@ class UserTaskListSerializer(serializers.ModelSerializer):
             'assigned_on_step_id',
             'assigned_on_step_name',
             'task_status',
+            'ticket_owner_id',
+            'ticket_owner_name',
+            'ticket_owner_role',
             'assigned_on',
             'status_updated_on',
             'acted_on',
