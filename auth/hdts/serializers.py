@@ -6,6 +6,7 @@ import logging
 import jwt
 import requests
 from .models import Employees, EmployeeOTP
+from notification_client import notification_client
 
 logger = logging.getLogger(__name__)
 
@@ -160,23 +161,19 @@ class EmployeeTokenObtainPairSerializer(serializers.Serializer):
         
         access_payload = {
             'employee_id': employee.id,
-            'user_id': employee.id,  # For compatibility with middleware
             'email': employee.email,
             'first_name': employee.first_name,
             'last_name': employee.last_name,
             'company_id': employee.company_id,
             'token_type': 'access',
-            'user_type': 'employee',  # Mark as employee user
             'exp': access_exp.timestamp(),
             'iat': now.timestamp(),
         }
         
         refresh_payload = {
             'employee_id': employee.id,
-            'user_id': employee.id,  # For compatibility with middleware
             'email': employee.email,
             'token_type': 'refresh',
-            'user_type': 'employee',  # Mark as employee user
             'exp': refresh_exp.timestamp(),
             'iat': now.timestamp(),
         }
@@ -292,23 +289,19 @@ class EmployeeTokenObtainPairWithRecaptchaSerializer(serializers.Serializer):
         
         access_payload = {
             'employee_id': employee.id,
-            'user_id': employee.id,  # For compatibility with middleware
             'email': employee.email,
             'first_name': employee.first_name,
             'last_name': employee.last_name,
             'company_id': employee.company_id,
             'token_type': 'access',
-            'user_type': 'employee',  # Mark as employee user
             'exp': access_exp.timestamp(),
             'iat': now.timestamp(),
         }
         
         refresh_payload = {
             'employee_id': employee.id,
-            'user_id': employee.id,  # For compatibility with middleware
             'email': employee.email,
             'token_type': 'refresh',
-            'user_type': 'employee',  # Mark as employee user
             'exp': refresh_exp.timestamp(),
             'iat': now.timestamp(),
         }

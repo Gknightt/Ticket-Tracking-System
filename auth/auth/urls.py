@@ -20,6 +20,8 @@ from users.views import (
     CustomTokenObtainPairView,
     UILogoutView,
     StaffNotAuthenticatedMixin,
+    StaffLoginRequiredMixin,
+    StaffEmployeeBlockerMixin,
 )
 from tts.views import assign_agent_to_role_form
 from hdts import views as hdts_views
@@ -27,6 +29,7 @@ from hdts.employee_template_views import (
     EmployeeLoginView,
     EmployeeRegisterView,
     EmployeeVerifyOTPView,
+    EmployeeForgotPasswordUIView,
     EmployeeResetPasswordUIView,
     EmployeeProfileSettingsView,
     EmployeeChangePasswordView,
@@ -63,6 +66,19 @@ class StaffNotAuthenticatedLoginView(StaffNotAuthenticatedMixin, LoginView):
     - If authenticated (no systems): redirect to welcome page
     """
     pass
+
+
+class StaffProfileSettingsProtectedView(StaffLoginRequiredMixin, TemplateView):
+    """
+    Wrap profile settings view with authentication requirement.
+    - If not authenticated: redirect to /staff/login/
+    - If authenticated: show profile settings
+    """
+    template_name = 'users/profile_settings.html'
+    
+    def get(self, request, *args, **kwargs):
+        # Delegate to original profile_settings_view
+        return profile_settings_view(request)
 
 
 class APIRootSerializer(serializers.Serializer):
@@ -131,6 +147,7 @@ urlpatterns = [
     path('verify-otp/', EmployeeVerifyOTPView.as_view(), name='employee-verify-otp-shortcut'),
     path('profile-settings/', EmployeeProfileSettingsView.as_view(), name='employee-profile-settings-shortcut'),
     path('change-password/', EmployeeChangePasswordView.as_view(), name='employee-change-password-shortcut'),
+    path('forgot-password/', EmployeeForgotPasswordUIView.as_view(), name='employee-forgot-password-shortcut'),
     path('reset-password/', EmployeeResetPasswordUIView.as_view(), name='employee-reset-password-shortcut'),
     
     # API shortcut for current user profile (works for both staff and employees)

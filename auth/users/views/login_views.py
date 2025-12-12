@@ -26,6 +26,7 @@ from ..models import User, UserOTP
 from ..forms import LoginForm
 from ..serializers import CustomTokenObtainPairSerializer
 from ..decorators import jwt_cookie_required
+from ..utils import create_system_redirect_response
 from ..rate_limiting import (
     check_login_rate_limits,
     record_failed_login_attempt,
@@ -41,16 +42,14 @@ logger = logging.getLogger(__name__)
 class LoginView(FormView):
     """
     Custom login view with support for:
-    - Email/password authentication via API
-    - 2FA OTP verification via API
+    - Email/password authentication
+    - 2FA OTP verification
     - System selection
     - Captcha protection
+    - Remember me functionality
     - Account lockout protection
-    
-    NOTE: This view serves the staff login template (staff_login.html)
-    which communicates with /api/v1/users/login/api/ and /api/v1/users/login/verify-otp/
     """
-    template_name = 'public/staff_login.html'  # Changed to staff login template
+    template_name = 'users/login.html'
     form_class = LoginForm
     success_url = reverse_lazy('system-welcome')
     OTP_ERROR_CODES = {'otp_required', 'otp_invalid', 'otp_expired'}
@@ -84,8 +83,46 @@ class LoginView(FormView):
             request.COOKIES.pop('access_token', None)
             request.COOKIES.pop('refresh_token', None)
         
-        # If user is authenticated, middleware will handle routing
-        # Just show the login page (user shouldn't see it if already authenticated)
+        # If user is authenticated, redirect to their system
+        if user:
+            from users.utils import get_system_redirect_url
+
+            access_token = request.COOKIES.get('access_token')
+            system_slug = request.GET.get('system')
+
+            if system_slug:
+                redirect_url = get_system_redirect_url(user, system_slug)
+                if redirect_url:
+                    if access_token:
+                        separator = '&' if '?' in redirect_url else '?'
+                        redirect_url += f"{separator}token={access_token}"
+                    request.session['last_selected_system'] = system_slug
+                    return redirect(redirect_url)
+                messages.error(request, 'You do not have access to the requested system.')
+
+            available_systems = System.objects.filter(
+                user_roles__user=user,
+                user_roles__is_active=True
+            ).distinct()
+
+            if not available_systems.exists():
+                messages.error(request, 'No systems are assigned to your account. Please contact support.')
+                return redirect('system-welcome')
+
+            if available_systems.count() == 1:
+                selected_system = available_systems.first()
+                redirect_url = get_system_redirect_url(user, selected_system.slug)
+                if redirect_url:
+                    if access_token:
+                        separator = '&' if '?' in redirect_url else '?'
+                        redirect_url += f"{separator}token={access_token}"
+                    request.session['last_selected_system'] = selected_system.slug
+                    return redirect(redirect_url)
+                logger.error(f'System redirect URL is None for system: {selected_system.slug}')
+                messages.error(request, f'System "{selected_system.name}" is not properly configured. Please contact support.')
+                return redirect('system-welcome')
+
+            return redirect('system-welcome')
         
         # Proceed with normal dispatch and clear invalid cookies from response
         response = super().dispatch(request, *args, **kwargs)
@@ -201,8 +238,21 @@ class LoginView(FormView):
 
         if system_count == 1:
             selected_system = available_systems.first()
-            # System routing is now handled by AuthenticationRoutingMiddleware based on JWT user_type claim
-            self.request.session['last_selected_system'] = selected_system.slug
+            from users.utils import get_system_redirect_url
+            redirect_target_url = get_system_redirect_url(user, selected_system.slug)
+            if redirect_target_url:
+                separator = '&' if '?' in redirect_target_url else '?'
+                redirect_target_url += f"{separator}token={access_token}"
+                self.request.session['last_selected_system'] = selected_system.slug
+            else:
+                logger.error(f'System redirect URL is None for system: {selected_system.slug}')
+                messages.error(
+                    self.request,
+                    f'System "{selected_system.name}" is not properly configured. Please contact support.'
+                )
+                return HttpResponseServerError(
+                    f'System "{selected_system.name}" (slug: {selected_system.slug}) URL not configured.'
+                )
         elif system_count == 0:
             messages.error(
                 self.request,
@@ -372,11 +422,14 @@ def request_otp_for_login(request):
                     otp_instance = UserOTP.generate_for_user(user, otp_type='email')
                     
                     try:
-                        from emails.services import get_email_service
-                        get_email_service().send_otp_email(
-                            user_email=user.email,
-                            user_name=user.get_full_name() or user.username,
-                            otp_code=otp_instance.otp_code
+                        from django.core.mail import send_mail
+                        
+                        send_mail(
+                            subject='Your Login OTP Code',
+                            message=f'Your OTP code is: {otp_instance.code}\n\nThis code will expire in 10 minutes.',
+                            from_email=settings.DEFAULT_FROM_EMAIL,
+                            recipient_list=[user.email],
+                            fail_silently=False,
                         )
                         
                         messages.success(
@@ -426,18 +479,32 @@ class SystemWelcomeView(TemplateView):
         return context
 
     def get(self, request, *args, **kwargs):
-        # Middleware handles routing, just display system selection page
+        system_slug = request.GET.get('system')
+
+        if system_slug:
+            response = create_system_redirect_response(request, system_slug, include_token=True)
+            if response:
+                request.session['last_selected_system'] = system_slug
+                return response
+            messages.error(request, 'You do not have access to the requested system or it is not configured.')
+
         systems = list(self.get_user_systems())
 
         if not systems:
             messages.error(request, 'No systems are assigned to your account. Please contact support.')
             return self.render_to_response(self.get_context_data(systems=systems))
 
+        if len(systems) == 1 and not system_slug:
+            sole_system = systems[0]
+            request.session['last_selected_system'] = sole_system.slug
+            response = create_system_redirect_response(request, sole_system.slug, include_token=True)
+            if response:
+                return response
+            messages.error(request, f'System "{sole_system.name}" is not properly configured. Please contact support.')
+
         return self.render_to_response(self.get_context_data(systems=systems))
 
     def post(self, request, *args, **kwargs):
-        # System selection is now handled by the frontend/middleware
-        # This is kept for legacy support
         system_slug = request.POST.get('system_slug') or request.POST.get('system')
 
         if not system_slug:
@@ -451,10 +518,15 @@ class SystemWelcomeView(TemplateView):
             messages.error(request, 'You do not have access to the selected system.')
             return self.get(request, *args, **kwargs)
 
-        request.session['last_selected_system'] = selected_system.slug
-        # Middleware will redirect based on user_type, just redirect to home
-        return redirect('/')
 
+        request.session['last_selected_system'] = selected_system.slug
+        response = create_system_redirect_response(request, selected_system.slug, include_token=True)
+
+        if response:
+            return response
+
+        messages.error(request, f'System "{selected_system.name}" is not properly configured. Please contact support.')
+        return self.get(request, *args, **kwargs)
 
 
 # API-based login endpoint with reCAPTCHA
@@ -471,89 +543,138 @@ class LoginAPIView(APIView):
         "password": "password",
         "g_recaptcha_response": "response-from-client"
     }
-    
-    Response: If OTP is required, returns temporary_token with otp_required flag.
-    Must call /api/v1/users/verify-otp-login/ with temporary_token + otp_code.
     """
     permission_classes = [AllowAny]
     
     def post(self, request):
         from rest_framework import status
-        from django.contrib.auth import login
+        from system_roles.models import UserSystemRole
+        from django.utils.timezone import now
         
-        from ..serializers import LoginProcessSerializer, LoginResponseSerializer
+        from ..serializers import LoginWithRecaptchaSerializer
         
-        # Pass request context for session and IP access
-        serializer = LoginProcessSerializer(data=request.data, context={'request': request})
+        serializer = LoginWithRecaptchaSerializer(data=request.data)
+        email = request.data.get('email', '').lower()
         
         if serializer.is_valid():
-            # The serializer validate() method handles authentication, 2FA checks,
-            # token generation, and structuring the return data.
-            response_data = serializer.validated_data
+            user = serializer.validated_data['user']
             
-            # If login was successful (not just OTP step), perform Django login for session
-            if response_data.get('success') and not response_data.get('otp_required'):
-                user = response_data.get('user')
-                if user:
-                    login(request, user)
-                    
-                    # Record successful login (rate limiting)
-                    record_successful_login(request, user_email=user.email)
+            # Check HDTS Employee approval status
+            is_hdts_employee = UserSystemRole.objects.filter(
+                user=user,
+                system__slug='hdts',
+                role__name='Employee'
+            ).exists()
             
-            # Use Response Serializer to ensure consistent output format
-            response_serializer = LoginResponseSerializer(response_data)
-            return Response(response_serializer.data, status=status.HTTP_200_OK)
+            if is_hdts_employee and user.status != 'Approved':
+                error_message = 'Your account is pending approval by the HDTS system administrator.'
+                if user.status == 'Rejected':
+                    error_message = 'Your account has been rejected by the HDTS system administrator.'
+                
+                record_failed_login_attempt(request, user_email=user.email)
+                return Response(
+                    {'detail': error_message},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Generate tokens using CustomTokenObtainPairSerializer for rich data
+            serializer_data = {
+                'email': user.email,
+                'password': request.data.get('password', ''),
+                'otp_code': ''
+            }
+            
+            token_serializer = CustomTokenObtainPairSerializer(
+                data=serializer_data,
+                context={'request': request}
+            )
+            
+            if token_serializer.is_valid():
+                tokens = token_serializer.validated_data
+                access_token = tokens['access']
+                refresh_token = tokens['refresh']
+            else:
+                # Fallback: create tokens manually
+                refresh = RefreshToken.for_user(user)
+                access_token = str(refresh.access_token)
+                refresh_token = str(refresh)
+            
+            # Reset failed login attempts
+            user.failed_login_attempts = 0
+            user.is_locked = False
+            user.lockout_time = None
+            user.save(update_fields=["failed_login_attempts", "is_locked", "lockout_time"])
+            
+            # Log the user into Django's session framework
+            login(request, user)
+            
+            # Update last_logged_on for all user system roles
+            UserSystemRole.objects.filter(user=user).update(last_logged_on=now())
+            
+            # Get system roles for the user
+            system_roles_data = []
+            user_system_roles = UserSystemRole.objects.filter(user=user).select_related('system', 'role')
+            for role_assignment in user_system_roles:
+                system_roles_data.append({
+                    'system_name': role_assignment.system.name,
+                    'system_slug': role_assignment.system.slug,
+                    'role_name': role_assignment.role.name,
+                    'assigned_at': role_assignment.assigned_at,
+                })
+            
+            # Determine the primary system and redirect URL
+            primary_system = None
+            redirect_url = settings.DEFAULT_SYSTEM_URL
+            
+            if system_roles_data:
+                primary_system = system_roles_data[0]['system_slug']
+                redirect_url = settings.SYSTEM_TEMPLATE_URLS.get(primary_system, settings.DEFAULT_SYSTEM_URL)
+            
+            # Prepare available system URLs for frontend
+            available_systems = {}
+            for role_data in system_roles_data:
+                system_slug = role_data['system_slug']
+                available_systems[system_slug] = settings.SYSTEM_TEMPLATE_URLS.get(system_slug, settings.DEFAULT_SYSTEM_URL)
+            
+            # Record successful login
+            record_successful_login(request, user_email=user.email)
+            
+            response_data = {
+                'success': True,
+                'message': 'Authentication successful',
+                'access_token': access_token,
+                'refresh_token': refresh_token,
+                'user': {
+                    'id': user.id,
+                    'email': user.email,
+                    'first_name': user.first_name,
+                    'middle_name': user.middle_name,
+                    'last_name': user.last_name,
+                    'suffix': user.suffix,
+                    'username': user.username,
+                    'phone_number': user.phone_number,
+                    'company_id': user.company_id,
+                    'department': user.department,
+                    'status': user.status,
+                    'notified': user.notified,
+                    'is_staff': user.is_staff,
+                    'is_superuser': user.is_superuser,
+                    'otp_enabled': user.otp_enabled,
+                    'date_joined': user.date_joined,
+                    'system_roles': system_roles_data,
+                },
+                'redirect': {
+                    'primary_system': primary_system,
+                    'url': redirect_url,
+                    'available_systems': available_systems
+                }
+            }
+            
+            return Response(response_data, status=status.HTTP_200_OK)
         else:
-            email = request.data.get('email', '')
-            if email:
-                record_failed_login_attempt(request, user_email=email)
+            record_failed_login_attempt(request, user_email=email)
             
             return Response({
                 'success': False,
-                'otp_required': False,
                 'errors': serializer.errors
             }, status=status.HTTP_400_BAD_REQUEST)
-
-
-class VerifyOTPLoginView(APIView):
-    """
-    API endpoint to verify OTP during login flow.
-    POST /api/v1/users/verify-otp-login/
-    {
-        "temporary_token": "...",
-        "otp_code": "123456"
-    }
-    
-    Returns full authentication tokens if OTP is valid.
-    """
-    permission_classes = [AllowAny]
-    
-    def post(self, request):
-        from rest_framework import status
-        from django.contrib.auth import login
-        
-        from ..serializers import VerifyOTPLoginSerializer, LoginResponseSerializer
-        
-        serializer = VerifyOTPLoginSerializer(data=request.data, context={'request': request})
-        
-        if serializer.is_valid():
-            response_data = serializer.validated_data
-            
-            # Log in the user to establish session
-            user = response_data.get('user')
-            if user:
-                login(request, user)
-                
-                # Record successful login (rate limiting)
-                record_successful_login(request, user_email=user.email)
-                
-                logger.info(f"User {user.email} successfully logged in with OTP verification")
-            
-            response_serializer = LoginResponseSerializer(response_data)
-            return Response(response_serializer.data, status=status.HTTP_200_OK)
-        
-        return Response({
-            'success': False,
-            'errors': serializer.errors
-        }, status=status.HTTP_400_BAD_REQUEST)
-

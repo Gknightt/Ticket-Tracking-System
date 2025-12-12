@@ -20,39 +20,11 @@ from ..serializers import (
     UserProfileUpdateSerializer,
     AdminUserProfileUpdateSerializer,
 )
-from auth.permissions import IsSystemAdminOrSuperUser, filter_users_by_system_access
+from permissions import IsSystemAdminOrSuperUser, filter_users_by_system_access
 from system_roles.models import UserSystemRole
 from systems.models import System
 from roles.models import Role
 from ..decorators import jwt_cookie_required
-
-
-def get_or_set_default_system(request):
-    """
-    Helper function to get the current system from session,
-    or auto-select one if not set.
-    
-    Returns: system slug if found, empty string otherwise
-    """
-    current_system_slug = request.session.get('last_selected_system')
-    
-    # If system is already set, return it
-    if current_system_slug:
-        return current_system_slug
-    
-    # Otherwise, try to auto-select the first system the user has access to
-    user_systems = System.objects.filter(
-        user_roles__user=request.user,
-        user_roles__is_active=True
-    ).distinct().order_by('name')
-    
-    if user_systems.exists():
-        system = user_systems.first()
-        request.session['last_selected_system'] = system.slug
-        request.session.modified = True
-        return system.slug
-    
-    return ''
 
 
 @extend_schema_view(
@@ -544,7 +516,6 @@ def agent_management_view(request):
     """
     Render the agent management page for system admins and superusers.
     This view uses the same permissions as the UserViewSet API.
-    Automatically selects a system if one isn't already selected.
     """
     user = request.user
     
@@ -560,14 +531,14 @@ def agent_management_view(request):
             messages.error(request, 'Access denied. You need admin privileges to access agent management.')
             return redirect('profile-settings')
     
-    # Get or set current system from session
-    current_system_slug = get_or_set_default_system(request)
+    # Get current system from session
+    current_system_slug = request.session.get('last_selected_system', '')
     
     context = {
         'user': user,
         'current_system': current_system_slug,
     }
-    return render(request, 'management/agent_management.html', context)
+    return render(request, 'admins/agent_management.html', context)
 
 
 @jwt_cookie_required
@@ -575,7 +546,6 @@ def invite_agent_view(request):
     """
     Render the invite agent page for system admins and superusers.
     This page allows admins to invite new agents to the system.
-    Automatically selects a system if one isn't already selected.
     """
     user = request.user
     
@@ -591,11 +561,7 @@ def invite_agent_view(request):
             messages.error(request, 'Access denied. You need admin privileges to invite agents.')
             return redirect('profile-settings')
     
-    # Get or set current system from session
-    current_system_slug = get_or_set_default_system(request)
-    
     context = {
         'user': user,
-        'current_system': current_system_slug,
     }
-    return render(request, 'management/invite_agent.html', context)
+    return render(request, 'admins/invite_agent.html', context)
