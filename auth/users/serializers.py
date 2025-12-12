@@ -986,7 +986,6 @@ class LoginProcessSerializer(LoginWithRecaptchaSerializer):
         return self._generate_full_login_response(user)
 
     def _generate_full_login_response(self, user):
-        from rest_framework_simplejwt.tokens import RefreshToken
         from django.utils.timezone import now
         
         # Reset failed login attempts
@@ -998,9 +997,9 @@ class LoginProcessSerializer(LoginWithRecaptchaSerializer):
         # Update last_logged_on
         UserSystemRole.objects.filter(user=user).update(last_logged_on=now())
         
-        # Generate tokens
-        refresh = RefreshToken.for_user(user)
-        # Add custom claims if needed here, or rely on the fact that simplejwt handles it via settings
+        # Generate tokens using CustomTokenObtainPairSerializer for custom claims
+        # (email, username, full_name, user_type, roles)
+        refresh = CustomTokenObtainPairSerializer.get_token(user)
         
         # Gather system roles
         system_roles_data = []
@@ -1075,7 +1074,6 @@ class VerifyOTPLoginSerializer(serializers.Serializer):
         # Let's just instantiate LoginProcessSerializer temporarily to reuse the method? No, that's messy.
         
         # Re-implement generation logic here for now (it's clean enough)
-        from rest_framework_simplejwt.tokens import RefreshToken
         from django.utils.timezone import now
         
         user.failed_login_attempts = 0
@@ -1085,7 +1083,8 @@ class VerifyOTPLoginSerializer(serializers.Serializer):
         
         UserSystemRole.objects.filter(user=user).update(last_logged_on=now())
         
-        refresh = RefreshToken.for_user(user)
+        # Use CustomTokenObtainPairSerializer for custom claims (email, username, full_name, user_type, roles)
+        refresh = CustomTokenObtainPairSerializer.get_token(user)
         
         system_roles_data = []
         user_system_roles = UserSystemRole.objects.filter(user=user).select_related('system', 'role')

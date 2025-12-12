@@ -338,6 +338,9 @@ CELERY_TASK_ROUTES = {
     # HDTS routes
     'hdts.tasks.sync_user': {'queue': 'hdts.user.sync'},
     'hdts.tasks.sync_user_system_role': {'queue': 'hdts.user_system_role.sync'},
+    # HDTS to TTS sync routes (for cross-system role/user sync)
+    'hdts.tasks.sync_hdts_role_to_tts': {'queue': 'tts.role.sync'},
+    'hdts.tasks.sync_hdts_user_to_tts': {'queue': 'tts.user_system_role.sync'},
 }
 
 CELERY_TASK_DEFAULT_QUEUE = 'default'
