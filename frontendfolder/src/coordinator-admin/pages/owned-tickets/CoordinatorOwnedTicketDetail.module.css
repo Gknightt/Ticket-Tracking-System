@@ -12,31 +12,10 @@
 .detail-header {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
   background-color: var(--white);
   padding: 1.5rem;
   border-radius: 0.5rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.back-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  background-color: var(--primary-color);
-  color: var(--white);
-  border: none;
-  border-radius: 0.375rem;
-  cursor: pointer;
-  font-weight: var(--font-medium);
-  transition: all 0.2s ease;
-  white-space: nowrap;
-}
-
-.back-btn:hover {
-  background-color: var(--primary-color-hover);
-  transform: translateY(-2px);
 }
 
 .header-content {
@@ -679,11 +658,33 @@
   gap: 1rem;
 }
 
+.messages-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
 .messages-section h3 {
   margin: 0;
   font-size: 0.875rem;
   font-weight: var(--font-semibold);
   color: var(--text-color);
+}
+
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.65rem;
+  font-weight: var(--font-medium);
+}
+
+.connection-status.connected {
+  color: #10b981;
+}
+
+.connection-status.disconnected {
+  color: #ef4444;
 }
 
 .message-list {
@@ -693,12 +694,27 @@
   margin-bottom: 1rem;
   padding-bottom: 1rem;
   border-bottom: 1px solid var(--gray-300);
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.loading-messages,
+.no-messages {
+  padding: 1rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--neutral-gray);
 }
 
 .msg-item {
   padding: 0.75rem;
   background-color: #f9f9f9;
   border-radius: 0.375rem;
+}
+
+.msg-item.msg-own {
+  background-color: #e8f4fd;
+  border-left: 3px solid var(--primary-color);
 }
 
 .msg-sender {
@@ -708,11 +724,35 @@
   margin-bottom: 0.25rem;
 }
 
+.msg-role {
+  font-weight: normal;
+  color: var(--neutral-gray);
+}
+
 .msg-text {
   margin: 0.25rem 0;
   font-size: 0.75rem;
   color: var(--text-color);
   line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.msg-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+}
+
+.attachment-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  background-color: var(--gray-200);
+  border-radius: 0.25rem;
+  font-size: 0.65rem;
+  color: var(--text-color);
 }
 
 .msg-time {
@@ -720,6 +760,24 @@
   font-size: 0.65rem;
   color: var(--neutral-gray);
   margin-top: 0.25rem;
+}
+
+.edited-tag {
+  font-style: italic;
+  opacity: 0.7;
+}
+
+.typing-indicator {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.7rem;
+  color: var(--neutral-gray);
+  font-style: italic;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
 }
 
 .send-msg-form {
@@ -742,6 +800,11 @@
   outline: none;
   border-color: var(--primary-color);
   box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
+}
+
+.msg-textarea:disabled {
+  background-color: var(--gray-100);
+  cursor: not-allowed;
 }
 
 .send-msg-btn {

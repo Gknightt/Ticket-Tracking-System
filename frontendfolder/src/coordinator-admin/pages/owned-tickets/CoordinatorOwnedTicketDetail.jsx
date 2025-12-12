@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FaArrowLeft, FaEdit, FaSave, FaTimes, FaPaperclip, FaDownload, FaFile } from 'react-icons/fa';
+import { FaEdit, FaSave, FaTimes, FaPaperclip, FaDownload, FaFile, FaCircle } from 'react-icons/fa';
 import styles from './CoordinatorOwnedTicketDetail.module.css';
 import { backendTicketService } from '../../../services/backend/ticketService';
 import { useAuth } from '../../../context/AuthContext';
@@ -8,6 +8,7 @@ import { mockOwnedTickets, coordinatorTicketActions, coordinatorMessages, reques
 import Breadcrumb from '../../../shared/components/Breadcrumb';
 import Skeleton from '../../../shared/components/Skeleton/Skeleton';
 import { API_CONFIG } from '../../../config/environment';
+import { useMessaging } from '../../../shared/hooks/messaging';
 
 const CoordinatorOwnedTicketDetail = () => {
   const { ticketNumber } = useParams();
@@ -26,12 +27,14 @@ const CoordinatorOwnedTicketDetail = () => {
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
 
-  // Message states
-  const [messages, setMessages] = useState([]);
-  const [newMessage, setNewMessage] = useState('');
+  // Local message states (for requester communication)
   const [requesterMessages, setRequesterMessages] = useState([]);
   const [replyContent, setReplyContent] = useState('');
   const [showAllMessages, setShowAllMessages] = useState(false);
+  
+  // TTS Agent messaging input
+  const [agentMessageInput, setAgentMessageInput] = useState('');
+  const messagesEndRef = useRef(null);
 
   // Priority and status states
   const [ticketStatus, setTicketStatus] = useState('LOW');
@@ -39,6 +42,37 @@ const CoordinatorOwnedTicketDetail = () => {
 
   // Action log
   const [actionLog, setActionLog] = useState([]);
+
+  // Real-time messaging with TTS agents
+  const userDisplayName = `${currentUser?.first_name || ''} ${currentUser?.last_name || ''}`.trim() || 
+    currentUser?.username || currentUser?.email || 'Coordinator';
+  
+  const {
+    messages: agentMessages,
+    isConnected: wsConnected,
+    isLoading: messagingLoading,
+    typingUsers,
+    sendMessage: sendAgentMessage,
+    startTyping,
+    stopTyping,
+    fetchMessages: refreshMessages,
+  } = useMessaging(
+    ticketNumber, // Use ticket number as the messaging ticket ID
+    userDisplayName, // Use display name for typing indicators
+    {
+      name: userDisplayName,
+      role: 'HDTS: Ticket Coordinator',
+      first_name: currentUser?.first_name,
+      last_name: currentUser?.last_name,
+    }
+  );
+
+  // Auto-scroll to latest message
+  useEffect(() => {
+    if (messagesEndRef.current && activeTab === 'messages') {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [agentMessages, activeTab]);
 
   useEffect(() => {
     const loadTicket = async () => {
@@ -168,18 +202,8 @@ const CoordinatorOwnedTicketDetail = () => {
               isOwn: comment.user?.id === currentUser?.id
             }));
             
-            // Split into internal (TTS agent) messages and requester messages
-            const internalComments = formattedComments.filter(c => c.isInternal);
+            // Public comments go to requester messages (internal messages now use real-time WebSocket)
             const publicComments = formattedComments.filter(c => !c.isInternal);
-            
-            setMessages(internalComments.length > 0 ? internalComments : [{
-              id: '1',
-              sender: 'Support Team',
-              role: 'TTS Agent',
-              timestamp: new Date().toLocaleDateString(),
-              time: new Date().toLocaleTimeString(),
-              content: 'Ticket acknowledged. Working on resolution.'
-            }]);
             
             setRequesterMessages(publicComments.length > 0 ? publicComments : [{
               id: '1',
@@ -191,16 +215,7 @@ const CoordinatorOwnedTicketDetail = () => {
               isOwn: false
             }]);
           } else {
-            // Initialize with default messages
-            setMessages([{
-              id: '1',
-              sender: 'Support Team',
-              role: 'TTS Agent',
-              timestamp: new Date().toLocaleDateString(),
-              time: new Date().toLocaleTimeString(),
-              content: 'Ticket acknowledged. Working on resolution.'
-            }]);
-
+            // Initialize requester messages only (agent messages use real-time WebSocket)
             setRequesterMessages([{
               id: '1',
               sender: mergedData.requester || 'Requester',
@@ -264,19 +279,24 @@ const CoordinatorOwnedTicketDetail = () => {
     }
   };
 
-  const handleSendMessage = () => {
-    if (newMessage.trim()) {
-      const newMsg = {
-        id: Date.now().toString(),
-        sender: currentUser?.first_name || 'You',
-        role: currentUser?.role || 'Agent',
-        timestamp: new Date().toLocaleDateString(),
-        time: new Date().toLocaleTimeString(),
-        content: newMessage
-      };
-      setMessages([...messages, newMsg]);
-      setNewMessage('');
+  // Send message to TTS agents via real-time WebSocket
+  const handleSendAgentMessage = async () => {
+    if (!agentMessageInput.trim()) return;
+    
+    try {
+      stopTyping();
+      await sendAgentMessage(agentMessageInput.trim());
+      setAgentMessageInput('');
+    } catch (err) {
+      console.error('Failed to send message:', err);
+      // Optionally show error toast
     }
+  };
+
+  // Handle typing indicator for agent messages
+  const handleAgentMessageInputChange = (e) => {
+    setAgentMessageInput(e.target.value);
+    startTyping();
   };
 
   const handleSendRequesterMessage = () => {
@@ -371,12 +391,6 @@ const CoordinatorOwnedTicketDetail = () => {
     <div className={styles['detail-container']}>
       {/* Header */}
       <div className={styles['detail-header']}>
-        <button 
-          className={styles['back-btn']}
-          onClick={() => navigate('/admin/owned-tickets')}
-        >
-          <FaArrowLeft /> Back
-        </button>
         <div className={styles['header-content']}>
           <h1>Ticket #{ticket.id}</h1>
           <div className={styles['header-badges']}>
@@ -783,32 +797,86 @@ const CoordinatorOwnedTicketDetail = () => {
             </div>
           ) : (
             <div className={styles['sidebar-content']}>
-              {/* TTS Agent Messages */}
+              {/* TTS Agent Messages - Real-time WebSocket */}
               <div className={styles['messages-section']}>
-                <h3>TTS Agent Messages</h3>
+                <div className={styles['messages-header']}>
+                  <h3>TTS Agent Messages</h3>
+                  <span className={`${styles['connection-status']} ${wsConnected ? styles['connected'] : styles['disconnected']}`}>
+                    <FaCircle size={8} />
+                    {wsConnected ? 'Connected' : 'Disconnected'}
+                  </span>
+                </div>
+                
                 <div className={styles['message-list']}>
-                  {messages.map((msg) => (
-                    <div key={msg.id} className={styles['msg-item']}>
-                      <div className={styles['msg-sender']}>{msg.sender}</div>
-                      <p className={styles['msg-text']}>{msg.content}</p>
-                      <span className={styles['msg-time']}>{msg.time}</span>
+                  {messagingLoading && agentMessages.length === 0 ? (
+                    <div className={styles['loading-messages']}>Loading messages...</div>
+                  ) : agentMessages.length === 0 ? (
+                    <div className={styles['no-messages']}>
+                      No messages yet. Start a conversation with TTS agents.
                     </div>
-                  ))}
+                  ) : (
+                    agentMessages.map((msg) => {
+                      const isOwnMessage = msg.user_id === (currentUser?.id || currentUser?.user_id);
+                      return (
+                        <div 
+                          key={msg.message_id || msg.id} 
+                          className={`${styles['msg-item']} ${isOwnMessage ? styles['msg-own'] : ''}`}
+                        >
+                          <div className={styles['msg-sender']}>
+                            {msg.sender || 'Unknown'}
+                            {msg.sender_role && <span className={styles['msg-role']}> ({msg.sender_role})</span>}
+                          </div>
+                          <p className={styles['msg-text']}>{msg.message || msg.content}</p>
+                          {msg.attachments && msg.attachments.length > 0 && (
+                            <div className={styles['msg-attachments']}>
+                              {msg.attachments.map((att, idx) => (
+                                <span key={att.attachment_id || idx} className={styles['attachment-tag']}>
+                                  📎 {att.filename}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <span className={styles['msg-time']}>
+                            {msg.created_at 
+                              ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                              : msg.time}
+                            {msg.is_edited && <span className={styles['edited-tag']}> (edited)</span>}
+                          </span>
+                        </div>
+                      );
+                    })
+                  )}
+                  
+                  {/* Typing indicator */}
+                  {typingUsers.length > 0 && (
+                    <div className={styles['typing-indicator']}>
+                      {typingUsers.join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing...
+                    </div>
+                  )}
+                  
+                  <div ref={messagesEndRef} />
                 </div>
 
                 {/* Send Message */}
                 <div className={styles['send-msg-form']}>
                   <textarea
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
+                    value={agentMessageInput}
+                    onChange={handleAgentMessageInputChange}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendAgentMessage();
+                      }
+                    }}
                     placeholder="Type a message to TTS agents..."
                     className={styles['msg-textarea']}
                     rows="3"
+                    disabled={!wsConnected}
                   />
                   <button
                     className={styles['send-msg-btn']}
-                    onClick={handleSendMessage}
-                    disabled={!newMessage.trim()}
+                    onClick={handleSendAgentMessage}
+                    disabled={!agentMessageInput.trim() || !wsConnected}
                   >
                     Send
                   </button>
