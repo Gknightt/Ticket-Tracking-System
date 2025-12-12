@@ -41,6 +41,13 @@ from .views import (
     DrilldownTransfersView,
     DrilldownTaskItemsByStatusView,
     DrilldownTaskItemsByOriginView,
+    
+    # Operational Insights endpoints
+    OperationalInsightsView,
+    WorkloadAnalysisView,
+    SLARiskReportView,
+    AnomalyDetectionView,
+    ServiceHealthSummaryView,
 )
 
 app_name = 'reporting'
@@ -93,4 +100,11 @@ urlpatterns = [
     path('drilldown/task-items/origin/', DrilldownTaskItemsByOriginView.as_view(), name='drilldown-taskitems-origin'),
     path('drilldown/user-tasks/', DrilldownUserTasksView.as_view(), name='drilldown-user-tasks'),
     path('drilldown/transfers/', DrilldownTransfersView.as_view(), name='drilldown-transfers'),
+    
+    # ==================== OPERATIONAL INSIGHTS ====================
+    path('insights/', OperationalInsightsView.as_view(), name='operational-insights'),
+    path('insights/workload/', WorkloadAnalysisView.as_view(), name='workload-analysis'),
+    path('insights/sla-risk/', SLARiskReportView.as_view(), name='sla-risk-report'),
+    path('insights/anomalies/', AnomalyDetectionView.as_view(), name='anomaly-detection'),
+    path('insights/health/', ServiceHealthSummaryView.as_view(), name='service-health'),
 ]

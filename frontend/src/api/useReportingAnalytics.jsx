@@ -37,6 +37,14 @@ const ENDPOINTS = {
   categories: {
     tickets: 'analytics/ticket-categories/',
   },
+  // Operational Insights
+  insights: {
+    overview: 'analytics/insights/',
+    workload: 'analytics/insights/workload/',
+    slaRisk: 'analytics/insights/sla-risk/',
+    anomalies: 'analytics/insights/anomalies/',
+    health: 'analytics/insights/health/',
+  },
   // Legacy aggregated endpoints (deprecated - for backward compatibility)
   legacy: {
     tickets: 'analytics/reports/tickets/',
@@ -131,6 +139,13 @@ const useReportingAnalytics = () => {
   
   // Category Analytics State
   const [ticketCategories, setTicketCategories] = useState(null);
+  
+  // Operational Insights State
+  const [operationalInsights, setOperationalInsights] = useState(null);
+  const [workloadAnalysis, setWorkloadAnalysis] = useState(null);
+  const [slaRiskReport, setSlaRiskReport] = useState(null);
+  const [anomalyDetection, setAnomalyDetection] = useState(null);
+  const [serviceHealth, setServiceHealth] = useState(null);
   
   // Legacy state (for backward compatibility)
   const [ticketsReport, setTicketsReport] = useState(null);
@@ -493,6 +508,133 @@ const useReportingAnalytics = () => {
     }
   }, [fetchEndpoint]);
 
+  // ==================== OPERATIONAL INSIGHTS ====================
+
+  /**
+   * Fetch comprehensive operational insights
+   * Returns alerts, health score, and aggregated system analysis
+   */
+  const fetchOperationalInsights = useCallback(async (dateRange = null) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchEndpoint(ENDPOINTS.insights.overview, dateRange);
+      setOperationalInsights(data);
+      return data;
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to fetch operational insights');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchEndpoint]);
+
+  /**
+   * Fetch detailed workload analysis per agent
+   */
+  const fetchWorkloadAnalysis = useCallback(async (dateRange = null) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchEndpoint(ENDPOINTS.insights.workload, dateRange);
+      setWorkloadAnalysis(data);
+      return data;
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to fetch workload analysis');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchEndpoint]);
+
+  /**
+   * Fetch SLA risk report with at-risk and breached tickets
+   */
+  const fetchSlaRiskReport = useCallback(async (dateRange = null) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchEndpoint(ENDPOINTS.insights.slaRisk, dateRange);
+      setSlaRiskReport(data);
+      return data;
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to fetch SLA risk report');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchEndpoint]);
+
+  /**
+   * Fetch anomaly detection results
+   */
+  const fetchAnomalyDetection = useCallback(async (days = 7) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchEndpoint(ENDPOINTS.insights.anomalies, null, { days });
+      setAnomalyDetection(data);
+      return data;
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to fetch anomaly detection');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchEndpoint]);
+
+  /**
+   * Fetch service health summary
+   */
+  const fetchServiceHealth = useCallback(async (dateRange = null) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchEndpoint(ENDPOINTS.insights.health, dateRange);
+      setServiceHealth(data);
+      return data;
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to fetch service health');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchEndpoint]);
+
+  /**
+   * Fetch all operational insights in parallel
+   */
+  const fetchAllInsights = useCallback(async (dateRange = null) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const results = await Promise.allSettled([
+        fetchEndpoint(ENDPOINTS.insights.overview, dateRange),
+        fetchEndpoint(ENDPOINTS.insights.workload, dateRange),
+        fetchEndpoint(ENDPOINTS.insights.slaRisk, dateRange),
+        fetchEndpoint(ENDPOINTS.insights.anomalies, null, { days: 7 }),
+        fetchEndpoint(ENDPOINTS.insights.health, dateRange),
+      ]);
+      
+      const [overview, workload, slaRisk, anomalies, health] = results.map(r => 
+        r.status === 'fulfilled' ? r.value : null
+      );
+      
+      setOperationalInsights(overview);
+      setWorkloadAnalysis(workload);
+      setSlaRiskReport(slaRisk);
+      setAnomalyDetection(anomalies);
+      setServiceHealth(health);
+      
+      return { overview, workload, slaRisk, anomalies, health };
+    } catch (err) {
+      setError('Failed to fetch operational insights');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchEndpoint]);
+
   // ==================== UNIFIED FETCH ALL ====================
 
   /**
@@ -707,6 +849,13 @@ const useReportingAnalytics = () => {
     // Category Analytics State
     ticketCategories,
     
+    // Operational Insights State
+    operationalInsights,
+    workloadAnalysis,
+    slaRiskReport,
+    anomalyDetection,
+    serviceHealth,
+    
     // Legacy State (for backward compatibility)
     ticketsReport,
     workflowsReport,
@@ -740,6 +889,14 @@ const useReportingAnalytics = () => {
     
     // Category Analytics Methods
     fetchTicketCategories,
+    
+    // Operational Insights Methods
+    fetchOperationalInsights,
+    fetchWorkloadAnalysis,
+    fetchSlaRiskReport,
+    fetchAnomalyDetection,
+    fetchServiceHealth,
+    fetchAllInsights,
     
     // Unified Methods
     fetchAllAnalytics,

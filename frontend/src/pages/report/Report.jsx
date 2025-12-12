@@ -10,6 +10,7 @@ import WorkflowTab from "./tabs/WorkflowTab";
 import AgentTab from "./tabs/AgentTab";
 import IntegrationTab from "./tabs/IntegrationTab";
 import TaskItemTab from "./tabs/TaskItemTab";
+import InsightsTab from "./tabs/InsightsTab";
 
 // hooks
 import useReportingAnalytics from "../../api/useReportingAnalytics";
@@ -82,6 +83,8 @@ export default function Report() {
         return <WorkflowTab timeFilter={timeFilter} analyticsData={workflowsReport} loading={loading} error={error} />;
       case "integration":
         return <IntegrationTab analyticsData={ticketsReport} loading={loading} error={error} />;
+      case "insights":
+        return <InsightsTab timeFilter={timeFilter} />;
       default:
         return <TaskItemTab timeFilter={timeFilter} analyticsData={tasksReport} trendData={taskItemTrends} loading={loading} error={error} />;
     }
@@ -115,12 +118,13 @@ export default function Report() {
         <section className={styles.rpBody}>
           {/* Tabs */}
           <div className={styles.rpTabs}>
-            {["taskitem", "agent", "ticket", "workflow", "integration"].map((tab) => {
+            {["taskitem", "agent", "ticket", "workflow", "insights", "integration"].map((tab) => {
               const tabLabels = {
                 taskitem: "Tasks",
                 agent: "Agent",
                 ticket: "Ticket",
                 workflow: "Workflow",
+                insights: "Insights",
                 integration: "Integration"
               };
               return (
