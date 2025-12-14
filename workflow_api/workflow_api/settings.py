@@ -44,8 +44,7 @@ INSTALLED_APPS = [
     'role',
     'task',
     'tickets',
-    'amscheckout',
-    'bmscheckout',
+
     'workflowmanager',
     'audit',
     'reporting',
