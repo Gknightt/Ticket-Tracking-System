@@ -78,6 +78,7 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 */test
+tests/
 
 # Translations
 *.mo
@@ -191,7 +192,7 @@ celerybeat.pid
 dump.rdb
 
 # Editor and IDE files
-.vscode/
+# .vscode/
 .idea/
 *.swp
 *.swo
