@@ -1,4 +1,4 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, mixins
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -8,16 +8,13 @@ import logging
 from copy import deepcopy
 
 from audit.utils import log_action, compare_models
-from .models import Workflows, Category
+from .models import Workflows
 from .serializers import (
     WorkflowBasicSerializer,
-    WorkflowGraphResponseSerializer,
     CreateWorkflowSerializer,
     CreateWorkflowWithGraphSerializer,
     UpdateWorkflowDetailsSerializer,
     UpdateWorkflowGraphSerializer,
-    UpdateWorkflowGraphSerializerV2,
-    CategorySerializer,
     StepSerializer,
     UpdateStepDetailsSerializer,
     TransitionSerializer,
@@ -31,21 +28,7 @@ from authentication import JWTCookieAuthentication
 logger = logging.getLogger(__name__)
 
 
-class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    ViewSet for viewing workflow categories.
-    
-    Actions:
-    - list: GET /categories/ - List all categories
-    - retrieve: GET /categories/{id}/ - Get category details
-    """
-    queryset = Category.objects.all()
-    serializer_class = CategorySerializer
-    authentication_classes = [JWTCookieAuthentication]
-    permission_classes = [IsAuthenticated]
-
-
-class WorkflowViewSet(viewsets.ModelViewSet):
+class WorkflowViewSet(mixins.CreateModelMixin, viewsets.ReadOnlyModelViewSet):
     """
     ViewSet for managing workflows.
     
@@ -53,7 +36,6 @@ class WorkflowViewSet(viewsets.ModelViewSet):
     - list: GET /workflows/ - List all workflows
     - create: POST /workflows/ - Create workflow with optional graph
     - retrieve: GET /workflows/{id}/ - Get workflow details
-    - update: PUT /workflows/{id}/ - Update workflow
     - update_graph: PUT /workflows/{id}/update-graph/ - Update workflow graph (nodes/edges)
     - update_details: PUT /workflows/{id}/update-details/ - Update workflow metadata
     - workflow_detail: GET /workflows/{id}/detail/ - Get complete workflow details with graph
@@ -178,7 +160,10 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                         logger.error(f"Failed to log audit for create_workflow: {e}")
                     
                     # Return the created workflow with its graph
-                    return self._get_workflow_detail_response(workflow, temp_id_mapping)
+                    return Response(
+                        self._get_workflow_detail_response(workflow, temp_id_mapping),
+                        status=status.HTTP_201_CREATED
+                    )
             
             except Roles.DoesNotExist as e:
                 logger.error(f"❌ Role not found: {str(e)}")
@@ -224,16 +209,17 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
     
-    def _get_workflow_detail_response(self, workflow, temp_id_mapping=None):
-        """Helper method to return complete workflow details with graph"""
-        workflow_serializer = WorkflowBasicSerializer(workflow)
-        workflow_data = workflow_serializer.data
+    def _build_graph_data(self, workflow_id, temp_id_mapping=None):
+        """Helper method to build graph data (nodes and edges)"""
+        nodes = Steps.objects.filter(workflow_id=workflow_id)
+        edges = StepTransition.objects.filter(workflow_id=workflow_id)
         
-        nodes = Steps.objects.filter(workflow_id=workflow.workflow_id)
-        edges = StepTransition.objects.filter(workflow_id=workflow.workflow_id)
+        # Get total step count for design calculations
+        total_steps = nodes.count()
         
         nodes_data = []
         for node in nodes:
+            # Convert datetime to ISO format string
             created_at = node.created_at
             updated_at = node.updated_at
             if hasattr(created_at, 'isoformat'):
@@ -241,13 +227,23 @@ class WorkflowViewSet(viewsets.ModelViewSet):
             if hasattr(updated_at, 'isoformat'):
                 updated_at = updated_at.isoformat()
             
+            # Use existing design or calculate default if missing
+            design = node.design if node.design else {}
+            if not design or (not design.get('x') and not design.get('y')):
+                # Calculate default design based on step order and total steps
+                # node.order is 1-indexed, so convert to 0-indexed for calculation
+                design = calculate_default_node_design(
+                    step_order=node.order - 1 if node.order > 0 else 0,
+                    total_steps=total_steps
+                )
+            
             nodes_data.append({
                 'id': node.step_id,
                 'name': node.name,
                 'role': node.role_id.name if node.role_id else '',
                 'description': node.description or '',
                 'instruction': node.instruction or '',
-                'design': node.design or {},
+                'design': design,
                 'created_at': created_at,
                 'updated_at': updated_at,
                 'is_start': node.is_start,
@@ -255,12 +251,24 @@ class WorkflowViewSet(viewsets.ModelViewSet):
             })
         
         # Use utility function to calculate and apply handles to edges
-        edges_data = apply_edge_handles_to_transitions(edges, workflow.workflow_id)
+        edges_data = apply_edge_handles_to_transitions(edges, workflow_id)
         
         graph_data = {
             'nodes': nodes_data,
             'edges': edges_data
         }
+        
+        if temp_id_mapping:
+            graph_data['temp_id_mapping'] = temp_id_mapping
+            
+        return graph_data
+
+    def _get_workflow_detail_response(self, workflow, temp_id_mapping=None):
+        """Helper method to return complete workflow details with graph as a dict"""
+        workflow_serializer = WorkflowBasicSerializer(workflow)
+        workflow_data = workflow_serializer.data
+        
+        graph_data = self._build_graph_data(workflow.workflow_id, temp_id_mapping)
         
         response_data = {
             'workflow': workflow_data,
@@ -270,27 +278,13 @@ class WorkflowViewSet(viewsets.ModelViewSet):
         if temp_id_mapping:
             response_data['temp_id_mapping'] = temp_id_mapping
         
-        return Response(response_data, status=status.HTTP_201_CREATED)
+        return response_data
     
     @action(detail=True, methods=['put'], url_path='update-graph')
     def update_graph(self, request, workflow_id=None):
         """
         Update workflow graph (nodes and edges).
         Supports create, update, and delete operations.
-        
-        Request body:
-        {
-            "nodes": [
-                {"id": 1, "name": "Updated", "role": "Admin", "description": "...", ...},
-                {"id": "temp-1", "name": "New Node", "role": "User", "design": {"x": 100, "y": 200}},
-                {"id": 5, "to_delete": true}
-            ],
-            "edges": [
-                {"id": 1, "from": 1, "to": 2, "name": "Edge Name"},
-                {"id": "temp-e1", "from": 1, "to": "temp-1"},
-                {"id": 10, "to_delete": true}
-            ]
-        }
         """
         try:
             workflow = Workflows.objects.get(workflow_id=workflow_id)
@@ -492,7 +486,11 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                     except Exception as e:
                         logger.error(f"Failed to log audit for update_workflow: {e}")
                 
-                return self._get_workflow_graph_response(workflow, temp_id_mapping)
+                # Using 200 OK for updates
+                return Response(
+                    self._get_workflow_detail_response(workflow, temp_id_mapping),
+                    status=status.HTTP_200_OK
+                )
         
         except Exception as e:
             logger.error(f"❌ Error updating workflow graph: {str(e)}")
@@ -501,50 +499,15 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
     
-    def _get_workflow_graph_response(self, workflow, temp_id_mapping=None):
-        """Helper method to return workflow graph with all nodes and edges"""
-        nodes = Steps.objects.filter(workflow_id=workflow.workflow_id)
-        edges = StepTransition.objects.filter(workflow_id=workflow.workflow_id)
-        
-        # Get total step count for design calculations
-        total_steps = nodes.count()
-        
-        nodes_data = []
-        for node in nodes:
-            # Use existing design or calculate default if missing
-            design = node.design if node.design else {}
-            if not design or (not design.get('x') and not design.get('y')):
-                # Calculate default design based on step order and total steps
-                # node.order is 1-indexed, so convert to 0-indexed for calculation
-                design = calculate_default_node_design(
-                    step_order=node.order - 1 if node.order > 0 else 0,
-                    total_steps=total_steps
-                )
-            
-            nodes_data.append({
-                'id': node.step_id,
-                'name': node.name,
-                'role': node.role_id.name if node.role_id else '',
-                'description': node.description or '',
-                'instruction': node.instruction or '',
-                'design': design,
-                'is_start': node.is_start,
-                'is_end': node.is_end,
-            })
-        
-        # Use utility function to calculate and apply handles to edges
-        edges_data = apply_edge_handles_to_transitions(edges, workflow.workflow_id)
-        
-        response_data = {
-            'nodes': nodes_data,
-            'edges': edges_data
-        }
-        
-        if temp_id_mapping:
-            response_data['temp_id_mapping'] = temp_id_mapping
-        
-        return Response(response_data, status=status.HTTP_200_OK)
-    
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Get workflow details including graph.
+        Overrides default retrieve to return full details.
+        """
+        instance = self.get_object()
+        data = self._get_workflow_detail_response(instance)
+        return Response(data, status=status.HTTP_200_OK)
+
     @action(detail=True, methods=['get'], url_path='graph')
     def get_graph(self, request, workflow_id=None):
         """Get complete workflow graph (all nodes and edges)"""
@@ -556,7 +519,10 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        return self._get_workflow_graph_response(workflow)
+        return Response(
+            self._build_graph_data(workflow.workflow_id),
+            status=status.HTTP_200_OK
+        )
     
     @action(detail=True, methods=['get'], url_path='detail')
     def workflow_detail(self, request, workflow_id=None):
@@ -569,65 +535,10 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        # Get workflow details
-        workflow_serializer = WorkflowBasicSerializer(workflow)
-        workflow_data = workflow_serializer.data
-        
-        # Get graph data
-        nodes = Steps.objects.filter(workflow_id=workflow_id)
-        edges = StepTransition.objects.filter(workflow_id=workflow_id)
-        
-        # Get total step count for design calculations
-        total_steps = nodes.count()
-        
-        nodes_data = []
-        for node in nodes:
-            # Convert datetime to ISO format string
-            created_at = node.created_at
-            updated_at = node.updated_at
-            if hasattr(created_at, 'isoformat'):
-                created_at = created_at.isoformat()
-            if hasattr(updated_at, 'isoformat'):
-                updated_at = updated_at.isoformat()
-            
-            # Use existing design or calculate default if missing
-            design = node.design if node.design else {}
-            if not design or (not design.get('x') and not design.get('y')):
-                # Calculate default design based on step order and total steps
-                # node.order is 1-indexed, so convert to 0-indexed for calculation
-                design = calculate_default_node_design(
-                    step_order=node.order - 1 if node.order > 0 else 0,
-                    total_steps=total_steps
-                )
-            
-            nodes_data.append({
-                'id': node.step_id,
-                'name': node.name,
-                'role': node.role_id.name if node.role_id else '',
-                'description': node.description or '',
-                'instruction': node.instruction or '',
-                'design': design,
-                'created_at': created_at,
-                'updated_at': updated_at,
-                'is_start': node.is_start,
-                'is_end': node.is_end,
-            })
-        
-        # Use utility function to calculate and apply handles to edges
-        edges_data = apply_edge_handles_to_transitions(edges, workflow_id)
-        
-        graph_data = {
-            'nodes': nodes_data,
-            'edges': edges_data
-        }
-        
-        # Combine workflow details with graph
-        response_data = {
-            'workflow': workflow_data,
-            'graph': graph_data
-        }
-        
-        return Response(response_data, status=status.HTTP_200_OK)
+        return Response(
+            self._get_workflow_detail_response(workflow),
+            status=status.HTTP_200_OK
+        )
     
     @action(detail=True, methods=['put'], url_path='update-details')
     def update_details(self, request, workflow_id=None):
