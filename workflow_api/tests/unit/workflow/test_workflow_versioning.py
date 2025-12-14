@@ -31,8 +31,15 @@ from datetime import timedelta
 
 # Fix Windows console encoding for Unicode
 if sys.platform == 'win32':
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+    # Only reconfigure if stdout/stderr are not closed
+    try:
+        if hasattr(sys.stdout, 'buffer') and not sys.stdout.closed:
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        if hasattr(sys.stderr, 'buffer') and not sys.stderr.closed:
+            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+    except (ValueError, AttributeError):
+        # Skip reconfiguration if streams are closed or unavailable
+        pass
 
 # Setup Django settings before importing models
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'workflow_api.settings')

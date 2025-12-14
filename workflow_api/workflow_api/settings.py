@@ -238,3 +238,19 @@ CELERY_TASK_ROUTES = {
 USER_SERVICE_URL = config('DJANGO_USER_SERVICE_URL', default='http://localhost:8000')
 AUTH_SERVICE_URL = config('DJANGO_AUTH_SERVICE_URL', default='http://localhost:8000')
 BASE_URL = config('DJANGO_BASE_URL', default='http://localhost:8000')
+
+# Test Runner Configuration (Python 3.13 compatibility)
+TEST_RUNNER = 'workflow_api.test_runner.Python313CompatibleTestRunner'
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+}

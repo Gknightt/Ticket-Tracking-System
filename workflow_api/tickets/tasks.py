@@ -9,6 +9,7 @@ import requests
 from urllib.parse import urlparse, urljoin
 import os
 import json
+from workflow_api.safe_logging import safe_print as print  # Use safe print for Python 3.13 compatibility
 
 @shared_task(name='tickets.tasks.receive_ticket')
 def receive_ticket(ticket_data):
