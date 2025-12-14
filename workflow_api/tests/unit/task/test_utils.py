@@ -13,6 +13,7 @@ from task.utils.target_resolution import (
     get_sla_for_priority,
     calculate_step_weight_percentage,
     calculate_target_resolution_for_task,
+    calculate_target_resolution_for_task_item,
 )
 from workflow.models import Workflows
 from step.models import Steps, StepTransition
@@ -454,6 +455,81 @@ class SLACalculationTests(TestCase):
         time_diff = (target - now).total_seconds() / 3600  # hours
         
         self.assertAlmostEqual(time_diff, 12.0, delta=0.5)
+
+    def test_zero_weight_step_sla(self):
+        """Test that a step with 0 weight gets immediate deadline (now)"""
+        # Create a 0-weight step
+        zero_weight_step = Steps.objects.create(
+            workflow_id=self.workflow,
+            role_id=self.role,
+            name="Instant Step",
+            description="Step with 0 weight",
+            order=4,
+            weight=0.0,
+            is_initialized=True
+        )
+        
+        ticket = WorkflowTicket.objects.create(
+            ticket_number="ZERO-W-TEST",
+            priority="Medium",
+            department="IT",
+            ticket_data={"priority": "Medium"}
+        )
+        
+        # Calculate target resolution for this specific step
+        target = calculate_target_resolution_for_task_item(
+            ticket,
+            zero_weight_step,
+            self.workflow
+        )
+        
+        now = timezone.now()
+        
+        # Should be extremely close to now (within seconds)
+        self.assertIsNotNone(target)
+        time_diff = abs((target - now).total_seconds())
+        
+        self.assertLess(time_diff, 5.0, "Target should be 'now' for 0 weight step")
+
+    def test_total_weight_zero(self):
+        """Test behavior when total workflow weight is 0 (should distribute equally)"""
+        # Create a new workflow with all 0 weights
+        zero_workflow = Workflows.objects.create(
+            user_id=1,
+            name="Zero Weight Workflow",
+            description="Workflow with zero total weight",
+            workflow_id=999,
+            category="Test",
+            sub_category="Zero",
+            department="IT",
+            status="deployed",
+            medium_sla=timedelta(hours=10)
+        )
+        
+        step_1 = Steps.objects.create(
+            workflow_id=zero_workflow,
+            role_id=self.role,
+            name="Step 1",
+            order=1,
+            weight=0.0
+        )
+        
+        step_2 = Steps.objects.create(
+            workflow_id=zero_workflow,
+            role_id=self.role,
+            name="Step 2",
+            order=2,
+            weight=0.0
+        )
+        
+        # Both steps should get equal share (50% of 10h = 5h)
+        # implementation says: return 1.0 / len(all_steps) if all_steps.exists() else 1.0
+        
+        percentage_1 = calculate_step_weight_percentage(step_1, zero_workflow)
+        percentage_2 = calculate_step_weight_percentage(step_2, zero_workflow)
+        
+        self.assertAlmostEqual(percentage_1, 0.5)
+        self.assertAlmostEqual(percentage_2, 0.5)
 
 
 class EscalationLogicTests(TestCase):
