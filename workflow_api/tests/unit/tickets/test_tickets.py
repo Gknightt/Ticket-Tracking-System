@@ -29,72 +29,11 @@ versioning signals) to ensure focused unit testing.
 
 To run these tests:
 ```bash
-python manage.py test tickets
-```
-"""
-
-"""
-Unit Tests for the Tickets Application
-
-This file contains comprehensive unit tests for the core functionalities
-of the `tickets` Django application within the Workflow API. It focuses on
-verifying the behavior of the `receive_ticket` and `create_task_for_ticket`
-Celery tasks, which are central to ticket ingestion and automated workflow
-initiation.
-
-Key functionalities tested include:
-
--   **`receive_ticket` task**:
-    -   Correct creation and updating of `WorkflowTicket` instances.
-    -   Accurate extraction of `ticket_number` from various input data fields.
-    -   Proper triggering of `create_task_for_ticket` only for newly created tickets.
-    -   Robust error handling for unexpected input or internal issues.
-
--   **`create_task_for_ticket` task**:
-    -   Identification of matching workflows based on ticket department and category.
-    -   Correct retrieval of the initial step of a workflow.
-    -   Reliable creation of `Task` instances linked to appropriate `WorkflowTicket` and `WorkflowVersion`.
-    -   On-demand creation of `WorkflowVersion` if none is active for a matched workflow.
-    -   Correct assignment of ticket owners and initial task users via mocked assignment utilities.
-    -   Handling of edge cases such as non-existent tickets, missing workflows, or workflows without steps/users.
-
-The tests utilize Django's `TestCase` for database isolation and `unittest.mock`
-for simulating external dependencies (like assignment utilities and workflow
-versioning signals) to ensure focused unit testing.
-
-To run these tests:
-```bash
-python manage.py test tickets
+python manage.py test tests.unit.tickets.test_tickets
 ```
 """
 
 import os
-import io
-import sys
-from unittest.mock import patch, MagicMock
-from datetime import timedelta
-
-import django
-from django.test import TestCase
-from django.utils import timezone
-from decimal import Decimal
-
-# Setup Django settings before importing models
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'workflow_api.settings')
-django.setup()
-
-# Import models
-from tickets.models import WorkflowTicket, RoundRobin
-from workflow.models import Workflows, WorkflowVersion
-from step.models import Steps, StepTransition
-from role.models import Roles, RoleUsers
-from task.models import Task, TaskItem, TaskItemHistory
-
-
-# Fix Windows console encoding for Unicode
-if sys.platform == 'win32':
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 import io
 import sys
 from unittest.mock import patch, MagicMock

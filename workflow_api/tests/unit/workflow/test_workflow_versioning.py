@@ -21,9 +21,7 @@ Architecture Overview:
 - TaskItem: User assignments within tasks
 - WorkflowTicket: Incoming tickets that spawn tasks
 
-Run with: python manage.py test test_workflow_versioning --verbosity=2
-Or standalone: python test_workflow_versioning.py
-"""
+Run with: python manage.py test tests.unit.workflow.test_workflow_versioning"""
 
 import os
 import sys
@@ -842,40 +840,4 @@ class WorkflowVersioningTestCase(TransactionTestCase):
         self._cleanup_test_data()
 
 
-def run_tests():
-    """Run the test suite"""
-    import unittest
-    
-    # Create a test suite
-    suite = unittest.TestLoader().loadTestsFromTestCase(WorkflowVersioningTestCase)
-    
-    # Run with verbosity
-    runner = unittest.TextTestRunner(verbosity=2)
-    result = runner.run(suite)
-    
-    # Print summary
-    print("\n" + "="*80)
-    print("TEST SUMMARY")
-    print("="*80)
-    print(f"Tests run: {result.testsRun}")
-    print(f"Failures: {len(result.failures)}")
-    print(f"Errors: {len(result.errors)}")
-    
-    if result.failures:
-        print("\n❌ FAILURES:")
-        for test, traceback in result.failures:
-            print(f"  - {test}: {traceback}")
-    
-    if result.errors:
-        print("\n❌ ERRORS:")
-        for test, traceback in result.errors:
-            print(f"  - {test}: {traceback}")
-    
-    if not result.failures and not result.errors:
-        print("\n🎉 ALL TESTS PASSED!")
-    
-    return result
 
-
-if __name__ == '__main__':
-    run_tests()
