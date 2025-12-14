@@ -1,41 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import { WorkflowTransition } from './WorkflowEditorLayout';
 import { Trash2 } from 'lucide-react';
 
-export default function TransitionEditPanel({ transition, onUpdate, onDelete }) {
-  const [formData, setFormData] = useState({
-    label: '',
-  });
+interface TransitionEditPanelProps {
+  transition: WorkflowTransition;
+  onUpdate: (updates: Partial<WorkflowTransition>) => void;
+  onDelete?: () => void;
+}
 
-  useEffect(() => {
-    if (transition) {
-      setFormData({
-        label: transition.label || transition.name || '',
-      });
-    }
-  }, [transition]);
-
-  const handleChange = (field, value) => {
-    const newFormData = { ...formData, [field]: value };
-    setFormData(newFormData);
-    if (onUpdate) {
-      onUpdate({
-        label: newFormData.label,
-        name: newFormData.label,
-      });
-    }
-  };
-
-  if (!transition) return null;
-
+export default function TransitionEditPanel({ transition, onUpdate, onDelete }: TransitionEditPanelProps) {
   return (
     <div className="space-y-4">
       <div>
         <label className="block text-sm text-gray-700 mb-1">Transition Label</label>
         <input
           type="text"
-          value={formData.label}
-          onChange={(e) => handleChange('label', e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          value={transition.label}
+          onChange={(e) => onUpdate({ label: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
           placeholder="e.g., Approved, Rejected, Submit"
         />
       </div>

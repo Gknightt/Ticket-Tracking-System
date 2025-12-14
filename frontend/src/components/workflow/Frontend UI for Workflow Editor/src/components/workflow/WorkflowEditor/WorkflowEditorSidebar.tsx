@@ -1,20 +1,30 @@
-import React from 'react';
 import { X } from 'lucide-react';
 import StepEditPanel from './StepEditPanel';
 import TransitionEditPanel from './TransitionEditPanel';
 import WorkflowEditPanel from './WorkflowEditPanel';
+import { WorkflowData, WorkflowStep, WorkflowTransition } from './WorkflowEditorLayout';
+
+interface WorkflowEditorSidebarProps {
+  selectedElement: { type: 'step' | 'transition' | 'workflow'; id?: string } | null;
+  workflowData: WorkflowData;
+  onUpdateStep: (stepId: string, updates: Partial<WorkflowStep>) => void;
+  onUpdateTransition: (transitionId: string, updates: Partial<WorkflowTransition>) => void;
+  onUpdateWorkflow: (updates: Partial<WorkflowData>) => void;
+  onDeleteStep?: (stepId: string) => void;
+  onDeleteTransition?: (transitionId: string) => void;
+  onClose: () => void;
+}
 
 export default function WorkflowEditorSidebar({
   selectedElement,
   workflowData,
-  roles,
   onUpdateStep,
   onUpdateTransition,
+  onUpdateWorkflow,
   onDeleteStep,
   onDeleteTransition,
   onClose,
-}) {
-  // No selection state
+}: WorkflowEditorSidebarProps) {
   if (!selectedElement) {
     return (
       <div className="w-80 bg-white border-l border-gray-200 flex flex-col items-center justify-center p-8">
@@ -31,40 +41,10 @@ export default function WorkflowEditorSidebar({
     );
   }
 
-  // Get selected step or transition data
-  const getStepData = () => {
-    if (selectedElement.type !== 'step') return null;
-    const step = workflowData?.graph?.nodes?.find((s) => String(s.id) === String(selectedElement.id));
-    if (!step) return selectedElement.data || null;
-    return {
-      id: step.id,
-      label: step.name,
-      role: step.role,
-      description: step.description,
-      instruction: step.instruction,
-      is_start: step.is_start,
-      is_end: step.is_end,
-      ...selectedElement.data,
-    };
-  };
-
-  const getTransitionData = () => {
-    if (selectedElement.type !== 'transition') return null;
-    const transition = workflowData?.graph?.edges?.find((t) => String(t.id) === String(selectedElement.id));
-    if (!transition) return selectedElement.data || null;
-    return {
-      id: transition.id,
-      label: transition.name,
-      source: transition.from,
-      target: transition.to,
-      ...selectedElement.data,
-    };
-  };
-
   return (
     <div className="w-80 bg-white border-l border-gray-200 flex flex-col">
       <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-        <h3 className="text-gray-900 font-medium">
+        <h3 className="text-gray-900">
           {selectedElement.type === 'step' && 'Edit Step'}
           {selectedElement.type === 'transition' && 'Edit Transition'}
           {selectedElement.type === 'workflow' && 'Workflow Properties'}
@@ -81,25 +61,24 @@ export default function WorkflowEditorSidebar({
       <div className="flex-1 overflow-y-auto p-4">
         {selectedElement.type === 'step' && selectedElement.id && (
           <StepEditPanel
-            step={getStepData()}
-            roles={roles}
-            onUpdate={(updates) => onUpdateStep(selectedElement.id, updates)}
-            onDelete={onDeleteStep ? () => onDeleteStep(selectedElement.id) : undefined}
+            step={workflowData.steps.find((s) => s.id === selectedElement.id)!}
+            onUpdate={(updates) => onUpdateStep(selectedElement.id!, updates)}
+            onDelete={onDeleteStep ? () => onDeleteStep(selectedElement.id!) : undefined}
           />
         )}
 
         {selectedElement.type === 'transition' && selectedElement.id && (
           <TransitionEditPanel
-            transition={getTransitionData()}
-            onUpdate={(updates) => onUpdateTransition(selectedElement.id, updates)}
-            onDelete={onDeleteTransition ? () => onDeleteTransition(selectedElement.id) : undefined}
+            transition={workflowData.transitions.find((t) => t.id === selectedElement.id)!}
+            onUpdate={(updates) => onUpdateTransition(selectedElement.id!, updates)}
+            onDelete={onDeleteTransition ? () => onDeleteTransition(selectedElement.id!) : undefined}
           />
         )}
 
         {selectedElement.type === 'workflow' && (
           <WorkflowEditPanel
-            workflow={workflowData?.workflow}
-            readOnly={true}
+            workflow={workflowData}
+            onUpdate={onUpdateWorkflow}
           />
         )}
       </div>

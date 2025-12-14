@@ -1,12 +1,17 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Plus, BarChart3, Grid3x3, Zap } from 'lucide-react';
+
+interface WorkflowEditorToolbarProps {
+  onAddStep: (label: string) => void;
+  stepCount: number;
+  transitionCount: number;
+}
 
 export default function WorkflowEditorToolbar({
   onAddStep,
   stepCount,
   transitionCount,
-  isEditingGraph,
-}) {
+}: WorkflowEditorToolbarProps) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newStepLabel, setNewStepLabel] = useState('');
 
@@ -28,13 +33,12 @@ export default function WorkflowEditorToolbar({
   return (
     <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
       <div className="p-4 border-b border-gray-200">
-        <h3 className="text-gray-900 font-medium mb-4">Tools</h3>
+        <h3 className="text-gray-900 mb-4">Tools</h3>
         
         {!showAddForm ? (
           <button
             onClick={() => setShowAddForm(true)}
-            disabled={!isEditingGraph}
-            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             <Plus className="w-4 h-4" />
             Add Step
@@ -47,7 +51,7 @@ export default function WorkflowEditorToolbar({
               onChange={(e) => setNewStepLabel(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleAddStep()}
               placeholder="Step name..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
               autoFocus
             />
             <div className="flex gap-2">
@@ -82,8 +86,7 @@ export default function WorkflowEditorToolbar({
             <button
               key={template.label}
               onClick={() => onAddStep(template.label)}
-              disabled={!isEditingGraph}
-              className="px-3 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-700 transition-colors flex items-center gap-2"
             >
               <span>{template.icon}</span>
               <span>{template.label}</span>
@@ -95,16 +98,16 @@ export default function WorkflowEditorToolbar({
       <div className="p-4">
         <div className="flex items-center gap-2 mb-3">
           <BarChart3 className="w-4 h-4 text-gray-600" />
-          <span className="text-gray-900 font-medium">Workflow Stats</span>
+          <span className="text-gray-900">Workflow Stats</span>
         </div>
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-gray-600">Total Steps:</span>
-            <span className="text-gray-900 font-medium">{stepCount}</span>
+            <span className="text-gray-900">{stepCount}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-600">Transitions:</span>
-            <span className="text-gray-900 font-medium">{transitionCount}</span>
+            <span className="text-gray-900">{transitionCount}</span>
           </div>
         </div>
       </div>
@@ -113,7 +116,7 @@ export default function WorkflowEditorToolbar({
       <div className="mt-auto p-4 border-t border-gray-200 bg-gray-50">
         <div className="flex items-center gap-2 mb-2">
           <Grid3x3 className="w-4 h-4 text-gray-600" />
-          <span className="text-sm text-gray-700 font-medium">Shortcuts</span>
+          <span className="text-sm text-gray-700">Shortcuts</span>
         </div>
         <div className="space-y-1 text-xs text-gray-600">
           <div className="flex justify-between">

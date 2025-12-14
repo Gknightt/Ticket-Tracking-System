@@ -1,54 +1,76 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { ReactFlowProvider } from 'reactflow';
-import 'reactflow/dist/style.css';
+import { useState, useEffect, useCallback } from 'react';
+import { Save, RefreshCw, Undo, Redo, AlertCircle, ChevronRight, ChevronLeft } from 'lucide-react';
 import WorkflowEditorContent from './WorkflowEditorContent';
 import WorkflowEditorSidebar from './WorkflowEditorSidebar';
 import WorkflowEditorToolbar from './WorkflowEditorToolbar';
 import SLAWeightEditor from './SLAWeightEditor';
 import ConfirmDialog from './ConfirmDialog';
-import { useWorkflowAPI } from '../../../api/useWorkflowAPI';
-import { useWorkflowRoles } from '../../../api/useWorkflowRoles';
 import { useWorkflowRefresh } from '../WorkflowRefreshContext';
-import AdminNav from "../../../components/navigation/AdminNav";
-import { Save, RefreshCw, Undo, Redo, AlertCircle, ChevronRight, ChevronLeft, Settings } from 'lucide-react';
 
-export default function WorkflowEditorLayout({ workflowId }) {
+export interface WorkflowStep {
+  id: string;
+  label: string;
+  role: string;
+  isStart?: boolean;
+  isEnd?: boolean;
+  slaWeight?: number;
+}
+
+export interface WorkflowTransition {
+  id: string;
+  source: string;
+  target: string;
+  label: string;
+}
+
+export interface WorkflowData {
+  name: string;
+  description: string;
+  totalSLA: number;
+  steps: WorkflowStep[];
+  transitions: WorkflowTransition[];
+}
+
+interface WorkflowEditorLayoutProps {
+  workflowId: string;
+}
+
+export default function WorkflowEditorLayout({ workflowId }: WorkflowEditorLayoutProps) {
   const { triggerRefresh } = useWorkflowRefresh();
-  const [selectedElement, setSelectedElement] = useState(null);
-  const [workflowData, setWorkflowData] = useState(null);
-  const [isEditingGraph, setIsEditingGraph] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [selectedElement, setSelectedElement] = useState<{ type: 'step' | 'transition' | 'workflow'; id?: string } | null>(null);
   const [showSLAModal, setShowSLAModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [toolbarCollapsed, setToolbarCollapsed] = useState(false);
-  const [confirmDialog, setConfirmDialog] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    type: 'deleteStep' | 'deleteTransition';
+    id: string;
+    title: string;
+    message: string;
+  } | null>(null);
+  
+  const [workflowData, setWorkflowData] = useState<WorkflowData>({
+    name: 'Customer Onboarding',
+    description: 'Workflow for onboarding new customers',
+    totalSLA: 48,
+    steps: [
+      { id: '1', label: 'Submit Application', role: 'Customer', isStart: true, slaWeight: 1 },
+      { id: '2', label: 'Review Documents', role: 'Admin', slaWeight: 2 },
+      { id: '3', label: 'Approve Account', role: 'Manager', slaWeight: 1 },
+      { id: '4', label: 'Setup Complete', role: 'System', isEnd: true, slaWeight: 1 },
+    ],
+    transitions: [
+      { id: 'e1-2', source: '1', target: '2', label: 'Submit' },
+      { id: 'e2-3', source: '2', target: '3', label: 'Approved' },
+      { id: 'e3-4', source: '3', target: '4', label: 'Activate' },
+    ],
+  });
 
   // History management for undo/redo
-  const [history, setHistory] = useState([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
-  const [savedHistoryIndex, setSavedHistoryIndex] = useState(-1);
-
-  const contentRef = useRef();
-  const { getWorkflowDetail } = useWorkflowAPI();
-  const { roles } = useWorkflowRoles();
-
-  // Load workflow data
-  useEffect(() => {
-    const loadWorkflow = async () => {
-      try {
-        const data = await getWorkflowDetail(workflowId);
-        setWorkflowData(data);
-        // Initialize history with loaded data
-        setHistory([data]);
-        setHistoryIndex(0);
-        setSavedHistoryIndex(0);
-      } catch (err) {
-        console.error('Failed to load workflow:', err);
-      }
-    };
-    loadWorkflow();
-  }, [workflowId, getWorkflowDetail]);
+  const [history, setHistory] = useState<WorkflowData[]>([workflowData]);
+  const [historyIndex, setHistoryIndex] = useState(0);
+  const [savedHistoryIndex, setSavedHistoryIndex] = useState(0);
 
   // Track unsaved changes
   useEffect(() => {
@@ -57,43 +79,46 @@ export default function WorkflowEditorLayout({ workflowId }) {
 
   // Warn before leaving with unsaved changes
   useEffect(() => {
-    const handleBeforeUnload = (e) => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (hasUnsavedChanges) {
         e.preventDefault();
         e.returnValue = '';
       }
     };
+
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasUnsavedChanges]);
 
   // Keyboard shortcuts
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + Z for undo
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
         handleUndo();
       }
-      if ((e.ctrlKey || e.metaKey) && ((e.shiftKey && e.key === 'z') || e.key === 'y')) {
+      // Ctrl/Cmd + Shift + Z or Ctrl/Cmd + Y for redo
+      if ((e.ctrlKey || e.metaKey) && (e.shiftKey && e.key === 'z') || e.key === 'y') {
         e.preventDefault();
         handleRedo();
       }
+      // Ctrl/Cmd + S for save
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
         handleSave();
       }
     };
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [historyIndex, history]);
 
-  // addToHistory can be used for future undo/redo feature enhancements
-  // eslint-disable-next-line no-unused-vars
-  const addToHistory = useCallback((newData) => {
+  const addToHistory = useCallback((newData: WorkflowData) => {
     setHistory((prev) => {
       const newHistory = prev.slice(0, historyIndex + 1);
       newHistory.push(newData);
+      // Limit history to 50 states
       if (newHistory.length > 50) {
         return newHistory.slice(-50);
       }
@@ -121,112 +146,130 @@ export default function WorkflowEditorLayout({ workflowId }) {
     }
   }, [historyIndex, history]);
 
-  const handleSave = useCallback(async () => {
+  const handleSave = async () => {
     setIsSaving(true);
-    try {
-      if (contentRef.current?.saveChanges) {
-        await contentRef.current.saveChanges();
-        setSavedHistoryIndex(historyIndex);
-        setHasUnsavedChanges(false);
-        triggerRefresh();
-      }
-    } catch (err) {
-      console.error('Failed to save:', err);
-    } finally {
+    // Simulate API save
+    setTimeout(() => {
+      console.log('Saving workflow:', workflowData);
       setIsSaving(false);
-    }
-  }, [historyIndex, triggerRefresh]);
+      setSavedHistoryIndex(historyIndex);
+      setHasUnsavedChanges(false);
+      triggerRefresh();
+    }, 500);
+  };
 
-  const handleAddStep = useCallback((label = 'New Step') => {
-    contentRef.current?.handleAddNode?.(label);
-    setHasUnsavedChanges(true);
-  }, []);
+  const handleUpdateStep = (stepId: string, updates: Partial<WorkflowStep>) => {
+    const newData = {
+      ...workflowData,
+      steps: workflowData.steps.map((step) =>
+        step.id === stepId ? { ...step, ...updates } : step
+      ),
+    };
+    setWorkflowData(newData);
+    addToHistory(newData);
+  };
 
-  const onStepClick = useCallback((stepData) => {
-    setSelectedElement({ type: 'step', id: String(stepData.id), data: stepData });
-  }, []);
+  const handleUpdateTransition = (transitionId: string, updates: Partial<WorkflowTransition>) => {
+    const newData = {
+      ...workflowData,
+      transitions: workflowData.transitions.map((transition) =>
+        transition.id === transitionId ? { ...transition, ...updates } : transition
+      ),
+    };
+    setWorkflowData(newData);
+    addToHistory(newData);
+  };
 
-  const onEdgeClick = useCallback((edgeData) => {
-    setSelectedElement({ type: 'transition', id: edgeData.id, data: edgeData });
-  }, []);
+  const handleUpdateWorkflow = (updates: Partial<WorkflowData>) => {
+    const newData = { ...workflowData, ...updates };
+    setWorkflowData(newData);
+    addToHistory(newData);
+  };
 
-  const onPaneClick = useCallback(() => {
-    setSelectedElement({ type: 'workflow' });
-  }, []);
+  const handleAddStep = (label: string) => {
+    const newId = String(workflowData.steps.length + 1);
+    const newStep: WorkflowStep = {
+      id: newId,
+      label,
+      role: 'Unassigned',
+      slaWeight: 1,
+    };
+    const newData = {
+      ...workflowData,
+      steps: [...workflowData.steps, newStep],
+    };
+    setWorkflowData(newData);
+    addToHistory(newData);
+  };
 
-  const handleUpdateStep = useCallback((stepId, updates) => {
-    contentRef.current?.updateNodeData(stepId, {
-      label: updates.name || updates.label,
-      role: updates.role,
-      description: updates.description,
-      instruction: updates.instruction,
-      is_start: updates.is_start || updates.isStart,
-      is_end: updates.is_end || updates.isEnd,
-    });
-    setHasUnsavedChanges(true);
-  }, []);
+  const handleUpdateSLAWeights = (weights: Record<string, number>) => {
+    const newData = {
+      ...workflowData,
+      steps: workflowData.steps.map((step) => ({
+        ...step,
+        slaWeight: weights[step.id] ?? step.slaWeight ?? 1,
+      })),
+    };
+    setWorkflowData(newData);
+    addToHistory(newData);
+  };
 
-  const handleUpdateTransition = useCallback((transitionId, updates) => {
-    contentRef.current?.updateEdgeData(transitionId, { label: updates.label || updates.name });
-    setHasUnsavedChanges(true);
-  }, []);
-
-  const handleDeleteStep = useCallback((stepId) => {
-    const step = workflowData?.graph?.nodes?.find((s) => String(s.id) === String(stepId));
+  const handleDeleteStep = (stepId: string) => {
+    const step = workflowData.steps.find((s) => s.id === stepId);
     if (!step) return;
 
     setConfirmDialog({
       type: 'deleteStep',
       id: stepId,
       title: 'Delete Step',
-      message: `Are you sure you want to delete "${step.name}"? This will also remove all connected transitions.`,
+      message: `Are you sure you want to delete "${step.label}"? This will also remove all connected transitions.`,
     });
-  }, [workflowData]);
+  };
 
-  const handleDeleteTransition = useCallback((transitionId) => {
+  const handleDeleteTransition = (transitionId: string) => {
+    const transition = workflowData.transitions.find((t) => t.id === transitionId);
+    if (!transition) return;
+
     setConfirmDialog({
       type: 'deleteTransition',
       id: transitionId,
       title: 'Delete Transition',
-      message: `Are you sure you want to delete this transition?`,
+      message: `Are you sure you want to delete the transition "${transition.label}"?`,
     });
-  }, []);
+  };
 
-  const confirmDelete = useCallback(() => {
+  const confirmDelete = () => {
     if (!confirmDialog) return;
 
     if (confirmDialog.type === 'deleteStep') {
-      contentRef.current?.deleteNode(confirmDialog.id);
+      const newData = {
+        ...workflowData,
+        steps: workflowData.steps.filter((s) => s.id !== confirmDialog.id),
+        transitions: workflowData.transitions.filter(
+          (t) => t.source !== confirmDialog.id && t.target !== confirmDialog.id
+        ),
+      };
+      setWorkflowData(newData);
+      addToHistory(newData);
+      setSelectedElement(null);
     } else if (confirmDialog.type === 'deleteTransition') {
-      contentRef.current?.deleteEdge(confirmDialog.id);
+      const newData = {
+        ...workflowData,
+        transitions: workflowData.transitions.filter((t) => t.id !== confirmDialog.id),
+      };
+      setWorkflowData(newData);
+      addToHistory(newData);
+      setSelectedElement(null);
     }
-    
-    setSelectedElement(null);
-    setHasUnsavedChanges(true);
+
     setConfirmDialog(null);
-  }, [confirmDialog]);
+  };
 
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;
 
-  if (!workflowData) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <RefreshCw className="w-8 h-8 animate-spin mx-auto text-blue-600 mb-4" />
-          <p className="text-gray-600">Loading workflow...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const stepCount = workflowData.graph?.nodes?.length || 0;
-  const transitionCount = workflowData.graph?.edges?.length || 0;
-
   return (
-    <div className="h-screen flex flex-col bg-gray-100">
-      <AdminNav />
-      
+    <div className="h-full flex flex-col">
       {/* Unsaved Changes Warning */}
       {hasUnsavedChanges && (
         <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-2 flex items-center justify-between">
@@ -243,19 +286,8 @@ export default function WorkflowEditorLayout({ workflowId }) {
         </div>
       )}
 
-      {/* Top Ribbon */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">{workflowData.workflow?.name}</h2>
-            <span className="text-sm text-gray-500">
-              {workflowData.workflow?.category && `${workflowData.workflow.category}`}
-              {workflowData.workflow?.category && workflowData.workflow?.sub_category && ' • '}
-              {workflowData.workflow?.sub_category && `${workflowData.workflow.sub_category}`}
-            </span>
-          </div>
-        </div>
-
+      {/* Ribbon Actions */}
+      <div className="bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button
             onClick={handleSave}
@@ -293,26 +325,13 @@ export default function WorkflowEditorLayout({ workflowId }) {
 
           <button
             onClick={() => setShowSLAModal(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
           >
-            <Settings className="w-4 h-4" />
             Manage SLA
           </button>
-
-          <button
-            onClick={() => setIsEditingGraph(!isEditingGraph)}
-            className={`px-4 py-2 rounded-lg transition-colors ${
-              isEditingGraph
-                ? 'bg-green-100 text-green-700 border border-green-300'
-                : 'bg-gray-100 text-gray-700 border border-gray-300'
-            }`}
-          >
-            {isEditingGraph ? '🔓 Editing' : '🔒 Locked'}
-          </button>
         </div>
-
         <div className="text-sm text-gray-600">
-          {stepCount} steps • {transitionCount} transitions
+          {workflowData.steps.length} steps • {workflowData.transitions.length} transitions
         </div>
       </div>
 
@@ -323,13 +342,12 @@ export default function WorkflowEditorLayout({ workflowId }) {
           <div className="relative">
             <WorkflowEditorToolbar
               onAddStep={handleAddStep}
-              stepCount={stepCount}
-              transitionCount={transitionCount}
-              isEditingGraph={isEditingGraph}
+              stepCount={workflowData.steps.length}
+              transitionCount={workflowData.transitions.length}
             />
             <button
               onClick={() => setToolbarCollapsed(true)}
-              className="absolute top-2 -right-3 p-1 bg-white border border-gray-200 rounded shadow-sm hover:bg-gray-50 transition-colors z-10"
+              className="absolute top-2 -right-3 p-1 bg-white border border-gray-200 rounded shadow-sm hover:bg-gray-50 transition-colors"
               title="Hide toolbar"
             >
               <ChevronLeft className="w-3 h-3 text-gray-600" />
@@ -347,18 +365,20 @@ export default function WorkflowEditorLayout({ workflowId }) {
 
         {/* Canvas */}
         <div className="flex-1">
-          <ReactFlowProvider>
-            <WorkflowEditorContent
-              ref={contentRef}
-              workflowId={workflowId}
-              workflowData={workflowData}
-              onStepClick={onStepClick}
-              onEdgeClick={onEdgeClick}
-              onPaneClick={onPaneClick}
-              isEditingGraph={isEditingGraph}
-              setHasUnsavedChanges={setHasUnsavedChanges}
-            />
-          </ReactFlowProvider>
+          <WorkflowEditorContent
+            workflowData={workflowData}
+            onSelectElement={setSelectedElement}
+            onUpdateSteps={(steps) => {
+              const newData = { ...workflowData, steps };
+              setWorkflowData(newData);
+              addToHistory(newData);
+            }}
+            onUpdateTransitions={(transitions) => {
+              const newData = { ...workflowData, transitions };
+              setWorkflowData(newData);
+              addToHistory(newData);
+            }}
+          />
         </div>
 
         {/* Sidebar */}
@@ -367,16 +387,16 @@ export default function WorkflowEditorLayout({ workflowId }) {
             <WorkflowEditorSidebar
               selectedElement={selectedElement}
               workflowData={workflowData}
-              roles={roles}
               onUpdateStep={handleUpdateStep}
               onUpdateTransition={handleUpdateTransition}
+              onUpdateWorkflow={handleUpdateWorkflow}
               onDeleteStep={handleDeleteStep}
               onDeleteTransition={handleDeleteTransition}
               onClose={() => setSelectedElement(null)}
             />
             <button
               onClick={() => setSidebarCollapsed(true)}
-              className="absolute top-2 -left-3 p-1 bg-white border border-gray-200 rounded shadow-sm hover:bg-gray-50 transition-colors z-10"
+              className="absolute top-2 -left-3 p-1 bg-white border border-gray-200 rounded shadow-sm hover:bg-gray-50 transition-colors"
               title="Hide sidebar"
             >
               <ChevronRight className="w-3 h-3 text-gray-600" />
@@ -396,7 +416,9 @@ export default function WorkflowEditorLayout({ workflowId }) {
       {/* SLA Weight Modal */}
       {showSLAModal && (
         <SLAWeightEditor
-          workflowId={workflowId}
+          steps={workflowData.steps}
+          totalSLA={workflowData.totalSLA}
+          onSave={handleUpdateSLAWeights}
           onClose={() => setShowSLAModal(false)}
         />
       )}

@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import styles from './WorkflowEditPanel.module.css';
 import { useWorkflowAPI } from '../../../api/useWorkflowAPI';
 
-export default function WorkflowEditPanel({ workflow, onClose, onSave, readOnly = false }) {
+export default function WorkflowEditPanel({ workflow, onSave, readOnly = false }) {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -68,10 +67,12 @@ export default function WorkflowEditPanel({ workflow, onClose, onSave, readOnly 
       };
 
       await updateWorkflowDetails(workflow.workflow_id, updateData);
-      onSave({
-        ...workflow,
-        ...updateData,
-      });
+      if (onSave) {
+        onSave({
+          ...workflow,
+          ...updateData,
+        });
+      }
       setIsEditing(false);
     } catch (err) {
       setError(err.message || 'Failed to update workflow');
@@ -81,191 +82,182 @@ export default function WorkflowEditPanel({ workflow, onClose, onSave, readOnly 
     }
   };
 
-  return (
-    <div className={styles.panel}>
-      <div className={styles.header}>
-        <h3>{readOnly ? 'Workflow Details' : 'Edit Workflow'}</h3>
-        {onClose && (
-          <button className={styles.closeBtn} onClick={onClose}>
-            ✕
-          </button>
-        )}
+  if (!workflow) {
+    return (
+      <div className="text-center text-gray-500 py-8">
+        <p>Click on the canvas to view workflow properties</p>
       </div>
+    );
+  }
 
-      {error && <div className={styles.error}>{error}</div>}
+  return (
+    <div className="space-y-4">
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
 
-      <form onSubmit={handleSubmit} className={styles.form}>
-        <div className={styles.section}>
-          <h4>Basic Information</h4>
-          
-          <div className={styles.formGroup}>
-            <label>Workflow Name</label>
-            <input
-              type="text"
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              placeholder="Enter workflow name"
-              disabled={!isEditing || readOnly}
-              required
-            />
-          </div>
-
-          <div className={styles.formGroup}>
-            <label>Description</label>
-            <textarea
-              name="description"
-              value={formData.description}
-              onChange={handleChange}
-              placeholder="Enter workflow description"
-              rows="3"
-              disabled={!isEditing || readOnly}
-            />
-          </div>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm text-gray-700 mb-1">Workflow Name</label>
+          <input
+            type="text"
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+            disabled={!isEditing}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
+          />
         </div>
 
-        <div className={styles.section}>
-          <h4>Classification</h4>
+        <div>
+          <label className="block text-sm text-gray-700 mb-1">Description</label>
+          <textarea
+            name="description"
+            value={formData.description}
+            onChange={handleChange}
+            disabled={!isEditing}
+            rows={3}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
+          />
+        </div>
 
-          <div className={styles.formGroup}>
-            <label>Category</label>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm text-gray-700 mb-1">Category</label>
             <input
               type="text"
               name="category"
               value={formData.category}
               onChange={handleChange}
-              placeholder="e.g., Support, Sales, HR"
-              disabled={!isEditing || readOnly}
+              disabled={!isEditing}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
             />
           </div>
-
-          <div className={styles.formGroup}>
-            <label>Sub-Category</label>
+          <div>
+            <label className="block text-sm text-gray-700 mb-1">Sub-Category</label>
             <input
               type="text"
               name="sub_category"
               value={formData.sub_category}
               onChange={handleChange}
-              placeholder="e.g., Technical, Billing"
-              disabled={!isEditing || readOnly}
-            />
-          </div>
-
-          <div className={styles.formGroup}>
-            <label>Department</label>
-            <input
-              type="text"
-              name="department"
-              value={formData.department}
-              onChange={handleChange}
-              placeholder="e.g., Engineering, Operations"
-              disabled={!isEditing || readOnly}
+              disabled={!isEditing}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
             />
           </div>
         </div>
 
-        <div className={styles.section}>
-          <h4>SLA Times (in hours)</h4>
+        <div>
+          <label className="block text-sm text-gray-700 mb-1">Department</label>
+          <input
+            type="text"
+            name="department"
+            value={formData.department}
+            onChange={handleChange}
+            disabled={!isEditing}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
+          />
+        </div>
 
-          <div className={styles.slaGrid}>
-            <div className={styles.formGroup}>
-              <label>Low Priority</label>
-              <input
-                type="number"
-                name="low_sla"
-                value={formData.low_sla}
-                onChange={handleChange}
-                placeholder="e.g., 48"
-                min="0"
-                disabled={!isEditing || readOnly}
-              />
-            </div>
-
-            <div className={styles.formGroup}>
-              <label>Medium Priority</label>
-              <input
-                type="number"
-                name="medium_sla"
-                value={formData.medium_sla}
-                onChange={handleChange}
-                placeholder="e.g., 24"
-                min="0"
-                disabled={!isEditing || readOnly}
-              />
-            </div>
-
-            <div className={styles.formGroup}>
-              <label>High Priority</label>
-              <input
-                type="number"
-                name="high_sla"
-                value={formData.high_sla}
-                onChange={handleChange}
-                placeholder="e.g., 12"
-                min="0"
-                disabled={!isEditing || readOnly}
-              />
-            </div>
-
-            <div className={styles.formGroup}>
-              <label>Urgent Priority</label>
+        {/* SLA Section */}
+        <div className="pt-4 border-t border-gray-200">
+          <h4 className="text-sm font-medium text-gray-900 mb-3">SLA Settings (seconds)</h4>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Urgent SLA</label>
               <input
                 type="number"
                 name="urgent_sla"
                 value={formData.urgent_sla}
                 onChange={handleChange}
-                placeholder="e.g., 4"
-                min="0"
-                disabled={!isEditing || readOnly}
+                disabled={!isEditing}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm disabled:bg-gray-100 disabled:text-gray-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">High SLA</label>
+              <input
+                type="number"
+                name="high_sla"
+                value={formData.high_sla}
+                onChange={handleChange}
+                disabled={!isEditing}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm disabled:bg-gray-100 disabled:text-gray-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Medium SLA</label>
+              <input
+                type="number"
+                name="medium_sla"
+                value={formData.medium_sla}
+                onChange={handleChange}
+                disabled={!isEditing}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm disabled:bg-gray-100 disabled:text-gray-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Low SLA</label>
+              <input
+                type="number"
+                name="low_sla"
+                value={formData.low_sla}
+                onChange={handleChange}
+                disabled={!isEditing}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm disabled:bg-gray-100 disabled:text-gray-500"
               />
             </div>
           </div>
         </div>
 
-        <div className={styles.section}>
-          <h4>End Logic</h4>
-
-          <div className={styles.formGroup}>
-            <label>End Logic (Optional)</label>
-            <textarea
-              name="end_logic"
-              value={formData.end_logic}
-              onChange={handleChange}
-              placeholder="Define the logic for workflow completion"
-              rows="3"
-              disabled={!isEditing || readOnly}
-            />
-          </div>
-        </div>
-
-        <div className={styles.formActions}>
-          {readOnly ? (
-            <div className={styles.readOnlyNote}>
-              <p>ℹ️ Go to the "Edit Workflow" tab to make changes</p>
-            </div>
-          ) : !isEditing ? (
-            <button
-              type="button"
-              onClick={() => setIsEditing(true)}
-              className={styles.editBtn}
-            >
-              ✏️ Edit
-            </button>
-          ) : (
-            <>
+        {!readOnly && (
+          <div className="pt-4 flex gap-2">
+            {!isEditing ? (
               <button
                 type="button"
-                onClick={() => setIsEditing(false)}
-                className={styles.cancelBtn}
+                onClick={() => setIsEditing(true)}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
-                Cancel
+                Edit
               </button>
-              <button type="submit" className={styles.saveBtn} disabled={loading}>
-                {loading ? 'Saving...' : 'Save Workflow'}
-              </button>
-            </>
-          )}
-        </div>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditing(false);
+                    // Reset form data
+                    if (workflow) {
+                      setFormData({
+                        name: workflow.name || '',
+                        description: workflow.description || '',
+                        category: workflow.category || '',
+                        sub_category: workflow.sub_category || '',
+                        department: workflow.department || '',
+                        end_logic: workflow.end_logic || '',
+                        low_sla: workflow.low_sla || '',
+                        medium_sla: workflow.medium_sla || '',
+                        high_sla: workflow.high_sla || '',
+                        urgent_sla: workflow.urgent_sla || '',
+                      });
+                    }
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  {loading ? 'Saving...' : 'Save'}
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </form>
     </div>
   );
