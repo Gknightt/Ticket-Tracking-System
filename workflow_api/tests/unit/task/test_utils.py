@@ -1,13 +1,14 @@
 """
 Unit tests for task utility functions.
 Tests assignment logic, SLA calculations, and escalation behavior.
+
+Run with: python manage.py test tests.unit.task.test_utils
 """
-import logging
-from django.test import TestCase
 from django.utils import timezone
 from datetime import timedelta
 from unittest.mock import patch, MagicMock
 
+from tests.base import BaseTestCase
 from task.models import Task, TaskItem, TaskItemHistory
 from task.utils.assignment import fetch_users_for_role, apply_round_robin_assignment
 from task.utils.target_resolution import (
@@ -20,39 +21,6 @@ from workflow.models import Workflows
 from step.models import Steps, StepTransition
 from role.models import Roles, RoleUsers
 from tickets.models import WorkflowTicket, RoundRobin
-
-logger = logging.getLogger(__name__)
-
-# Global test counter
-_test_counter = {'count': 0}
-
-
-class BaseTestCase(TestCase):
-    """Base test case with one-line test logging"""
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        _test_counter['count'] += 1
-        self.test_number = _test_counter['count']
-    
-    def run(self, result=None):
-        """Run test and log result in one-line format"""
-        # Get test method name
-        test_method = str(self).split()[0]
-        test_name = test_method.split('.')[-1]
-        
-        # Run the test
-        super().run(result)
-        
-        # Log result with aligned dots
-        if result and result.errors and any(test_method in str(e[0]) for e in result.errors):
-            status = "● FAIL"
-        elif result and result.failures and any(test_method in str(f[0]) for f in result.failures):
-            status = "● FAIL"
-        else:
-            status = "● PASS"
-        
-        logger.info(f"{self.test_number:2}. {test_name:<45} {status}")
 
 
 class RoundRobinAssignmentTests(BaseTestCase):

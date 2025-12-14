@@ -79,10 +79,16 @@ python manage.py test tests.unit.task.test_models --verbosity=3
 ```bash
 python manage.py test tests.unit.task.test_models
 # Output:
-# 1. test_task_creation - ✅ PASS
-# 2. test_task_status_choices - ✅ PASS
-# ...
-# 10. test_task_item_history_creation - ✅ PASS
+. 1. test_task_item_creation                  ● PASS
+. 2. test_task_item_history_creation          ● PASS
+. 3. test_task_item_origin_tracking           ● PASS
+. 4. test_task_item_status_transitions        ● PASS
+. 5. test_task_completion_workflow            ● PASS
+. 6. test_task_creation                       ● PASS
+. 7. test_task_get_assigned_users             ● PASS
+. 8. test_task_status_choices                 ● PASS
+. 9. test_task_target_resolution_calculation  ● PASS
+.10. test_task_ticket_owner_assignment        ● PASS
 ```
 
 **Run specific test with full debug:**
@@ -110,6 +116,25 @@ python manage.py test tests.integration --verbosity=2
 The verbosity behavior is controlled by the custom test runner in:
 ```
 workflow_api/workflow_api/test_runner.py
+```
+
+The shared BaseTestCase class is located in:
+```
+workflow_api/tests/base.py
+```
+
+Usage in test files:
+```python
+from tests.base import BaseTestCase, BaseTransactionTestCase
+
+class MyTests(BaseTestCase):
+    def test_something(self):
+        self.assertEqual(1, 1)
+
+# For tests requiring transaction handling (e.g., signals):
+class MyTransactionTests(BaseTransactionTestCase):
+    def test_with_signals(self):
+        ...
 ```
 
 Logging levels are automatically adjusted based on the `--verbosity` flag:

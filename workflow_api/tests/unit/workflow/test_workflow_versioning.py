@@ -1,6 +1,6 @@
 """
-Comprehensive In-Memory Test Script for Workflow Versioning
-============================================================
+Comprehensive Tests for Workflow Versioning
+============================================
 
 This test validates the workflow versioning integrity system:
 1. Creates all necessary models in-memory (using Django's test infrastructure)
@@ -21,36 +21,23 @@ Architecture Overview:
 - TaskItem: User assignments within tasks
 - WorkflowTicket: Incoming tickets that spawn tasks
 
-Run with: python manage.py test tests.unit.workflow.test_workflow_versioning"""
+Run with: python manage.py test tests.unit.workflow.test_workflow_versioning
+"""
 
 import os
-import sys
-import io
 import django
 from datetime import timedelta
-
-# Fix Windows console encoding for Unicode
-if sys.platform == 'win32':
-    # Only reconfigure if stdout/stderr are not closed
-    try:
-        if hasattr(sys.stdout, 'buffer') and not sys.stdout.closed:
-            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-        if hasattr(sys.stderr, 'buffer') and not sys.stderr.closed:
-            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
-    except (ValueError, AttributeError):
-        # Skip reconfiguration if streams are closed or unavailable
-        pass
 
 # Setup Django settings before importing models
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'workflow_api.settings')
 django.setup()
 
-from django.test import TestCase, TransactionTestCase
 from django.utils import timezone
 from django.db import transaction
 from decimal import Decimal
 
 # Import all models
+from tests.base import BaseTransactionTestCase
 from workflow.models import Workflows, WorkflowVersion, STATUS_CHOICES
 from step.models import Steps, StepTransition
 from role.models import Roles, RoleUsers
@@ -58,20 +45,14 @@ from task.models import Task, TaskItem, TaskItemHistory
 from tickets.models import WorkflowTicket, RoundRobin
 
 
-class WorkflowVersioningTestCase(TransactionTestCase):
+class WorkflowVersioningTestCase(BaseTransactionTestCase):
     """
     Test case for workflow versioning system.
     Uses TransactionTestCase to ensure proper signal handling.
     """
     
     def setUp(self):
-        """
-        Set up the complete test environment with all required models.
-        """
-        print("\n" + "="*80)
-        print("🚀 SETTING UP TEST ENVIRONMENT")
-        print("="*80)
-        
+        """Set up the complete test environment with all required models."""
         # Clean up any existing data
         self._cleanup_test_data()
         
@@ -80,13 +61,9 @@ class WorkflowVersioningTestCase(TransactionTestCase):
         
         # Create users and assign to roles
         self._create_role_users()
-        
-        print("\n✅ Test environment setup complete!")
     
     def _cleanup_test_data(self):
-        """Clean up test data to ensure fresh start"""
-        print("\n[CLEANUP] Cleaning up existing test data...")
-        
+        """Clean up test data to ensure fresh start."""
         # Disconnect signals temporarily to avoid signal handler errors during cleanup
         from django.db.models.signals import post_save, post_delete
         from workflow.signals import update_workflow_status, push_initialized_workflow
@@ -130,9 +107,7 @@ class WorkflowVersioningTestCase(TransactionTestCase):
             post_delete.connect(create_step_instance, sender=Task)
     
     def _create_roles(self):
-        """Create roles for the test environment"""
-        print("\n👤 Creating roles...")
-        
+        """Create roles for the test environment."""
         self.roles = {}
         role_definitions = [
             {'role_id': 1, 'name': 'Ticket Coordinator', 'system': 'tts'},
@@ -152,12 +127,9 @@ class WorkflowVersioningTestCase(TransactionTestCase):
                 role.system = role_def['system']
                 role.save()
             self.roles[role_def['name']] = role
-            print(f"  ✓ Role: {role.name} (ID: {role.role_id})")
     
     def _create_role_users(self):
-        """Create users and assign them to roles"""
-        print("\n👥 Creating role-user assignments...")
-        
+        """Create users and assign them to roles."""
         self.role_users = []
         user_assignments = [
             {'user_id': 101, 'role_name': 'Ticket Coordinator', 'full_name': 'John Coordinator'},
@@ -179,7 +151,6 @@ class WorkflowVersioningTestCase(TransactionTestCase):
                 }
             )
             self.role_users.append(role_user)
-            print(f"  ✓ User {assignment['full_name']} → {assignment['role_name']}")
     
     def _create_workflow_with_steps(self, name, category, sub_category, department, 
                                      steps_config=None, auto_initialize=True):
@@ -197,7 +168,6 @@ class WorkflowVersioningTestCase(TransactionTestCase):
         Returns:
             Tuple of (workflow, steps_list)
         """
-        print(f"\n📋 Creating workflow: {name}")
         
         # Create workflow (starts in draft status)
         workflow = Workflows.objects.create(
@@ -214,7 +184,6 @@ class WorkflowVersioningTestCase(TransactionTestCase):
             high_sla=timedelta(hours=24),
             urgent_sla=timedelta(hours=8),
         )
-        print(f"  ✓ Workflow created (ID: {workflow.workflow_id}, Status: {workflow.status})")
         
         # Default steps configuration
         if steps_config is None:
@@ -238,27 +207,23 @@ class WorkflowVersioningTestCase(TransactionTestCase):
                 is_end=config.get('is_end', False) if auto_initialize else False,
             )
             steps.append(step)
-            print(f"  ✓ Step: {step.name} (Order: {step.order}, Role: {config['role']})")
         
         # Create transitions between consecutive steps
-        print("  🔗 Creating transitions...")
         for i in range(len(steps) - 1):
-            transition = StepTransition.objects.create(
+            StepTransition.objects.create(
                 workflow_id=workflow,
                 from_step_id=steps[i],
                 to_step_id=steps[i + 1],
                 name=f"To {steps[i + 1].name}"
             )
-            print(f"    → {steps[i].name} → {steps[i + 1].name}")
         
         # Refresh workflow to get updated status from signals
         workflow.refresh_from_db()
-        print(f"  📊 Final status: {workflow.status}, Published: {workflow.is_published}")
         
         return workflow, steps
     
     def _create_ticket(self, ticket_number, subject, category, sub_category, department, priority='Medium'):
-        """Create a test ticket"""
+        """Create a test ticket."""
         ticket_data = {
             'ticket_number': ticket_number,
             'subject': subject,
@@ -277,11 +242,10 @@ class WorkflowVersioningTestCase(TransactionTestCase):
             status='open',
             department=department,
         )
-        print(f"  🎫 Ticket created: {ticket_number} - {subject}")
         return ticket
     
     def _create_task_for_ticket(self, ticket, workflow, workflow_version=None):
-        """Create a task for a ticket with optional workflow version"""
+        """Create a task for a ticket with optional workflow version."""
         # Get first step
         first_step = Steps.objects.filter(workflow_id=workflow).order_by('order').first()
         
@@ -300,22 +264,14 @@ class WorkflowVersioningTestCase(TransactionTestCase):
             status='pending',
             fetched_at=timezone.now()
         )
-        print(f"  📌 Task created (ID: {task.task_id}, Version: {workflow_version.version if workflow_version else 'None'})")
         return task
     
     # ==========================================================================
     # TEST CASES
     # ==========================================================================
     
-    def test_01_workflow_version_created_on_initialization(self):
-        """
-        Test that a WorkflowVersion is automatically created when a workflow
-        transitions to 'initialized' status.
-        """
-        print("\n" + "="*80)
-        print("TEST 1: Workflow Version Created on Initialization")
-        print("="*80)
-        
+    def test_workflow_version_created_on_initialization(self):
+        """Test WorkflowVersion is created when workflow transitions to initialized."""
         # Create a complete workflow (should auto-initialize via signals)
         workflow, steps = self._create_workflow_with_steps(
             name='Version Test Workflow 1',
@@ -344,19 +300,9 @@ class WorkflowVersioningTestCase(TransactionTestCase):
         
         self.assertEqual(len(definition['nodes']), 3, "Should have 3 nodes")
         self.assertEqual(len(definition['edges']), 2, "Should have 2 edges")
-        
-        print(f"\n✅ TEST 1 PASSED: WorkflowVersion v{version.version} created successfully")
-        print(f"   Nodes: {len(definition['nodes'])}, Edges: {len(definition['edges'])}")
     
-    def test_02_task_tied_to_workflow_version(self):
-        """
-        Test that when a task is created, it gets tied to the current 
-        active workflow version.
-        """
-        print("\n" + "="*80)
-        print("TEST 2: Task Tied to Workflow Version")
-        print("="*80)
-        
+    def test_task_tied_to_workflow_version(self):
+        """Test that tasks are tied to the current active workflow version."""
         # Create workflow
         workflow, steps = self._create_workflow_with_steps(
             name='Task Version Test',
@@ -388,21 +334,9 @@ class WorkflowVersioningTestCase(TransactionTestCase):
                         "Task should be tied to the workflow version")
         self.assertEqual(task.workflow_version.version, 1,
                         "Task should be tied to version 1")
-        
-        print(f"\n✅ TEST 2 PASSED: Task {task.task_id} tied to WorkflowVersion {workflow_version.version}")
     
-    def test_03_new_version_on_workflow_modification(self):
-        """
-        Test that modifying an initialized workflow creates a new version.
-        Specifically tests that:
-        1. Adding a step triggers re-initialization and new version
-        2. Old version is deactivated
-        3. New version has updated structure
-        """
-        print("\n" + "="*80)
-        print("TEST 3: New Version Created on Workflow Modification")
-        print("="*80)
-        
+    def test_new_version_on_workflow_modification(self):
+        """Test that modifying an initialized workflow creates a new version."""
         # Create initial workflow
         workflow, steps = self._create_workflow_with_steps(
             name='Modification Test Workflow',
@@ -415,7 +349,6 @@ class WorkflowVersioningTestCase(TransactionTestCase):
         v1 = WorkflowVersion.objects.filter(workflow=workflow, version=1).first()
         self.assertIsNotNone(v1, "Version 1 should exist")
         initial_node_count = len(v1.definition['nodes'])
-        print(f"  📊 Initial version: {v1.version} with {initial_node_count} nodes")
         
         # First, set the workflow to draft (simulating edit mode)
         workflow.status = 'draft'
@@ -423,7 +356,6 @@ class WorkflowVersioningTestCase(TransactionTestCase):
         workflow.save(update_fields=['status', 'is_published'])
         
         # Modify the workflow: Add a new step
-        print("\n  🔧 Adding new step to workflow...")
         new_step = Steps.objects.create(
             workflow_id=workflow,
             role_id=self.roles['Manager'],
@@ -432,7 +364,7 @@ class WorkflowVersioningTestCase(TransactionTestCase):
             order=4,
             weight=Decimal('0.25'),
             is_start=False,
-            is_end=True,  # New end step
+            is_end=True,
         )
         
         # Update the old end step to not be end anymore
@@ -447,8 +379,6 @@ class WorkflowVersioningTestCase(TransactionTestCase):
             to_step_id=new_step,
             name=f"To {new_step.name}"
         )
-        print(f"  ✓ Added step: {new_step.name}")
-        print(f"  🔗 Transition: {old_end_step.name} → {new_step.name}")
         
         # Refresh workflow - signals should have updated status
         workflow.refresh_from_db()
@@ -456,10 +386,6 @@ class WorkflowVersioningTestCase(TransactionTestCase):
         # If workflow went back to initialized, a new version should be created
         if workflow.status == 'initialized':
             versions = WorkflowVersion.objects.filter(workflow=workflow).order_by('version')
-            
-            print(f"\n  📊 Total versions after modification: {versions.count()}")
-            for v in versions:
-                print(f"    - Version {v.version}: Active={v.is_active}, Nodes={len(v.definition['nodes'])}")
             
             # Check that we have a new version
             if versions.count() > 1:
@@ -474,35 +400,20 @@ class WorkflowVersioningTestCase(TransactionTestCase):
                 new_node_count = len(v2.definition['nodes'])
                 self.assertEqual(new_node_count, initial_node_count + 1,
                                "New version should have one more node")
-                
-                print(f"\n✅ TEST 3 PASSED: Version {v2.version} created with {new_node_count} nodes")
             else:
                 # Version wasn't created yet because status check might have different logic
-                print("\n⚠️ Single version scenario - checking node count difference")
                 v1.refresh_from_db()
                 # Just verify the workflow structure
                 current_steps = Steps.objects.filter(workflow_id=workflow).count()
                 self.assertEqual(current_steps, 4, "Workflow should now have 4 steps")
-                print(f"\n✅ TEST 3 PASSED: Workflow modified to {current_steps} steps")
         else:
-            print(f"  ⚠️ Workflow status is {workflow.status} - may need manual re-initialization")
             # Force re-check and version creation
             from workflow.utils.status import compute_workflow_status
             compute_workflow_status(workflow)
             workflow.refresh_from_db()
-            print(f"  📊 Status after recompute: {workflow.status}")
     
-    def test_04_task_version_immutability(self):
-        """
-        Test that tasks retain their original workflow version even after
-        the workflow is modified and new versions are created.
-        This ensures task integrity - a task always references the workflow
-        structure that existed when it was created.
-        """
-        print("\n" + "="*80)
-        print("TEST 4: Task Workflow Version Immutability")
-        print("="*80)
-        
+    def test_task_version_immutability(self):
+        """Test that tasks retain their original workflow version after modifications."""
         # Create workflow
         workflow, steps = self._create_workflow_with_steps(
             name='Immutability Test Workflow',
@@ -524,8 +435,6 @@ class WorkflowVersioningTestCase(TransactionTestCase):
             department='Finance'
         )
         task1 = self._create_task_for_ticket(ticket1, workflow, v1)
-        
-        print(f"  📌 Task 1 created with version {task1.workflow_version.version}")
         
         # Store the version ID before modification
         task1_version_id = task1.workflow_version.id
@@ -585,29 +494,12 @@ class WorkflowVersioningTestCase(TransactionTestCase):
         self.assertEqual(task1.workflow_version.version, task1_version_num,
                         "Task 1's version number should not change")
         
-        print(f"\n  🔍 Verification:")
-        print(f"    Task 1 version: {task1.workflow_version.version} (unchanged)")
-        print(f"    Task 2 version: {task2.workflow_version.version if task2.workflow_version else 'None'}")
-        
         if task2.workflow_version and v2 and task2.workflow_version.version > task1.workflow_version.version:
             self.assertNotEqual(task1.workflow_version.id, task2.workflow_version.id,
                               "Task 1 and Task 2 should have different versions")
-            print(f"\n✅ TEST 4 PASSED: Task immutability verified!")
-            print(f"   Task 1 retained version {task1.workflow_version.version}")
-            print(f"   Task 2 uses new version {task2.workflow_version.version}")
-        else:
-            print(f"\n✅ TEST 4 PASSED: Task 1 version unchanged at {task1.workflow_version.version}")
     
-    def test_05_version_definition_integrity(self):
-        """
-        Test that the workflow version definition accurately captures
-        the workflow structure (nodes, edges, metadata) at the time
-        of version creation.
-        """
-        print("\n" + "="*80)
-        print("TEST 5: Version Definition Integrity")
-        print("="*80)
-        
+    def test_version_definition_integrity(self):
+        """Test that version definition accurately captures workflow structure."""
         # Create workflow with specific configuration
         steps_config = [
             {'name': 'Receive Request', 'role': 'Ticket Coordinator', 'order': 1, 'is_start': True, 'is_end': False},
@@ -660,24 +552,9 @@ class WorkflowVersioningTestCase(TransactionTestCase):
         for node in nodes:
             self.assertIn('role_name', node, "Each node should have role_name")
             self.assertIsNotNone(node['role_name'], "Role name should not be None")
-        
-        print(f"\n  📊 Version Definition Summary:")
-        print(f"    Workflow: {metadata.get('workflow_name')}")
-        print(f"    Nodes: {len(nodes)}")
-        print(f"    Edges: {len(edges)}")
-        print(f"    Start nodes: {len(start_nodes)}")
-        print(f"    End nodes: {len(end_nodes)}")
-        
-        print(f"\n✅ TEST 5 PASSED: Version definition integrity verified")
     
-    def test_06_round_robin_assignment(self):
-        """
-        Test that round-robin assignment works correctly when creating tasks.
-        """
-        print("\n" + "="*80)
-        print("TEST 6: Round Robin Assignment")
-        print("="*80)
-        
+    def test_round_robin_assignment(self):
+        """Test that round-robin assignment works correctly when creating tasks."""
         # Create workflow
         workflow, steps = self._create_workflow_with_steps(
             name='Round Robin Test',
@@ -710,29 +587,10 @@ class WorkflowVersioningTestCase(TransactionTestCase):
         for task in tasks:
             self.assertEqual(task.workflow_version, version,
                            f"Task {task.task_id} should be tied to version {version.version}")
-        
-        print(f"\n  📊 Tasks created with round-robin:")
-        for task in tasks:
-            print(f"    Task {task.task_id}: Workflow {task.workflow_id.name}, Version {task.workflow_version.version}")
-        
-        print(f"\n✅ TEST 6 PASSED: Round-robin assignment working correctly")
     
-    def test_07_complete_workflow_lifecycle(self):
-        """
-        End-to-end test of the complete workflow versioning lifecycle:
-        1. Create workflow (draft)
-        2. Add steps and transitions (becomes initialized, v1 created)
-        3. Create tasks with v1
-        4. Modify workflow (new v2 created)
-        5. Create new tasks with v2
-        6. Verify old tasks still reference v1
-        """
-        print("\n" + "="*80)
-        print("TEST 7: Complete Workflow Lifecycle")
-        print("="*80)
-        
+    def test_complete_workflow_lifecycle(self):
+        """End-to-end test of the complete workflow versioning lifecycle."""
         # Phase 1: Create workflow
-        print("\n📌 Phase 1: Create initial workflow")
         workflow, steps = self._create_workflow_with_steps(
             name='Lifecycle Test Workflow',
             category='Sales',
@@ -741,15 +599,12 @@ class WorkflowVersioningTestCase(TransactionTestCase):
         )
         
         # Phase 2: Verify v1
-        print("\n📌 Phase 2: Verify version 1")
         v1 = WorkflowVersion.objects.filter(workflow=workflow, is_active=True).first()
         self.assertIsNotNone(v1)
         self.assertEqual(v1.version, 1)
         v1_node_count = len(v1.definition['nodes'])
-        print(f"  ✓ Version 1 created with {v1_node_count} nodes")
         
         # Phase 3: Create tasks with v1
-        print("\n📌 Phase 3: Create tasks with version 1")
         tasks_v1 = []
         for i in range(2):
             ticket = self._create_ticket(
@@ -761,10 +616,8 @@ class WorkflowVersioningTestCase(TransactionTestCase):
             )
             task = self._create_task_for_ticket(ticket, workflow, v1)
             tasks_v1.append(task)
-            print(f"  ✓ Task {task.task_id} created with version {task.workflow_version.version}")
         
         # Phase 4: Modify workflow
-        print("\n📌 Phase 4: Modify workflow (add step)")
         workflow.status = 'draft'
         workflow.is_published = False
         workflow.save(update_fields=['status', 'is_published'])
@@ -794,20 +647,15 @@ class WorkflowVersioningTestCase(TransactionTestCase):
         from workflow.utils import compute_workflow_status
         compute_workflow_status(workflow.workflow_id)
         workflow.refresh_from_db()
-        print(f"  ✓ Step added, workflow status: {workflow.status}")
         
         # Phase 5: Verify v2 or check current state
-        print("\n📌 Phase 5: Verify versions after modification")
         versions = list(WorkflowVersion.objects.filter(workflow=workflow).order_by('version'))
-        print(f"  Total versions: {len(versions)}")
         
         v2 = WorkflowVersion.objects.filter(workflow=workflow, is_active=True).first()
         if v2 and v2.version > 1:
             v2_node_count = len(v2.definition['nodes'])
-            print(f"  ✓ Version 2 created with {v2_node_count} nodes")
             
             # Create new tasks with v2
-            print("\n📌 Phase 6: Create tasks with version 2")
             tasks_v2 = []
             for i in range(2):
                 ticket = self._create_ticket(
@@ -819,32 +667,21 @@ class WorkflowVersioningTestCase(TransactionTestCase):
                 )
                 task = self._create_task_for_ticket(ticket, workflow, v2)
                 tasks_v2.append(task)
-                print(f"  ✓ Task {task.task_id} created with version {task.workflow_version.version}")
             
-            # Phase 7: Verify immutability
-            print("\n📌 Phase 7: Verify version immutability")
+            # Phase 6: Verify immutability
             for task in tasks_v1:
                 task.refresh_from_db()
                 self.assertEqual(task.workflow_version.version, 1,
                                f"Task {task.task_id} should still reference version 1")
-                print(f"  ✓ Task {task.task_id} still on version 1")
             
             for task in tasks_v2:
                 self.assertEqual(task.workflow_version.version, 2,
                                f"Task {task.task_id} should reference version 2")
-                print(f"  ✓ Task {task.task_id} on version 2")
         else:
-            print(f"  ℹ️ Single version scenario - testing with available version")
+            # Single version scenario - verify tasks have versions
             for task in tasks_v1:
                 task.refresh_from_db()
-                print(f"  ✓ Task {task.task_id} on version {task.workflow_version.version}")
-        
-        print(f"\n✅ TEST 7 PASSED: Complete workflow lifecycle verified")
+                self.assertIsNotNone(task.workflow_version)
     
     def tearDown(self):
-        """Clean up after each test"""
-        print("\n🧹 Cleaning up test data...")
-        self._cleanup_test_data()
-
-
-
+        """Clean up after each test."""

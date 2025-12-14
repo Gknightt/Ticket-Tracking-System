@@ -27,21 +27,14 @@ The tests utilize Django's `TestCase` for database isolation and `unittest.mock`
 for simulating external dependencies (like assignment utilities and workflow
 versioning signals) to ensure focused unit testing.
 
-To run these tests:
-```bash
-python manage.py test tests.unit.tickets.test_tickets
-```
+Run with: python manage.py test tests.unit.tickets.test_tickets
 """
 
 import os
-import io
-import sys
-import logging
 from unittest.mock import patch, MagicMock
 from datetime import timedelta
 
 import django
-from django.test import TestCase
 from django.utils import timezone
 from decimal import Decimal
 
@@ -50,50 +43,12 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'workflow_api.settings')
 django.setup()
 
 # Import models
+from tests.base import BaseTestCase
 from tickets.models import WorkflowTicket, RoundRobin
 from workflow.models import Workflows, WorkflowVersion
 from step.models import Steps, StepTransition
 from role.models import Roles, RoleUsers
 from task.models import Task, TaskItem, TaskItemHistory
-
-logger = logging.getLogger(__name__)
-
-# Global test counter
-_test_counter = {'count': 0}
-
-
-# Fix Windows console encoding for Unicode
-if sys.platform == 'win32':
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
-
-
-class BaseTestCase(TestCase):
-    """Base test case with one-line test logging"""
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        _test_counter['count'] += 1
-        self.test_number = _test_counter['count']
-    
-    def run(self, result=None):
-        """Run test and log result in one-line format"""
-        # Get test method name
-        test_method = str(self).split()[0]
-        test_name = test_method.split('.')[-1]
-        
-        # Run the test
-        super().run(result)
-        
-        # Log result with aligned dots
-        if result and result.errors and any(test_method in str(e[0]) for e in result.errors):
-            status = "● FAIL"
-        elif result and result.failures and any(test_method in str(f[0]) for f in result.failures):
-            status = "● FAIL"
-        else:
-            status = "● PASS"
-        
-        logger.info(f"{self.test_number:2}. {test_name:<50} {status}")
 
 
 class BaseTicketTaskTest(BaseTestCase):

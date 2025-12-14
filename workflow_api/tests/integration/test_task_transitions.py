@@ -14,14 +14,7 @@ Run with: python manage.py test tests.integration.test_task_transitions
 """
 
 import os
-import sys
-import io
 import django
-
-# Fix Windows console encoding for Unicode
-if sys.platform == 'win32':
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 # Setup Django settings before importing models
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'workflow_api.settings')
@@ -36,6 +29,7 @@ from datetime import timedelta
 from unittest.mock import patch, MagicMock
 
 # Import all models
+from tests.base import BaseTestCase
 from workflow.models import Workflows, WorkflowVersion
 from step.models import Steps, StepTransition
 from role.models import Roles, RoleUsers
@@ -52,11 +46,11 @@ User = get_user_model()
     BROKER_BACKEND='memory'
 )
 @patch('task.utils.assignment.notify_task.delay', return_value=None)
-class TaskTransitionTestCase(TestCase):
-    """Test suite for workflow state machine transitions"""
+class TaskTransitionTestCase(BaseTestCase):
+    """Test suite for workflow state machine transitions."""
     
     def setUp(self, mock_notify=None):
-        """Set up test data for all tests"""
+        """Set up test data for all tests."""
         # Create roles
         self.role_triage = Roles.objects.create(role_id=1, name='Triage Agent', system='tts')
         self.role_support = Roles.objects.create(role_id=2, name='Support Agent', system='tts')
@@ -439,11 +433,11 @@ class TaskTransitionTestCase(TestCase):
         )
 
 
-class TaskTransitionEdgeCasesTestCase(TestCase):
-    """Test edge cases and boundary conditions"""
+class TaskTransitionEdgeCasesTestCase(BaseTestCase):
+    """Test edge cases and boundary conditions."""
     
     def setUp(self):
-        """Set up minimal test data"""
+        """Set up minimal test data."""
         self.role = Roles.objects.create(role_id=1, name='Agent', system='tts')
         self.user = RoleUsers.objects.create(
             role_id=self.role,
