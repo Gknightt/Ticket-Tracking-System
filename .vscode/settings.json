@@ -53,6 +53,18 @@
             "icon": "browser",
             "overrideName": true,
             "args": ["-NoExit", "-File", "${workspaceFolder}/Scripts/start_frontend.ps1"]
+        },
+        "10. Helpdesk Backend": {
+            "source": "PowerShell",
+            "icon": "server",
+            "overrideName": true,
+            "args": ["-NoExit", "-File", "${workspaceFolder}/Scripts/start_helpdesk_backend.ps1"]
+        },
+        "11. Helpdesk Frontend": {
+            "source": "PowerShell",
+            "icon": "browser",
+            "overrideName": true,
+            "args": ["-NoExit", "-File", "${workspaceFolder}/Scripts/start_helpdesk_frontend.ps1"]
         }
     }
 }
