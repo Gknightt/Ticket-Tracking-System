@@ -22,19 +22,6 @@ export const API_CONFIG = {
   AUTH: {
     BASE_URL: import.meta.env.VITE_AUTH_URL || 'http://localhost:8003',
     TIMEOUT: 10000
-  },
-  
-  // Workflow API settings (workflow_api service)
-  WORKFLOW: {
-    BASE_URL: import.meta.env.VITE_WORKFLOW_URL || 'http://localhost:8002',
-    TIMEOUT: 10000
-  },
-  
-  // Messaging service settings (real-time communication)
-  MESSAGING: {
-    BASE_URL: import.meta.env.VITE_MESSAGING_API || 'http://localhost:8005',
-    WS_URL: import.meta.env.VITE_MESSAGING_WS || 'ws://localhost:8005',
-    TIMEOUT: 10000
   }
 };
 

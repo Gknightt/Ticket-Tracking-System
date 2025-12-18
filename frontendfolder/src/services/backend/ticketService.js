@@ -3,7 +3,6 @@ import { API_CONFIG } from '../../config/environment.js';
 import { backendAuthService } from './authService.js';
 
 const BASE_URL = API_CONFIG.BACKEND.BASE_URL;
-const WORKFLOW_URL = API_CONFIG.WORKFLOW.BASE_URL;
 
 // Helper function to get headers for cookie-based auth
 const getAuthHeaders = () => {
@@ -109,7 +108,6 @@ export const backendTicketService = {
         headers: getAuthHeaders(),
         credentials: 'include',
       });
-      handleAuthError(response);
       if (!response.ok) {
         throw new Error('Failed to fetch ticket by number');
       }
@@ -118,34 +116,6 @@ export const backendTicketService = {
     } catch (error) {
       console.error('Error fetching ticket by number:', error);
       throw error;
-    }
-  },
-
-  /**
-   * Get full ticket details from helpdesk for the owned ticket view.
-   * This fetches attachments, comments, employee info, and all ticket fields.
-   * @param {string} ticketNumber - The ticket number to fetch
-   * @returns {Promise<Object>} The full ticket data from helpdesk
-   */
-  async getHelpdeskTicketByNumber(ticketNumber) {
-    try {
-      const response = await fetch(`${BASE_URL}/api/tickets/number/${encodeURIComponent(ticketNumber)}/`, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-        credentials: 'include',
-      });
-      handleAuthError(response);
-      if (!response.ok) {
-        if (response.status === 403) {
-          console.warn('Permission denied for helpdesk ticket - user may not have access');
-          return null;
-        }
-        throw new Error(`Failed to fetch helpdesk ticket: ${response.status}`);
-      }
-      return await response.json();
-    } catch (error) {
-      console.error('Error fetching helpdesk ticket by number:', error);
-      return null; // Return null on error so we can still show task data
     }
   },
 
@@ -371,77 +341,6 @@ export const backendTicketService = {
       return await response.json();
     } catch (error) {
       console.error('Error withdrawing ticket:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Get owned tickets for the current Ticket Coordinator.
-   * Fetches tasks from the workflow_api where the current user is the ticket_owner.
-   * @param {Object} options - Query options
-   * @param {string} options.tab - Filter by tab: 'active' or 'inactive'
-   * @param {string} options.search - Search term for ticket number, subject, description
-   * @param {number} options.page - Page number (default 1)
-   * @param {number} options.pageSize - Items per page (default 10)
-   * @returns {Promise<{results: Array, count: number, next: string|null, previous: string|null}>}
-   */
-  async getOwnedTickets({ tab = '', search = '', page = 1, pageSize = 10 } = {}) {
-    try {
-      const params = new URLSearchParams();
-      if (tab) params.append('tab', tab);
-      if (search) params.append('search', search);
-      params.append('page', page);
-      params.append('page_size', pageSize);
-
-      const url = `${WORKFLOW_URL}/tasks/owned-tickets/`;
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-        credentials: 'include',
-      });
-
-      handleAuthError(response);
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.error || err.detail || `Failed to fetch owned tickets: ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      // Handle both paginated and non-paginated responses
-      if (Array.isArray(data)) {
-        return { results: data, count: data.length, next: null, previous: null };
-      }
-      
-      return data;
-    } catch (error) {
-      console.error('Error fetching owned tickets:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Get a single owned ticket by ticket number.
-   * Fetches the task from the workflow_api and enriches with ticket data.
-   * @param {string} ticketNumber - The ticket number to fetch
-   * @returns {Promise<Object>} The task with ticket details
-   */
-  async getOwnedTicketByNumber(ticketNumber) {
-    try {
-      // First, fetch all owned tickets and find the one with the matching ticket number
-      const { results } = await this.getOwnedTickets({ pageSize: 100 });
-      
-      const task = results.find(t => t.ticket_number === ticketNumber);
-      
-      if (!task) {
-        throw new Error(`Owned ticket with number ${ticketNumber} not found`);
-      }
-      
-      return task;
-    } catch (error) {
-      console.error('Error fetching owned ticket by number:', error);
       throw error;
     }
   }
