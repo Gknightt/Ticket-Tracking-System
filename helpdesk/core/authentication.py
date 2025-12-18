@@ -179,32 +179,64 @@ class CookieJWTAuthentication(JWTAuthentication):
         Try to decode and validate an employee JWT token.
         Returns ExternalUser if valid, None otherwise.
         
-        Employee tokens have shape:
+        New employee tokens have shape:
         {
-          "employee_id": 3,
-          "email": "robert.johnson@example.com",
-          "first_name": "Robert",
-          "last_name": "Johnson",
-          "company_id": null,
           "token_type": "access",
-          "exp": 1765193018.211683,
-          "iat": 1765192118.211683
+          "exp": 1765898284,
+          "iat": 1765869484,
+          "jti": "79ceaf9e84704e1ba8e35d8cc37fffdf",
+          "user_id": 6,
+          "employee_id": 6,
+          "email": "john.doe@example.com",
+          "username": "johndoe",
+          "full_name": "John Michael Doe",
+          "user_type": "staff",
+          "roles": [{"system": "hdts", "role": "Employee"}]
         }
         """
         try:
+            signing_key = getattr(settings, 'SIMPLE_JWT', {}).get('SIGNING_KEY', settings.SECRET_KEY)
             payload = jwt.decode(
                 token_str,
-                settings.SECRET_KEY,
+                signing_key,
                 algorithms=['HS256']
             )
             
-            # Check if this is an employee token (has employee_id and token_type)
+            # Check if this is an employee token
+            # New format: has employee_id, user_type='staff', and roles with system='hdts'
+            # Old format: has employee_id and token_type='access'
+            is_employee_token = False
+            
             if 'employee_id' in payload and payload.get('token_type') == 'access':
-                employee_id = payload.get('employee_id')
-                email = payload.get('email')
+                # Check new format: user_type='staff' with roles containing hdts/Employee
+                if payload.get('user_type') == 'staff' and 'roles' in payload:
+                    roles = payload.get('roles', [])
+                    if isinstance(roles, list):
+                        for role_obj in roles:
+                            if isinstance(role_obj, dict) and role_obj.get('system') == 'hdts' and role_obj.get('role') == 'Employee':
+                                is_employee_token = True
+                                break
+                else:
+                    # Old format compatibility
+                    is_employee_token = True
+            
+            if is_employee_token:
+                employee_id = payload.get('employee_id') or payload.get('user_id')
+                email = payload.get('email', '')
+                
+                # Try to extract first_name and last_name from full_name if not provided
+                full_name = payload.get('full_name', '')
                 first_name = payload.get('first_name', '')
                 last_name = payload.get('last_name', '')
-                company_id = payload.get('company_id')
+                
+                # If full_name exists but first/last don't, try to split
+                if full_name and not (first_name and last_name):
+                    name_parts = full_name.split()
+                    if len(name_parts) >= 2:
+                        first_name = name_parts[0]
+                        last_name = name_parts[-1]
+                    elif len(name_parts) == 1:
+                        first_name = name_parts[0]
                 
                 # Create ExternalUser for employee
                 user = ExternalUser(
@@ -213,7 +245,6 @@ class CookieJWTAuthentication(JWTAuthentication):
                     role='Employee',
                     first_name=first_name,
                     last_name=last_name,
-                    company_id=company_id,
                     user_type='employee'
                 )
                 return user

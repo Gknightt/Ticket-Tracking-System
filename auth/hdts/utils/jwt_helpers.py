@@ -22,7 +22,7 @@ def decode_employee_token(token_str):
     """
     try:
         algorithm = getattr(settings, 'SIMPLE_JWT', {}).get('ALGORITHM', 'HS256')
-        secret = settings.SECRET_KEY
+        secret = getattr(settings, 'SIMPLE_JWT', {}).get('SIGNING_KEY', settings.SECRET_KEY)
         
         payload = jwt.decode(token_str, secret, algorithms=[algorithm])
         return True, payload
@@ -80,7 +80,7 @@ def generate_employee_tokens(employee):
     }
     
     algorithm = getattr(settings, 'SIMPLE_JWT', {}).get('ALGORITHM', 'HS256')
-    secret = settings.SECRET_KEY
+    secret = getattr(settings, 'SIMPLE_JWT', {}).get('SIGNING_KEY', settings.SECRET_KEY)
     
     access_token = jwt.encode(access_payload, secret, algorithm=algorithm)
     refresh_token = jwt.encode(refresh_payload, secret, algorithm=algorithm)

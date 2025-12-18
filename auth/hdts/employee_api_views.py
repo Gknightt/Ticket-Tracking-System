@@ -697,9 +697,10 @@ class MeView(APIView):
         try:
             import jwt
             from django.conf import settings
+            secret = getattr(settings, 'SIMPLE_JWT', {}).get('SIGNING_KEY', settings.SECRET_KEY)
             payload = jwt.decode(
                 token_str,
-                settings.SECRET_KEY,
+                secret,
                 algorithms=['HS256']
             )
             if payload.get('token_type') == 'access':

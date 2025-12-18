@@ -193,7 +193,7 @@ class EmployeeTokenObtainPairSerializer(serializers.Serializer):
         }
         
         algorithm = getattr(settings, 'SIMPLE_JWT', {}).get('ALGORITHM', 'HS256')
-        secret = settings.SECRET_KEY
+        secret = getattr(settings, 'SIMPLE_JWT', {}).get('SIGNING_KEY', settings.SECRET_KEY)
         
         access_token = jwt.encode(access_payload, secret, algorithm=algorithm)
         refresh_token = jwt.encode(refresh_payload, secret, algorithm=algorithm)
@@ -336,7 +336,7 @@ class EmployeeTokenObtainPairWithRecaptchaSerializer(serializers.Serializer):
         }
         
         algorithm = getattr(settings, 'SIMPLE_JWT', {}).get('ALGORITHM', 'HS256')
-        secret = settings.SECRET_KEY
+        secret = getattr(settings, 'SIMPLE_JWT', {}).get('SIGNING_KEY', settings.SECRET_KEY)
         
         access_token = jwt.encode(access_payload, secret, algorithm=algorithm)
         refresh_token = jwt.encode(refresh_payload, secret, algorithm=algorithm)

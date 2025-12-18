@@ -15,6 +15,7 @@ from threading import Thread
 logger = logging.getLogger(__name__)
 
 # HDTS roles that should also sync to TTS/workflow_api
+# Ticket Coordinator needs to exist in both HDTS and TTS for workflow management
 HDTS_ROLES_TO_SYNC_TO_TTS = ['Ticket Coordinator']
 
 
@@ -68,80 +69,34 @@ def _should_sync_to_tts(role_name):
     return role_name in HDTS_ROLES_TO_SYNC_TO_TTS
 
 
-def _get_or_create_tts_role(hdts_role):
-    """
-    Get or create a corresponding TTS role for an HDTS role.
-    Returns the TTS role if it exists or was created, None otherwise.
-    """
-    from roles.models import Role
-    from systems.models import System
-    
-    try:
-        tts_system = System.objects.get(slug='tts')
-        # Use same name for the TTS role
-        tts_role, created = Role.objects.get_or_create(
-            system=tts_system,
-            name=hdts_role.name,
-            defaults={
-                'description': f'Synced from HDTS: {hdts_role.description or ""}',
-                'is_custom': False,
-            }
-        )
-        if created:
-            logger.info(f"Created TTS role '{tts_role.name}' synced from HDTS")
-        return tts_role
-    except System.DoesNotExist:
-        logger.warning("TTS system not found, cannot sync role to TTS")
-        return None
-    except Exception as e:
-        logger.error(f"Error getting/creating TTS role: {str(e)}")
-        return None
 
 
-def _prepare_tts_user_system_role_data(user, hdts_role, tts_role, action='update'):
+
+def _prepare_hdts_user_for_workflow(user, hdts_role, hdts_user_system_role, action='update'):
     """
-    Prepare UserSystemRole data for syncing HDTS user to TTS/workflow_api.
-    Uses the TTS role information for the sync.
+    Prepare HDTS user data for syncing to workflow_api.
+    Sends HDTS role information - workflow_api handles its own storage.
     """
-    from system_roles.models import UserSystemRole
-    
-    # Get or infer the user_system_role ID - try to find if user has TTS role already
-    try:
-        tts_system = tts_role.system
-        existing_usr = UserSystemRole.objects.filter(
-            user=user,
-            system=tts_system,
-            role=tts_role
-        ).first()
-        user_system_role_id = existing_usr.id if existing_usr else None
-        is_active = existing_usr.is_active if existing_usr else True
-        assigned_at = existing_usr.assigned_at.isoformat() if existing_usr else None
-        settings = existing_usr.settings if existing_usr else {}
-    except Exception:
-        user_system_role_id = None
-        is_active = True
-        assigned_at = None
-        settings = {}
-    
     return {
-        "user_system_role_id": user_system_role_id,
+        "user_system_role_id": hdts_user_system_role.id if hdts_user_system_role else None,
         "user_id": user.id,
         "user_email": user.email,
         "user_full_name": user.get_full_name(),
-        "system": "tts",
-        "role_id": tts_role.id,
-        "role_name": tts_role.name,
-        "assigned_at": assigned_at,
-        "is_active": is_active,
-        "settings": settings,
+        "system": "hdts",  # Keep as hdts - workflow_api knows this is an HDTS user
+        "role_id": hdts_role.id,
+        "role_name": hdts_role.name,
+        "assigned_at": hdts_user_system_role.assigned_at.isoformat() if hdts_user_system_role and hasattr(hdts_user_system_role, 'assigned_at') and hdts_user_system_role.assigned_at else None,
+        "is_active": hdts_user_system_role.is_active if hdts_user_system_role else True,
+        "settings": hdts_user_system_role.settings if hdts_user_system_role else {},
         "action": action,
-        "source_system": "hdts",  # Mark that this came from HDTS
+        "source_system": "hdts",
     }
 
 
-def _sync_hdts_role_to_tts(hdts_role, action='create'):
+def _sync_hdts_role_to_workflow(hdts_role, action='create'):
     """
-    Sync an HDTS role to TTS/workflow_api if it's in the list of roles to sync.
+    Sync an HDTS role to workflow_api if it's in the list of roles to sync.
+    Only forwards HDTS role data - does NOT create TTS roles.
     """
     if not _should_sync_to_tts(hdts_role.name):
         return
@@ -149,24 +104,19 @@ def _sync_hdts_role_to_tts(hdts_role, action='create'):
     from celery import current_app
     
     try:
-        # Get or create the corresponding TTS role
-        tts_role = _get_or_create_tts_role(hdts_role)
-        if not tts_role:
-            return
-        
-        # Prepare role data for workflow_api
+        # Prepare HDTS role data for workflow_api
         role_data = {
-            "role_id": tts_role.id,
-            "name": tts_role.name,
-            "system": "tts",
-            "description": tts_role.description,
-            "is_custom": tts_role.is_custom,
-            "created_at": tts_role.created_at.isoformat(),
+            "role_id": hdts_role.id,
+            "name": hdts_role.name,
+            "system": "hdts",  # Keep as hdts - workflow_api handles its own storage
+            "description": hdts_role.description or '',
+            "is_custom": hdts_role.is_custom,
+            "created_at": hdts_role.created_at.isoformat() if hdts_role.created_at else None,
             "action": action,
-            "source_system": "hdts",  # Mark that this came from HDTS
+            "source_system": "hdts",
         }
         
-        # Send to workflow_api via TTS role sync queue
+        # Send to workflow_api via role sync queue
         try:
             current_app.send_task(
                 'role.tasks.sync_role',
@@ -176,70 +126,42 @@ def _sync_hdts_role_to_tts(hdts_role, action='create'):
                 retry=False,
                 time_limit=10,
             )
-            logger.info(f"HDTS role '{hdts_role.name}' synced to TTS/workflow_api with action: {action}")
+            logger.info(f"HDTS role '{hdts_role.name}' forwarded to workflow_api with action: {action}")
         except Exception as celery_error:
-            logger.warning(f"Celery task send failed for HDTS->TTS role sync (non-blocking): {str(celery_error)}")
+            logger.warning(f"Celery task send failed for HDTS->workflow_api role sync (non-blocking): {str(celery_error)}")
     except Exception as e:
-        logger.error(f"Error syncing HDTS role to TTS: {str(e)}")
+        logger.error(f"Error forwarding HDTS role to workflow_api: {str(e)}")
 
 
-def _sync_hdts_user_to_tts(user, hdts_role, action='create'):
+def _sync_hdts_user_to_workflow(user, hdts_role, hdts_user_system_role, action='create'):
     """
-    Sync an HDTS user with a specific role to TTS/workflow_api.
-    This creates a corresponding UserSystemRole in TTS.
+    Sync an HDTS user with a specific role to workflow_api.
+    Only forwards HDTS user data - does NOT create TTS UserSystemRole.
     """
     if not _should_sync_to_tts(hdts_role.name):
         return
     
     from celery import current_app
-    from system_roles.models import UserSystemRole
-    from systems.models import System
     
     try:
-        # Get or create the corresponding TTS role
-        tts_role = _get_or_create_tts_role(hdts_role)
-        if not tts_role:
-            return
+        # Prepare HDTS user data for workflow_api
+        user_data = _prepare_hdts_user_for_workflow(user, hdts_role, hdts_user_system_role, action)
         
-        # Get TTS system
-        try:
-            tts_system = System.objects.get(slug='tts')
-        except System.DoesNotExist:
-            logger.warning("TTS system not found, cannot sync user to TTS")
-            return
-        
-        # For create/update: ensure the UserSystemRole exists in TTS
-        if action != 'delete':
-            usr, created = UserSystemRole.objects.get_or_create(
-                user=user,
-                system=tts_system,
-                role=tts_role,
-                defaults={
-                    'is_active': True,
-                    'settings': {},
-                }
-            )
-            if created:
-                logger.info(f"Created TTS UserSystemRole for user {user.email} with role {tts_role.name}")
-        
-        # Prepare user_system_role data for workflow_api
-        user_system_role_data = _prepare_tts_user_system_role_data(user, hdts_role, tts_role, action)
-        
-        # Send to workflow_api via TTS user_system_role sync queue
+        # Send to workflow_api via user_system_role sync queue
         try:
             current_app.send_task(
                 'role.tasks.sync_user_system_role',
-                args=[user_system_role_data],
+                args=[user_data],
                 queue='tts.user_system_role.sync',
                 routing_key='tts.user_system_role.sync',
                 retry=False,
                 time_limit=10,
             )
-            logger.info(f"HDTS user {user.email} with role '{hdts_role.name}' synced to TTS/workflow_api with action: {action}")
+            logger.info(f"HDTS user {user.email} with role '{hdts_role.name}' forwarded to workflow_api with action: {action}")
         except Exception as celery_error:
-            logger.warning(f"Celery task send failed for HDTS->TTS user sync (non-blocking): {str(celery_error)}")
+            logger.warning(f"Celery task send failed for HDTS->workflow_api user sync (non-blocking): {str(celery_error)}")
     except Exception as e:
-        logger.error(f"Error syncing HDTS user to TTS: {str(e)}")
+        logger.error(f"Error forwarding HDTS user to workflow_api: {str(e)}")
 
 
 def _prepare_hdts_employee_data(employee, action='update'):
@@ -281,13 +203,13 @@ def hdts_role_post_save(sender, instance, created, **kwargs):
             # Only process HDTS roles
             if instance.system.slug == 'hdts' and _should_sync_to_tts(instance.name):
                 action = 'create' if created else 'update'
-                logger.info(f"HDTS Role {instance.id} ({instance.name}) {action}d, syncing to TTS")
-                _sync_hdts_role_to_tts(instance, action)
+                logger.info(f"HDTS Role {instance.id} ({instance.name}) {action}d, forwarding to workflow_api")
+                _sync_hdts_role_to_workflow(instance, action)
         except Exception as e:
             logger.error(f"Error in hdts_role_post_save signal: {str(e)}")
     
     # Send in background thread to prevent blocking the response
-    thread = Thread(target=send_sync_task, daemon=True)
+    thread = Thread(target=send_sync_task, daemon=False)
     thread.start()
 
 
@@ -301,13 +223,13 @@ def hdts_role_post_delete(sender, instance, **kwargs):
         try:
             # Only process HDTS roles
             if instance.system.slug == 'hdts' and _should_sync_to_tts(instance.name):
-                logger.info(f"HDTS Role {instance.id} ({instance.name}) deleted, syncing to TTS")
-                _sync_hdts_role_to_tts(instance, 'delete')
+                logger.info(f"HDTS Role {instance.id} ({instance.name}) deleted, forwarding to workflow_api")
+                _sync_hdts_role_to_workflow(instance, 'delete')
         except Exception as e:
             logger.error(f"Error in hdts_role_post_delete signal: {str(e)}")
     
     # Send in background thread to prevent blocking the response
-    thread = Thread(target=send_sync_task, daemon=True)
+    thread = Thread(target=send_sync_task, daemon=False)
     thread.start()
 
 
@@ -350,7 +272,7 @@ def user_post_save(sender, instance, created, **kwargs):
             logger.error(f"Error in user_post_save signal: {str(e)}")
     
     # Send in background thread to prevent blocking the response
-    thread = Thread(target=send_sync_task, daemon=True)
+    thread = Thread(target=send_sync_task, daemon=False)
     thread.start()
 
 
@@ -394,7 +316,7 @@ def user_post_delete(sender, instance, **kwargs):
             logger.error(f"Error in user_post_delete signal: {str(e)}")
     
     # Send in background thread to prevent blocking the response
-    thread = Thread(target=send_sync_task, daemon=True)
+    thread = Thread(target=send_sync_task, daemon=False)
     thread.start()
 
 
@@ -435,15 +357,15 @@ def user_system_role_post_save(sender, instance, created, **kwargs):
                 except Exception as celery_error:
                     logger.warning(f"Celery task send failed (non-blocking): {str(celery_error)}")
                 
-                # Also sync to TTS if role is in the list of roles to sync
+                # Also forward to workflow_api if role is in the list of roles to sync
                 if _should_sync_to_tts(instance.role.name):
-                    logger.info(f"HDTS role '{instance.role.name}' should sync to TTS, syncing user {instance.user.email}")
-                    _sync_hdts_user_to_tts(instance.user, instance.role, action)
+                    logger.info(f"HDTS role '{instance.role.name}' should sync to workflow_api, forwarding user {instance.user.email}")
+                    _sync_hdts_user_to_workflow(instance.user, instance.role, instance, action)
         except Exception as e:
             logger.error(f"Error in user_system_role_post_save signal: {str(e)}")
     
     # Send in background thread to prevent blocking the response
-    thread = Thread(target=send_sync_task, daemon=True)
+    thread = Thread(target=send_sync_task, daemon=False)
     thread.start()
 
 
@@ -475,15 +397,15 @@ def user_system_role_post_delete(sender, instance, **kwargs):
                     routing_key='hdts.user.sync',
                 )
                 
-                # Also sync to TTS if role is in the list of roles to sync
+                # Also forward to workflow_api if role is in the list of roles to sync
                 if _should_sync_to_tts(instance.role.name):
-                    logger.info(f"HDTS role '{instance.role.name}' deletion should sync to TTS, syncing user {instance.user.email}")
-                    _sync_hdts_user_to_tts(instance.user, instance.role, 'delete')
+                    logger.info(f"HDTS role '{instance.role.name}' deletion should sync to workflow_api, forwarding user {instance.user.email}")
+                    _sync_hdts_user_to_workflow(instance.user, instance.role, instance, 'delete')
         except Exception as e:
             logger.error(f"Error in user_system_role_post_delete signal: {str(e)}")
     
     # Send in background thread to prevent blocking the response
-    thread = Thread(target=send_sync_task, daemon=True)
+    thread = Thread(target=send_sync_task, daemon=False)
     thread.start()
 
 
@@ -521,7 +443,7 @@ def employee_post_save(sender, instance, created, **kwargs):
             logger.error(f"Error in employee_post_save signal: {str(e)}")
     
     # Send in background thread to prevent blocking the response
-    thread = Thread(target=send_sync_task, daemon=True)
+    thread = Thread(target=send_sync_task, daemon=False)
     thread.start()
 
 
@@ -552,5 +474,5 @@ def employee_post_delete(sender, instance, **kwargs):
             logger.error(f"Error in employee_post_delete signal: {str(e)}")
     
     # Send in background thread to prevent blocking the response
-    thread = Thread(target=send_sync_task, daemon=True)
+    thread = Thread(target=send_sync_task, daemon=False)
     thread.start()
