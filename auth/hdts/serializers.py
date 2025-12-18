@@ -172,7 +172,7 @@ class EmployeeTokenObtainPairSerializer(serializers.Serializer):
             'email': employee.email,
             'username': employee.username or employee.email.split('@')[0],
             'full_name': full_name,
-            'user_type': 'staff',
+            'user_type': 'employee',
             'roles': [
                 {
                     'system': 'hdts',
@@ -189,7 +189,7 @@ class EmployeeTokenObtainPairSerializer(serializers.Serializer):
             'user_id': employee.id,
             'employee_id': employee.id,  # Keep for backward compatibility
             'email': employee.email,
-            'user_type': 'staff',
+            'user_type': 'employee',
         }
         
         algorithm = getattr(settings, 'SIMPLE_JWT', {}).get('ALGORITHM', 'HS256')
@@ -320,7 +320,7 @@ class EmployeeTokenObtainPairWithRecaptchaSerializer(serializers.Serializer):
             'email': employee.email,
             'username': employee.username or employee.email.split('@')[0],
             'full_name': full_name,
-            'user_type': 'staff',
+            'user_type': 'employee',
             'roles': [
                 {
                     'system': 'hdts',
@@ -337,7 +337,7 @@ class EmployeeTokenObtainPairWithRecaptchaSerializer(serializers.Serializer):
             'user_id': employee.id,
             'employee_id': employee.id,  # Keep for backward compatibility
             'email': employee.email,
-            'user_type': 'staff',
+            'user_type': 'employee',
         }
         
         algorithm = getattr(settings, 'SIMPLE_JWT', {}).get('ALGORITHM', 'HS256')

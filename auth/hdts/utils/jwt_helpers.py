@@ -59,7 +59,7 @@ def generate_employee_tokens(employee):
         'email': employee.email,
         'username': employee.username or employee.email.split('@')[0],
         'full_name': full_name,
-        'user_type': 'staff',
+        'user_type': 'employee',
         'roles': [
             {
                 'system': 'hdts',
@@ -76,7 +76,7 @@ def generate_employee_tokens(employee):
         'user_id': employee.id,
         'employee_id': employee.id,  # Keep for backward compatibility
         'email': employee.email,
-        'user_type': 'staff',
+        'user_type': 'employee',
     }
     
     algorithm = getattr(settings, 'SIMPLE_JWT', {}).get('ALGORITHM', 'HS256')

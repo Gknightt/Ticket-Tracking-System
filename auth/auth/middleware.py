@@ -76,7 +76,8 @@ class JWTAuthenticationMiddleware:
         """
         try:
             algorithm = getattr(settings, 'SIMPLE_JWT', {}).get('ALGORITHM', 'HS256')
-            secret = settings.SECRET_KEY
+            # Use the same signing key as jwt_helpers.py for consistency
+            secret = getattr(settings, 'SIMPLE_JWT', {}).get('SIGNING_KEY', settings.SECRET_KEY)
             
             payload = jwt.decode(token_str, secret, algorithms=[algorithm])
             
