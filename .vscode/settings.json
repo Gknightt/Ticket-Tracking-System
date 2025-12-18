@@ -65,6 +65,12 @@
             "icon": "browser",
             "overrideName": true,
             "args": ["-NoExit", "-File", "${workspaceFolder}/Scripts/start_helpdesk_frontend.ps1"]
+        },
+        "12. Helpdesk Backend Worker": {
+            "source": "PowerShell",
+            "icon": "tools",
+            "overrideName": true,
+            "args": ["-NoExit", "-File", "${workspaceFolder}/Scripts/start_helpdesk_backend_worker.ps1"]
         }
     }
 }
