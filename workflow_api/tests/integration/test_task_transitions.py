@@ -541,16 +541,16 @@ class TaskTransitionEdgeCasesTestCase(BaseTestCase):
         
         self._authenticate_as_user(100)
         
-        # This should raise an AttributeError because of the bug in transitions.py line 261
-        # The view tries to access task.current_step.step_id without checking if current_step is None
-        # For now, we expect this to fail with a 500 error (server error)
-        # TODO: Fix the view to handle this case properly with a 400 error
-        with self.assertRaises(AttributeError):
-            response = self.client.post('/transitions/', {
-                'task_id': task_no_step.task_id,
-                'transition_id': transition.transition_id,
-                'notes': 'Test'
-            }, format='json')
+        # This should return a 400 Bad Request because the task has no current step
+        response = self.client.post('/transitions/', {
+            'task_id': task_no_step.task_id,
+            'transition_id': transition.transition_id,
+            'notes': 'Test'
+        }, format='json')
+        
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('error', response.data)
+        self.assertIn('no current step', response.data['error'].lower())
 
 
 if __name__ == '__main__':

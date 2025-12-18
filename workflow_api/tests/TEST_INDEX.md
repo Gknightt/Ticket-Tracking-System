@@ -44,7 +44,7 @@ tests/
 To run the entire test suite (all unit and integration tests):
 
 ```bash
-python manage.py test
+w
 ```
 
 ## Running with Coverage
