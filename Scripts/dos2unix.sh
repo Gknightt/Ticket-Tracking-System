@@ -17,6 +17,8 @@ convert_to_unix "user_service" "start.sh"
 convert_to_unix "ticket_service" "start.sh"
 convert_to_unix "workflow_api" "start.sh"
 convert_to_unix "Docker/db-init" "start.sh"
+convert_to_unix "helpdesk" "entrypoint.sh"
+convert_to_unix "helpdesk" "start.sh"
 
 # auth uses entrypoint.sh instead of start.sh
 convert_to_unix "auth" "entrypoint.sh"

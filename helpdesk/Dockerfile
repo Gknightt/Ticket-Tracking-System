@@ -15,16 +15,9 @@ COPY . .
 # Create media directory for file uploads
 RUN mkdir -p /app/media/employee_images /app/media/ticket_attachments
 
-# Copy and enable entrypoint that waits for DB, runs migrations, creates superuser,
-# collects static files, then execs the container command (e.g. gunicorn).
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+# Copy and enable start script for migrations and seeding
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
 
-# Also copy to /backend/entrypoint.sh to satisfy runtime scripts that reference
-# the relative path "backend/entrypoint.sh" (some platforms call chmod on this path).
-COPY entrypoint.sh /backend/entrypoint.sh
-RUN chmod +x /backend/entrypoint.sh
-
-# Use the entrypoint and keep the default command to run gunicorn.
-ENTRYPOINT ["/entrypoint.sh"]
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "backend.wsgi"]
+# Default command runs the start script
+CMD ["/start.sh"]
