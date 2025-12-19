@@ -28,17 +28,8 @@ def send_assignment_notification(user_id, task_id, task_title, role_name):
         dict: Status of the operation
     """
     try:
-        subject = f"New Task Assignment: {task_title}"
-        message = f"""
-You have been assigned to a task with the following details:
-
-Task ID: {task_id}
-Task Title: {task_title}
-Role: {role_name}
-Assigned At: {timezone.now().strftime('%Y-%m-%d %H:%M:%S')}
-
-Please log in to the system to view more details.
-        """.strip()
+        subject = f"Task Assignment: {task_title}"
+        message = f"Assigned as {role_name}"
         
         notification = InAppNotification.objects.create(
             user_id=user_id,
@@ -108,17 +99,8 @@ def send_task_transfer_notification(
         
         # Notification for original assignee (task transferred away from them)
         subject_out = f"Task Transferred: {task_title}"
-        message_out = f"""
-Your task assignment has been transferred to another user.
-
-Task ID: {task_id}
-Task: {task_title}
-Transferred By: {transferred_by_name or f'User {transferred_by_id}'}
-Transferred At: {timestamp.strftime('%Y-%m-%d %H:%M:%S')}
-{f'Reason: {transfer_notes}' if transfer_notes else ''}
-
-You no longer need to work on this task.
-        """.strip()
+        transfer_by = transferred_by_name or f'User {transferred_by_id}'
+        message_out = f"Transferred by {transfer_by}" + (f" - {transfer_notes}" if transfer_notes else "")
         
         notification_out = InAppNotification.objects.create(
             user_id=from_user_id,
@@ -138,18 +120,8 @@ You no longer need to work on this task.
         logger.info(f"✅ Created transfer-out notification {notification_out.id} for user {from_user_id}")
         
         # Notification for new assignee (task transferred to them)
-        subject_in = f"Task Assigned via Transfer: {task_title}"
-        message_in = f"""
-A task has been transferred to you.
-
-Task ID: {task_id}
-Task: {task_title}
-Transferred By: {transferred_by_name or f'User {transferred_by_id}'}
-Transferred At: {timestamp.strftime('%Y-%m-%d %H:%M:%S')}
-{f'Notes: {transfer_notes}' if transfer_notes else ''}
-
-Please log in to the system to review and work on this task.
-        """.strip()
+        subject_in = f"Task Received: {task_title}"
+        message_in = f"Transferred from {transfer_by}" + (f" - {transfer_notes}" if transfer_notes else "")
         
         notification_in = InAppNotification.objects.create(
             user_id=to_user_id,
@@ -226,18 +198,8 @@ def send_escalation_notification(
         
         # Notification for original assignee (task escalated away from them)
         subject_out = f"Task Escalated: {task_title}"
-        message_out = f"""
-Your task has been escalated to a higher-priority role.
-
-Task ID: {task_id}
-Task: {task_title}
-Escalated To Role: {escalated_to_role}
-{f'Escalated By: {escalated_by_name or f"User {escalated_by_id}"}' if escalated_by_id else ''}
-Escalated At: {timestamp.strftime('%Y-%m-%d %H:%M:%S')}
-{f'Reason: {escalation_reason}' if escalation_reason else ''}
-
-The task has been assigned to another user for further handling.
-        """.strip()
+        escalated_by = escalated_by_name or f'User {escalated_by_id}' if escalated_by_id else None
+        message_out = f"Escalated to {escalated_to_role}" + (f" by {escalated_by}" if escalated_by else "") + (f" - {escalation_reason}" if escalation_reason else "")
         
         notification_out = InAppNotification.objects.create(
             user_id=from_user_id,
@@ -259,20 +221,8 @@ The task has been assigned to another user for further handling.
         logger.info(f"✅ Created escalation-out notification {notification_out.id} for user {from_user_id}")
         
         # Notification for new assignee (task escalated to them)
-        subject_in = f"🚨 Escalated Task Assigned: {task_title}"
-        message_in = f"""
-A task has been escalated to you for attention.
-
-Task ID: {task_id}
-Task: {task_title}
-Your Role: {escalated_to_role}
-Escalated From Role: {escalated_from_role}
-{f'Escalated By: {escalated_by_name or f"User {escalated_by_id}"}' if escalated_by_id else ''}
-Escalated At: {timestamp.strftime('%Y-%m-%d %H:%M:%S')}
-{f'Reason: {escalation_reason}' if escalation_reason else ''}
-
-This task requires your immediate attention. Please log in to review.
-        """.strip()
+        subject_in = f"Escalated Task: {task_title}"
+        message_in = f"From {escalated_from_role} as {escalated_to_role}" + (f" - {escalation_reason}" if escalation_reason else "")
         
         notification_in = InAppNotification.objects.create(
             user_id=to_user_id,
@@ -337,17 +287,9 @@ def send_task_completed_notification(
     try:
         timestamp = timezone.now()
         
-        subject = f"✅ Task Completed: {task_title}"
-        message = f"""
-A task has been completed.
-
-Task ID: {task_id}
-Task: {task_title}
-{f'Completed By: {completed_by_name or f"User {completed_by_id}"}' if completed_by_id else ''}
-Completed At: {timestamp.strftime('%Y-%m-%d %H:%M:%S')}
-
-The workflow for this task has been finalized.
-        """.strip()
+        subject = f"Task Completed: {task_title}"
+        completed_by = completed_by_name or f'User {completed_by_id}' if completed_by_id else None
+        message = f"Completed by {completed_by}" if completed_by else "Task has been finalized"
         
         notification = InAppNotification.objects.create(
             user_id=user_id,
@@ -412,17 +354,8 @@ def send_workflow_step_notification(
     try:
         timestamp = timezone.now()
         
-        subject = f"Workflow Progress: {task_title}"
-        message = f"""
-A workflow has progressed to a new step.
-
-Task ID: {task_id}
-Task: {task_title}
-Previous Step: {previous_step}
-Current Step: {current_step}
-{f'Action By: {action_by_name or f"User {action_by_id}"}' if action_by_id else ''}
-Updated At: {timestamp.strftime('%Y-%m-%d %H:%M:%S')}
-        """.strip()
+        subject = f"Workflow Update: {task_title}"
+        message = f"{previous_step} → {current_step}"
         
         notification = InAppNotification.objects.create(
             user_id=user_id,
@@ -484,18 +417,8 @@ def send_sla_warning_notification(
     try:
         timestamp = timezone.now()
         
-        subject = f"⚠️ SLA Warning: {task_title}"
-        message = f"""
-SLA deadline is approaching for your task.
-
-Task ID: {task_id}
-Task: {task_title}
-Time Remaining: {time_remaining}
-Target Resolution: {target_resolution}
-Warning Issued: {timestamp.strftime('%Y-%m-%d %H:%M:%S')}
-
-Please prioritize this task to avoid SLA breach.
-        """.strip()
+        subject = f"SLA Warning: {task_title}"
+        message = f"{time_remaining} remaining until {target_resolution}"
         
         notification = InAppNotification.objects.create(
             user_id=user_id,
@@ -551,18 +474,8 @@ def send_sla_breach_notification(
     try:
         timestamp = timezone.now()
         
-        subject = f"🔴 SLA Breached: {task_title}"
-        message = f"""
-SLA deadline has been breached for this task.
-
-Task ID: {task_id}
-Task: {task_title}
-Target Resolution Was: {target_resolution}
-{f'Overdue By: {breach_duration}' if breach_duration else ''}
-Breach Recorded: {timestamp.strftime('%Y-%m-%d %H:%M:%S')}
-
-Immediate action is required.
-        """.strip()
+        subject = f"SLA Breached: {task_title}"
+        message = f"Overdue by {breach_duration}" if breach_duration else f"Target was {target_resolution}"
         
         notification = InAppNotification.objects.create(
             user_id=user_id,
@@ -628,28 +541,15 @@ def send_ticket_status_notification(
         status_lower = new_status.lower()
         if status_lower in ['resolved', 'completed']:
             notification_type = 'ticket_resolved'
-            emoji = '✅'
         elif status_lower == 'closed':
             notification_type = 'ticket_closed'
-            emoji = '🔒'
         elif status_lower in ['reopened', 'open']:
             notification_type = 'ticket_reopened'
-            emoji = '🔓'
         else:
             notification_type = 'task_status_update'
-            emoji = '📝'
         
-        subject = f"{emoji} Ticket {new_status}: {ticket_number}"
-        message = f"""
-Ticket status has been updated.
-
-Ticket: {ticket_number}
-Task ID: {task_id}
-Previous Status: {old_status}
-New Status: {new_status}
-{f'Updated By: {changed_by_name}' if changed_by_name else ''}
-Updated At: {timestamp.strftime('%Y-%m-%d %H:%M:%S')}
-        """.strip()
+        subject = f"Ticket {new_status}: {ticket_number}"
+        message = f"{old_status} → {new_status}" + (f" by {changed_by_name}" if changed_by_name else "")
         
         notification = InAppNotification.objects.create(
             user_id=user_id,
@@ -850,18 +750,9 @@ def send_comment_notification(
     try:
         timestamp = timezone.now()
         
-        subject = f"💬 New Comment: {task_title}"
-        message = f"""
-A new comment has been added to a task you're involved with.
-
-Task ID: {task_id}
-Task: {task_title}
-Comment By: {commenter_name}
-{f'Preview: "{comment_preview[:100]}..."' if comment_preview and len(comment_preview) > 100 else f'Comment: "{comment_preview}"' if comment_preview else ''}
-Added At: {timestamp.strftime('%Y-%m-%d %H:%M:%S')}
-
-Log in to view the full comment.
-        """.strip()
+        subject = f"New Comment: {task_title}"
+        preview = comment_preview[:80] + "..." if comment_preview and len(comment_preview) > 80 else comment_preview
+        message = f"{commenter_name}: {preview}" if preview else f"Comment from {commenter_name}"
         
         notification = InAppNotification.objects.create(
             user_id=user_id,
@@ -917,18 +808,9 @@ def send_mention_notification(
     try:
         timestamp = timezone.now()
         
-        subject = f"📣 You were mentioned: {task_title}"
-        message = f"""
-You were mentioned in a comment.
-
-Task ID: {task_id}
-Task: {task_title}
-Mentioned By: {mentioned_by_name}
-{f'Context: "{comment_preview[:100]}..."' if comment_preview and len(comment_preview) > 100 else f'Context: "{comment_preview}"' if comment_preview else ''}
-Mentioned At: {timestamp.strftime('%Y-%m-%d %H:%M:%S')}
-
-Log in to view the full comment and respond.
-        """.strip()
+        subject = f"Mentioned: {task_title}"
+        preview = comment_preview[:80] + "..." if comment_preview and len(comment_preview) > 80 else comment_preview
+        message = f"{mentioned_by_name}: {preview}" if preview else f"Mentioned by {mentioned_by_name}"
         
         notification = InAppNotification.objects.create(
             user_id=user_id,

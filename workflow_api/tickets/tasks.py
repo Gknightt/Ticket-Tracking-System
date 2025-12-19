@@ -202,15 +202,17 @@ def find_matching_workflow(department, category, sub_category):
     
     Only requires department and category to match.
     Sub-category is ignored in matching logic.
+    Accepts workflows with status 'initialized' or 'deployed'.
     """
     from workflow.models import Workflows
     
     # Match on department + category only
+    # Accept both 'initialized' and 'deployed' statuses as active workflows
     workflow = Workflows.objects.filter(
         department=department,
         category=category,
         is_published=True,
-        status='initialized'
+        status__in=['initialized', 'deployed']
     ).first()
     
     return workflow

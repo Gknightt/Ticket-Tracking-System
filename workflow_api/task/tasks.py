@@ -40,17 +40,8 @@ def send_assignment_notification(user_id, task_id, task_title, role_name):
     try:
         from django.utils import timezone
         
-        subject = f"New Task Assignment: {task_title}"
-        message = f"""
-You have been assigned to a task with the following details:
-
-Task ID: {task_id}
-Task Title: {task_title}
-Role: {role_name}
-Assigned At: {timezone.now().strftime('%Y-%m-%d %H:%M:%S')}
-
-Please log in to the system to view more details.
-        """.strip()
+        subject = f"Task Assignment: {task_title}"
+        message = f"Assigned as {role_name}"
         
         # Send task to notification service via shared Celery broker
         # The notification service worker listens to 'inapp-notification-queue'

@@ -14,4 +14,4 @@ if (Test-Path $VenvPath) { . $VenvPath } else { Write-Warning "Venv not found at
 
 # Navigate and Run
 Set-Location "$PSScriptRoot\..\notification_service"
-celery -A notification_service worker --loglevel=info -Q notification-queue-default,inapp-notification-queue
+celery -A notification_service worker --pool=solo --loglevel=info -Q notification-queue-default,inapp-notification-queue
