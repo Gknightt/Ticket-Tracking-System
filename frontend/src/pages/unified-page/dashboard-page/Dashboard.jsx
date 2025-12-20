@@ -14,6 +14,7 @@ import ToDoTickets from "./components/ToDoTickets";
 import ChartContainer from "../../../components/charts/ChartContainer";
 import DoughnutChart from "../../../components/charts/DoughnutChart";
 import PieChart from "../../../components/charts/PieChart";
+import PriorityPieChart from "./components/PriorityPieChart";
 import DynamicTable from "../../../tables/components/DynamicTable";
 
 // hooks
@@ -33,49 +34,49 @@ export default function Dashboard() {
   // Only tickets that have not yet been acted
   const pendingTickets = useMemo(() => {
     return (userTickets || [])
-    .filter(entry => !entry.acted_on)
-    .map((entry) => ({
-      ticket_id: String(entry.ticket_id ?? entry.ticket_number ?? ""),
-      subject: String(entry.ticket_subject ?? ""),
-      description: String(entry.ticket_description ?? ""),
-      status: entry.status,
-      priority: entry.ticket_priority,
-      category: entry.category || "Uncategorized",
-      submit_date: entry.assigned_on,
+      .filter((entry) => !entry.acted_on)
+      .map((entry) => ({
+        ticket_id: String(entry.ticket_id ?? entry.ticket_number ?? ""),
+        subject: String(entry.ticket_subject ?? ""),
+        description: String(entry.ticket_description ?? ""),
+        status: entry.status,
+        priority: entry.ticket_priority,
+        category: entry.category || "Uncategorized",
+        submit_date: entry.assigned_on,
 
-      // TaskItem core fields
-      task_item_id: entry.task_item_id,
-      user_id: entry.user_id,
-      user_full_name: entry.user_full_name,
-      role: entry.role,
-      task_id: entry.task_id,
-      assigned_on: entry.assigned_on,
-      status_updated_on: entry.status_updated_on,
-      acted_on: entry.acted_on,
-      target_resolution: entry.target_resolution,
-      notes: entry.notes,
+        // TaskItem core fields
+        task_item_id: entry.task_item_id,
+        user_id: entry.user_id,
+        user_full_name: entry.user_full_name,
+        role: entry.role,
+        task_id: entry.task_id,
+        assigned_on: entry.assigned_on,
+        status_updated_on: entry.status_updated_on,
+        acted_on: entry.acted_on,
+        target_resolution: entry.target_resolution,
+        notes: entry.notes,
 
-      // Ticket fields
-      ticket_number: entry.ticket_number,
+        // Ticket fields
+        ticket_number: entry.ticket_number,
 
-      // Workflow fields
-      workflow_id: entry.workflow_id,
-      workflow_name: entry.workflow_name,
+        // Workflow fields
+        workflow_id: entry.workflow_id,
+        workflow_name: entry.workflow_name,
 
-      // Step fields
-      current_step_id: entry.current_step_id,
-      current_step_name: entry.current_step_name,
-      current_step_role: entry.current_step_role,
-      acted_on_step_id: entry.acted_on_step_id,
-      acted_on_step_name: entry.acted_on_step_name,
+        // Step fields
+        current_step_id: entry.current_step_id,
+        current_step_name: entry.current_step_name,
+        current_step_role: entry.current_step_role,
+        acted_on_step_id: entry.acted_on_step_id,
+        acted_on_step_name: entry.acted_on_step_name,
 
-      // Task status
-      task_status: entry.task_status,
+        // Task status
+        task_status: entry.task_status,
 
-      // Metadata
-      step_instance_id: entry.task_id, // Use task_id as identifier
-      hasacted: entry.acted_on ? true : false, // <-- changed to rely on acted_on
-    }));
+        // Metadata
+        step_instance_id: entry.task_id, // Use task_id as identifier
+        hasacted: entry.acted_on ? true : false, // <-- changed to rely on acted_on
+      }));
   }, [userTickets]);
 
   const counts = {
@@ -192,7 +193,7 @@ export default function Dashboard() {
                   />
                 </ChartContainer>
                 <ChartContainer title="Tickets by Priority">
-                  <PieChart
+                  <PriorityPieChart
                     labels={Object.keys(priorityCounts)}
                     dataPoints={Object.values(priorityCounts)}
                     chartLabel="Tickets"

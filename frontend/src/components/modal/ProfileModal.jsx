@@ -10,10 +10,10 @@ export default function ProfileModal({ closeProfileAction }) {
   const navigate = useNavigate();
   const { logout } = useLogout();
 
-  const { user, loading, } = useAuth();
+  const { user, loading } = useAuth();
   // console.log(user)
 
-    if (loading) return <p>Loading...</p>;
+  if (loading) return <p>Loading...</p>;
   return (
     <div
       className={styles.pmOverlayWrapper}
@@ -25,12 +25,17 @@ export default function ProfileModal({ closeProfileAction }) {
         <div className={styles.pmHeader}>
           <div className={styles.pmImage}>
             <img
-              src={user.profile_picture || 'https://i.pinimg.com/736x/01/c2/09/01c209e18fd7a17c9c5dcc7a4e03db0e.jpg'}
+              src={
+                user.profile_picture ||
+                "https://i.pinimg.com/736x/01/c2/09/01c209e18fd7a17c9c5dcc7a4e03db0e.jpg"
+              }
               alt="Anime Avatar"
             />
           </div>
           <div className={styles.pmProfileInfo}>
-            <h3>{user.first_name} {user.last_name}</h3>
+            <h3>
+              {user.first_name} {user.last_name}
+            </h3>
             <span className={styles.pmRoleBadge}>Agent</span>
           </div>
         </div>
@@ -41,10 +46,10 @@ export default function ProfileModal({ closeProfileAction }) {
               // close modal first
               closeProfileAction(false);
               // construct external URL from Vite env var and endpoint
-              const base = import.meta.env.VITE_AUTH_URL || '';
-              const url = `${base.replace(/\/$/, '')}/staff/settings/profile/`;
+              const base = import.meta.env.VITE_AUTH_URL || "";
+              const url = `${base.replace(/\/$/, "")}/staff/settings/profile/`;
               // open in a new browser window/tab safely
-              window.open(url, '_blank', 'noopener,noreferrer');
+              window.open(url, "_blank", "noopener,noreferrer");
             }}
           >
             Account Settings
