@@ -282,6 +282,10 @@ body {
     margin: 5px 0;
     font-size: 13px;
     color: var(--text-color);
+    word-break: break-word;
+    overflow-wrap: break-word;
+    white-space: normal;
+    max-width: 250px;
 }
 
 .quickLinksCard {
@@ -723,4 +727,18 @@ label {
 
 .cancelChangesBtn:hover {
     background-color: #e0e0e0;
+}
+
+/* Email text wrapping - prevent overlap */
+#display-email,
+#id_email {
+    word-break: break-word;
+    overflow-wrap: break-word;
+    white-space: normal;
+}
+
+.profileInfoContainer span#display-email {
+    max-width: 100%;
+    display: block;
+    word-break: break-all;
 }

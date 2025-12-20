@@ -17,6 +17,7 @@ const TicketComments = ({ ticketId }) => {
   const [attachmentFiles, setAttachmentFiles] = useState([]);
   const [clearAttachmentFilesTrigger, setClearAttachmentFilesTrigger] =
     useState(0);
+  const [deleteError, setDeleteError] = useState(null);
 
   // console.log("User:", user);
   // console.log("Is admin:", typeof isAdmin === "function" ? isAdmin() : isAdmin);
@@ -45,6 +46,7 @@ const TicketComments = ({ ticketId }) => {
 
   const handleDelete = (commentId) => {
     if (!commentId) return;
+    setDeleteError(null); // Clear any previous error
     setConfirmData({
       title: "Delete comment",
       message:
@@ -58,9 +60,12 @@ const TicketComments = ({ ticketId }) => {
     setConfirmOpen(false);
     if (!confirmData.id) return;
 
-    const success = await deleteComment(confirmData.id);
-    if (!success) {
-      console.error("Failed to delete comment", confirmData.id);
+    const result = await deleteComment(confirmData.id);
+    if (!result?.success) {
+      console.error("Failed to delete comment", confirmData.id, result?.error);
+      setDeleteError(result?.error || "Failed to delete comment. Please try again.");
+      // Auto-clear error after 5 seconds
+      setTimeout(() => setDeleteError(null), 5000);
     }
     setConfirmData({ title: "", message: "", id: null });
   };
@@ -167,6 +172,20 @@ const TicketComments = ({ ticketId }) => {
           </span>
         )}
       </div>
+
+      {/* Delete error message */}
+      {deleteError && (
+        <div className={styles.deleteErrorBanner}>
+          <span className={styles.deleteErrorText}>{deleteError}</span>
+          <button
+            className={styles.deleteErrorClose}
+            onClick={() => setDeleteError(null)}
+            aria-label="Dismiss error"
+          >
+            <i className="fas fa-times"></i>
+          </button>
+        </div>
+      )}
 
       <div className={styles.commentsList}>
         {loading ? (

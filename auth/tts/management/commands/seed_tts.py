@@ -64,54 +64,48 @@ class Command(BaseCommand):
 
         predefined_users = [
             {
-                'first_name': 'Marc Cedric',
-                'last_name': 'Mayuga',
-                'email': 'burnthisway22@gmail.com',
-                'username': 'marco',
+                'first_name': 'Lawrence',
+                'last_name': 'Afable',
+                'middle_initial': 'A.',
+                'email': 'tickettrackingsystem.mapactive+lawrenceafable@dev.mapactive.tech',
+                'username': 'lawrenceafable',
+                'phone_number': '+10000000001',
+                'role': 'Admin',
+                'is_staff': True,
+                'profile_picture': 'https://i.pinimg.com/736x/63/92/24/639224f094deff2ebf9cd261fba24004.jpg',
+            },
+            {
+                'first_name': 'Rivo',
+                'last_name': 'Vebayo',
+                'middle_initial': 'M.',
+                'email': 'tickettrackingsystem.mapactive+rivovebayo@dev.mapactive.tech',
+                'username': 'rivovebayo',
                 'phone_number': '+10000000002',
-                'role': 'Admin',
-                'is_staff': True,
-                'profile_picture': 'https://i.pinimg.com/736x/63/92/24/639224f094deff2ebf9cd261fba24004.jpg',
-            },
-            {
-                'first_name': 'John',
-                'last_name': 'Doe',
-                'email': 'burnthisway22+1@gmail.com',
-                'username': 'admin1',  # Updated username to avoid conflict
-                'phone_number': '+10000000011',  # Updated phone number to ensure uniqueness
-                'role': 'Admin',
-                'is_staff': True,
-                'profile_picture': 'https://i.pinimg.com/736x/63/92/24/639224f094deff2ebf9cd261fba24004.jpg',
-            },
-            {
-                'first_name': 'Jane',
-                'last_name': 'Smith',
-                'email': 'burnthisway22+2@gmail.com',
-                'username': 'assetmanager',
-                'phone_number': '+10000000012',  # Updated phone number to ensure uniqueness
                 'role': 'Asset Manager',
                 'is_staff': False,
                 'profile_picture': 'https://i.pinimg.com/736x/d6/4f/ad/d64fad416c52bee461fc185a0118aba8.jpg',
             },
             {
-                'first_name': 'Bob',
-                'last_name': 'Johnson',
-                'email': 'burnthisway22+3@gmail.com',
-                'username': 'budgetmanager',
-                'phone_number': '+10000000013',  # Updated phone number to ensure uniqueness
+                'first_name': 'Marc Cedric',
+                'last_name': 'Mayuga',
+                'middle_initial': 'C.',
+                'email': 'tickettrackingsystem.mapactive+marccedric@dev.mapactive.tech',
+                'username': 'marccedric',
+                'phone_number': '+10000000003',
+                'role': 'Admin',
+                'is_staff': True,
+                'profile_picture': 'https://i.pinimg.com/736x/63/92/24/639224f094deff2ebf9cd261fba24004.jpg',
+            },
+            {
+                'first_name': 'Sean Axzel',
+                'last_name': 'Valderama',
+                'middle_initial': 'Z.',
+                'email': 'tickettrackingsystem.mapactive+seanvalderama@dev.mapactive.tech',
+                'username': 'seanvalderama',
+                'phone_number': '+10000000004',
                 'role': 'Budget Manager',
                 'is_staff': False,
                 'profile_picture': 'https://i.pinimg.com/736x/55/29/f1/5529f10dd54c309092226f0f4b57a15d.jpg',
-            },
-            {
-                'first_name': 'Alice',
-                'last_name': 'Williams',
-                'email': 'burnthisway22+4@gmail.com',
-                'username': 'assetstaff',
-                'phone_number': '+10000000014',  # Updated phone number to ensure uniqueness
-                'role': 'Asset Manager',
-                'is_staff': False,
-                'profile_picture': 'https://i.pinimg.com/736x/15/78/a3/1578a3c53f3e4d29e9e1b79bd4d3f7c4.jpg',
             },
         ]
 
@@ -133,7 +127,7 @@ class Command(BaseCommand):
                 }
             )
             if created:
-                user.set_password('password123')  # Default password
+                user.set_password('Tr@ck1ng.Sys7em.2025!Secure')  # NIST-compliant secure password
                 user.save()
                 self.stdout.write(f'Created user: {user.email} ({role.name})')
             else:

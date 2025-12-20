@@ -260,8 +260,15 @@ class CommentViewSet(viewsets.ModelViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     def destroy(self, request, *args, **kwargs):
-        """Override destroy to send proper notifications"""
+        """Override destroy to send proper notifications and check permissions"""
         instance = self.get_object()
+        
+        logger.info(f"[destroy] Comment: {instance.comment_id}, user_id: {instance.user_id}")
+        logger.info(f"[destroy] Request user: {request.user}, user_id: {getattr(request.user, 'user_id', 'N/A')}")
+        
+        # Explicitly check object-level permissions for delete
+        # get_object() should have already done this, but let's be explicit
+        self.check_object_permissions(request, instance)
         
         # Send delete notification before deletion
         self.notification_service.send_comment_delete(instance)

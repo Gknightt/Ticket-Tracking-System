@@ -265,8 +265,7 @@ const Comment = ({
               className={styles.actionButton}
               onClick={() => {
                 if (onDelete) {
-                  const confirmed = window.confirm("Delete this comment?");
-                  if (confirmed) onDelete(comment.comment_id || comment.id);
+                  onDelete(comment.comment_id || comment.id);
                 }
               }}
             >

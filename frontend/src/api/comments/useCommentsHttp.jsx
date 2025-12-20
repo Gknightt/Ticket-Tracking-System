@@ -234,16 +234,41 @@ export const useCommentsHttp = (ticketId) => {
   const deleteComment = useCallback(async (commentId) => {
     if (!commentId) {
       setError("Unable to delete comment: Missing comment id");
-      return false;
+      return { success: false, error: "Missing comment id" };
     }
 
     try {
       await api.delete(`${MESSAGING_API}/comments/${commentId}/`);
-      return true;
+      setError(null);
+      return { success: true };
     } catch (err) {
       console.error("Error deleting comment:", err);
-      setError("Failed to delete comment. Please try again.");
-      return false;
+      
+      let errorMessage = "Failed to delete comment. Please try again.";
+      
+      if (err.response) {
+        const status = err.response.status;
+        const serverError = err.response.data?.error || err.response.data?.detail;
+        
+        switch (status) {
+          case 403:
+            errorMessage = serverError || "You don't have permission to delete this comment. Only comment authors or admins can delete comments.";
+            break;
+          case 404:
+            errorMessage = "Comment not found. It may have already been deleted.";
+            break;
+          case 401:
+            errorMessage = "Your session has expired. Please log in again.";
+            break;
+          default:
+            errorMessage = serverError || "Failed to delete comment. Please try again.";
+        }
+      } else if (err.request) {
+        errorMessage = "Unable to reach the server. Please check your connection.";
+      }
+      
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
     }
   }, []);
 

@@ -56,8 +56,21 @@ class CommentPermission(BasePermission):
         
         # For write operations on comments (update/delete)
         if hasattr(obj, 'user_id'):
+            # Get user IDs and normalize them for comparison
+            comment_user_id = str(obj.user_id).strip() if obj.user_id else None
+            request_user_id = str(getattr(request.user, 'user_id', '')).strip()
+            
+            # Also try 'id' attribute in case user_id is not set
+            if not request_user_id:
+                request_user_id = str(getattr(request.user, 'id', '')).strip()
+            
+            print(f"[CommentPermission] has_object_permission: Comparing user IDs:")
+            print(f"  - Comment user_id: '{comment_user_id}' (type: {type(obj.user_id)})")
+            print(f"  - Request user_id: '{request_user_id}'")
+            
             # Author can always modify their own comments
-            if obj.user_id == request.user.user_id:
+            is_author = comment_user_id == request_user_id if (comment_user_id and request_user_id) else False
+            if is_author:
                 return True
             
             # Admins can modify any comments
@@ -137,15 +150,35 @@ class CommentOwnerOrAdminPermission(BasePermission):
     def has_object_permission(self, request, view, obj):
         # Check if user is authenticated
         if not request.user or not getattr(request.user, 'is_authenticated', False):
+            print(f"[CommentOwnerOrAdminPermission] DENIED: User not authenticated")
             return False
         
+        # Get user IDs for comparison - normalize to string and strip whitespace
+        comment_user_id = str(obj.user_id).strip() if obj.user_id else None
+        request_user_id = str(getattr(request.user, 'user_id', '')).strip()
+        
+        # Also try 'id' attribute in case user_id is not set
+        if not request_user_id:
+            request_user_id = str(getattr(request.user, 'id', '')).strip()
+        
+        print(f"[CommentOwnerOrAdminPermission] Comparing user IDs:")
+        print(f"  - Comment user_id: '{comment_user_id}' (type: {type(obj.user_id)})")
+        print(f"  - Request user_id: '{request_user_id}' (type: {type(request_user_id)})")
+        
         # Check if user is the original author
-        is_author = str(obj.user_id) == str(getattr(request.user, 'user_id', None))
+        is_author = comment_user_id == request_user_id if (comment_user_id and request_user_id) else False
         
         # Check if user has admin role using the helper method
         is_admin = self._user_is_admin(request.user)
         
-        return is_author or is_admin
+        print(f"[CommentOwnerOrAdminPermission] is_author={is_author}, is_admin={is_admin}")
+        
+        if is_author or is_admin:
+            print(f"[CommentOwnerOrAdminPermission] GRANTED")
+            return True
+        
+        print(f"[CommentOwnerOrAdminPermission] DENIED: User {request_user_id} is not author {comment_user_id} and is not admin")
+        return False
     
     def _user_is_admin(self, user):
         """Check if user has admin privileges"""
