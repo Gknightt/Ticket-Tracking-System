@@ -163,9 +163,10 @@ export default function TicketDetail() {
 
     // Handle successful data
     if (stepInstance) {
+
       // Console log before normalizing the data
       // console.log('Raw stepInstance data before normalization:', JSON.stringify(stepInstance, null, 2));
-
+      
       // Map new ticket fields from the provided structure
       const t = stepInstance.task.ticket;
       dispatch({
@@ -222,34 +223,6 @@ export default function TicketDetail() {
   // console.log("ticket data", JSON.stringify(state.ticket, null, 2));
 
   const { tracker } = useWorkflowProgress(state.ticket?.ticket_id);
-
-  // Helper function to get button text based on ticket state
-  const getButtonText = (buttonType) => {
-    const ticket = state.ticket;
-
-    if (buttonType === "action") {
-      if (ticket?.is_escalated) return "Can't Make Action After Escalation";
-      if (ticket?.is_transferred) return "Can't Make Action After Transfer";
-      if (ticket?.has_acted) return "Action Already Taken";
-      return "Make an Action";
-    }
-
-    if (buttonType === "escalate") {
-      if (ticket?.is_escalated) return "Already Escalated";
-      if (ticket?.has_acted) return "Can't Escalate After Action";
-      if (ticket?.is_transferred) return "Can't Escalate After Transfer";
-      return "Escalate";
-    }
-
-    if (buttonType === "transfer") {
-      if (ticket?.is_transferred) return "Already Transferred";
-      if (ticket?.is_escalated) return "Can't Transfer After Escalation";
-      if (ticket?.has_acted) return "Can't Transfer After Action";
-      return "Transfer";
-    }
-
-    return "";
-  };
 
   if (loading) {
     return (
@@ -354,16 +327,14 @@ export default function TicketDetail() {
                   Opened On:{" "}
                   <span>
                     {formattedDates?.createdAt.date}
-                    {formattedDates?.createdAt.time &&
-                      ` at ${formattedDates?.createdAt.time}`}
+                    {formattedDates?.createdAt.time && ` at ${formattedDates?.createdAt.time}`}
                   </span>
                 </div>
                 <div className={styles.tdpMeta}>
                   Expected Resolution:{" "}
                   <span>
                     {formattedDates?.targetResolution.date}
-                    {formattedDates?.targetResolution.time &&
-                      ` at ${formattedDates?.targetResolution.time}`}
+                    {formattedDates?.targetResolution.time && ` at ${formattedDates?.targetResolution.time}`}
                   </span>
                 </div>
               </div>
@@ -476,44 +447,45 @@ export default function TicketDetail() {
                 {/* Make an Action */}
                 <button
                   className={
-                    state.ticket?.has_acted ||
-                    state.ticket?.is_escalated ||
-                    state.ticket?.is_transferred
+                    state.ticket?.has_acted
                       ? styles.ticketActionButtonDisabled
                       : styles.ticketActionButton
                   }
                   onClick={() => setOpenTicketAction(true)}
+                  // disabled={state.ticket?.has_acted}
                   disabled={
-                    state.ticket?.has_acted ||
-                    state.ticket?.is_escalated ||
-                    state.ticket?.is_transferred
+                    state.ticket?.has_acted || state.ticket?.is_escalated
                   }
                 >
                   <span className={styles.iconTextWrapper}>
                     <i className="fa fa-check-circle"></i>
-                    {getButtonText("action")}
+                    {state.ticket?.has_acted
+                      ? "Cannot Make Action After Escalation"
+                      : state.ticket?.has_acted
+                      ? "Action Already Taken"
+                      : "Make an Action"}
                   </span>
                 </button>
 
                 {/* Escalate */}
                 <button
                   className={
-                    state.ticket?.has_acted ||
-                    state.ticket?.is_escalated ||
-                    state.ticket?.is_transferred
+                    state.ticket?.has_acted || state.ticket?.is_escalated
                       ? styles.escalateButtonDisabled
                       : styles.escalateButton
                   }
                   onClick={() => setOpenEscalateModal(true)}
                   disabled={
-                    state.ticket?.has_acted ||
-                    state.ticket?.is_escalated ||
-                    state.ticket?.is_transferred
+                    state.ticket?.has_acted || state.ticket?.is_escalated
                   }
                 >
                   <span className={styles.iconTextWrapper}>
                     <i className="fa fa-arrow-up"></i>
-                    {getButtonText("escalate")}
+                    {state.ticket?.is_escalated
+                      ? "Already Escalated"
+                      : state.ticket?.has_acted
+                      ? "Can't Escalate After Action"
+                      : "Escalate"}
                   </span>
                 </button>
 
@@ -521,22 +493,22 @@ export default function TicketDetail() {
                 {isAdmin() && (
                   <button
                     className={
-                      state.ticket?.has_acted ||
-                      state.ticket?.is_escalated ||
-                      state.ticket?.is_transferred
+                      state.ticket?.has_acted || state.ticket?.is_transferred
                         ? styles.transferButtonDisabled
                         : styles.transferButton
                     }
                     onClick={() => setOpenTransferModal(true)}
                     disabled={
-                      state.ticket?.has_acted ||
-                      state.ticket?.is_escalated ||
-                      state.ticket?.is_transferred
+                      state.ticket?.has_acted || state.ticket?.is_escalated
                     }
                   >
                     <span className={styles.iconTextWrapper}>
                       <i className="fa fa-exchange"></i>
-                      {getButtonText("transfer")}
+                      {state.ticket?.is_escalated
+                        ? "Cannot Transfer After Escalation"
+                        : state.ticket?.has_acted
+                        ? "Cannot Transfer After Action"
+                        : "Transfer"}
                     </span>
                   </button>
                 )}
